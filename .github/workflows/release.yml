@@ -40,16 +40,41 @@ jobs:
               -o "dist/vat_${os}_${arch}${ext}" ./cmd/vat
           done
 
+      # Completions are generated once with a natively runnable build. The
+      # cross-compiled binaries cannot execute on the runner, so asking each one
+      # for its own completion script would silently produce empty files.
+      - name: Generate shell completions
+        run: |
+          mkdir -p completions
+          go run ./cmd/vat completion bash > completions/vat.bash
+          go run ./cmd/vat completion zsh  > completions/_vat
+          go run ./cmd/vat completion fish > completions/vat.fish
+
+      # Each archive unpacks to a directory holding a binary called `vat`, not
+      # `vat_linux_amd64`. Someone who downloads an archive should be able to
+      # run what comes out of it without renaming it first.
       - name: Package and checksum
         working-directory: dist
         run: |
           for file in vat_*; do
-            case "$file" in
-              *.exe) zip "${file%.exe}.zip" "$file" && rm "$file" ;;
-              *) tar -czf "${file}.tar.gz" "$file" && rm "$file" ;;
+            [ -f "$file" ] || continue
+            name="${file%.exe}"
+            binary="vat"
+            [ "$file" != "$name" ] && binary="vat.exe"
+            # Staged under a separate root: for the non-Windows targets $name
+            # is also the binary's own filename, so building the layout in
+            # place would try to create a directory over the file.
+            mkdir -p "stage/$name"
+            mv "$file" "stage/$name/$binary"
+            cp ../LICENSE ../README.md "stage/$name/"
+            cp -r ../completions "stage/$name/completions"
+            case "$binary" in
+              vat.exe) (cd stage && zip -qr "../${name}.zip" "$name") ;;
+              *) tar -czf "${name}.tar.gz" -C stage "$name" ;;
             esac
+            rm -rf stage
           done
-          sha256sum * > checksums.txt
+          sha256sum *.tar.gz *.zip > checksums.txt
           cat checksums.txt
 
       - uses: softprops/action-gh-release@v2
