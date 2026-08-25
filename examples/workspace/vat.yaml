@@ -1,0 +1,82 @@
+# vat workspace manifest — https://github.com/takealook97/vat
+# The single declaration of which repositories this workspace governs.
+version: 1
+
+workspace:
+  name: acme
+  default_branch: main
+  remote_template: https://github.com/acme/{name}.git
+  description: Ordering, fulfilment, and the console that operates them.
+
+policy:
+  sync:
+    fast_forward_only: true
+    allow_autostash: false
+    allow_auto_push: false
+    parallelism: 8
+
+  trust:
+    canonical: [brain, credential]
+    semi_trusted: [workspace-repos]
+    untrusted: [search-results, embeddings, web, issue-comments, model-output]
+
+  brain:
+    repo: brain
+    stale_after_days: 90
+    review_sla_days: 30
+    require_promotion_gate: true
+
+  changeset:
+    max_open_days: 14
+    require_rollback_point: true
+
+  gates:
+    deploy: manual
+    external_write: manual
+    brain_promote: manual
+
+repos:
+  - name: payments
+    origin: https://github.com/acme/payments.git
+    role: product
+    group: backend
+    required: true
+    access: private
+    description: Order state and the public API contract.
+    checks:
+      - make check
+
+  - name: console
+    origin: https://github.com/acme/console.git
+    role: product
+    group: frontend
+    required: true
+    access: private
+    description: The operator console. Consumes the order API.
+    checks:
+      - pnpm test
+      - pnpm typecheck
+
+  - name: brain
+    origin: https://github.com/acme/brain.git
+    role: brain
+    required: true
+    access: private
+    description: Reviewed organisational facts.
+
+  - name: credential
+    origin: git@github.com:acme/credential.git
+    role: credential
+    required: false
+    access: private
+    description: Encrypted environment and keys. Ciphertext only.
+
+  # A repository on `master` declares it, or every update skips it silently
+  # and reports "on another branch" — a note nobody reads.
+  - name: legacy-api
+    origin: https://github.com/acme/legacy-api.git
+    role: product
+    group: backend
+    default_branch: master
+    archived: true
+    description: Superseded by payments. Kept for the record.

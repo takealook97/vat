@@ -1,0 +1,46 @@
+# vat changeset — the revision bundle, the evidence, and the way back.
+# Written by `vat changeset`. Safe to edit by hand; `vat lint` checks it.
+id: CS-0001
+objective: Move order cancellation to v2
+status: closed
+opened_at: 2026-08-11
+closed_at: 2026-08-14
+
+non_goals:
+  - changing refund timing
+  - migrating historical cancellations
+
+contracts:
+  - POST /orders/{id}/cancel response schema
+
+integration_acceptance: cancel-then-refund passes end to end against staging
+decisions: [D-0001]
+approved_by: alex
+
+repositories:
+  # Enrolment order matters: the contract owner first, so the generated return
+  # plan undoes it last and no window exists where the consumer expects an
+  # interface that is already gone.
+  - name: payments
+    rollback_point: 3f9a1c2e8b7412d05e6740a1bc9382ff5e01d4a7
+    revision: a71c93d0e5f2189b4c0d76ae3f118825bb60c94e
+    branch: main
+    checks:
+      - command: make check
+        status: pass
+        ran_at: 2026-08-14T09:12:44Z
+        revision: a71c93d0e5f2189b4c0d76ae3f118825bb60c94e
+
+  - name: console
+    rollback_point: 8b2e0d19c4a0771f36b5ce8204d9a7136f0e5b82
+    revision: 5c1f80ab3d9e6142870bd35fa9c1e07b4d28619f
+    branch: main
+    checks:
+      - command: pnpm test
+        status: pass
+        ran_at: 2026-08-14T09:13:22Z
+        revision: 5c1f80ab3d9e6142870bd35fa9c1e07b4d28619f
+      - command: pnpm typecheck
+        status: pass
+        ran_at: 2026-08-14T09:13:58Z
+        revision: 5c1f80ab3d9e6142870bd35fa9c1e07b4d28619f
