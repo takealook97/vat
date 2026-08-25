@@ -390,8 +390,9 @@ func permute(set *flag.FlagSet, args []string) []string {
 			continue
 		}
 		name := strings.TrimLeft(arg, "-")
-		if key, _, hasValue := strings.Cut(name, "="); hasValue {
-			_ = key
+		if _, _, hasValue := strings.Cut(name, "="); hasValue {
+			// "--flag=value" is self-contained; it never consumes the next
+			// argument.
 			flags = append(flags, arg)
 			continue
 		}

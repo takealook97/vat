@@ -437,7 +437,10 @@ func describeRepo(ctx context.Context, root, name string) (manifest.Repo, bool) 
 	if err != nil {
 		origin = "local:" + name
 	}
-	branch, _ := gitx.CurrentBranch(ctx, dir)
+	// A branch that cannot be read leaves default_branch unset, and an
+	// undeclared default is what makes sync skip a repository forever with a
+	// note nobody reads. `vat lint` reports that case as repo/default-branch-missing.
+	branch, branchErr := gitx.CurrentBranch(ctx, dir)
 	repo := manifest.Repo{
 		Name:     name,
 		Origin:   origin,
@@ -446,7 +449,7 @@ func describeRepo(ctx context.Context, root, name string) (manifest.Repo, bool) 
 	}
 	// Recording the branch a repository is actually on is what stops sync from
 	// skipping it forever with a "not on main" note nobody reads.
-	if branch != "" && branch != "main" {
+	if branchErr == nil && branch != "" && branch != "main" {
 		repo.DefaultBranch = branch
 	}
 	if brain.IsBrain(dir) {

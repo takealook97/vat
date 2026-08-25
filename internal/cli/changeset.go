@@ -224,7 +224,17 @@ func runChangesetVerify(ctx context.Context, env *Env, args []string) error {
 		if err != nil {
 			return err
 		}
-		if dirty, _ := gitx.IsDirty(ctx, dir); dirty {
+		dirty, err := gitx.IsDirty(ctx, dir)
+		if err != nil {
+			// Discarding this would record checks against a revision while
+			// silently treating an unreadable repository as clean, which is
+			// the one thing a verification record must never do.
+			env.Printer.Status(ui.LevelFail, participant.Name,
+				"git cannot read the working tree state; not verified")
+			failures++
+			continue
+		}
+		if dirty {
 			// Checks that pass over uncommitted changes prove nothing about
 			// the revision they would be recorded against.
 			env.Printer.Status(ui.LevelWarn, participant.Name,
@@ -232,7 +242,10 @@ func runChangesetVerify(ctx context.Context, env *Env, args []string) error {
 		}
 		updated := participant
 		updated.Revision = revision
-		updated.Branch, _ = gitx.CurrentBranch(ctx, dir)
+		if updated.Branch, err = gitx.CurrentBranch(ctx, dir); err != nil {
+			env.Printer.Status(ui.LevelWarn, participant.Name,
+				"branch could not be read; recording the revision alone")
+		}
 		updated.Checks = nil
 
 		if len(repo.Checks) == 0 {
