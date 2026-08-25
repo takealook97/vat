@@ -40,5 +40,9 @@ The first release.
 - `vat fit` — a per-layer break-even advisor that recommends adopting nothing
   until the problem each layer solves is real.
 - `vat completion` for bash, zsh, and fish.
-- JSON output on every reporting command, and exit codes that distinguish
+- JSON output on every reporting command, with lists always rendered as arrays
+  and field names matching the manifest, and exit codes that distinguish
   "found problems" from "called wrong".
+- Installation through Homebrew (`brew install takealook97/tap/vat`), `go
+  install`, or a release archive that unpacks to a runnable binary with the
+  licence and shell completions beside it.

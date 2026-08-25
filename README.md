@@ -61,13 +61,17 @@ FAIL  lint                      2 errors, 2 warnings across 21 rules
 ## Install
 
 ```bash
+# Homebrew — macOS and Linux
+brew install takealook97/tap/vat
+
 # Go 1.25+
 go install github.com/takealook97/vat/cmd/vat@latest
 ```
 
-Or download a binary for macOS, Linux, or Windows from
-[Releases](https://github.com/takealook97/vat/releases). Every archive ships
-with a SHA-256 checksum.
+Or download an archive for macOS, Linux, or Windows from
+[Releases](https://github.com/takealook97/vat/releases). Each one unpacks to a
+`vat` binary with the licence and shell completions beside it, and every release
+publishes SHA-256 checksums.
 
 One binary. One dependency (`gopkg.in/yaml.v3`). No runtime, no daemon, no
 config server. `vat` shells out to your `git`, so your credential helpers,
