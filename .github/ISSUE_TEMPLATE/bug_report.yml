@@ -1,0 +1,51 @@
+name: Bug report
+description: Something behaved differently from how it is documented.
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Please include the exact command and the exact output. `vat` is a tool
+        about evidence; a report without it is a guess.
+
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened
+      description: The command you ran and what it printed.
+      render: console
+      placeholder: |
+        $ vat sync
+        ...
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: What you expected instead
+    validations:
+      required: true
+
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: Output of `vat version`.
+    validations:
+      required: true
+
+  - type: input
+    id: platform
+    attributes:
+      label: Platform and git version
+      placeholder: macOS 15.2 arm64, git 2.48.1
+    validations:
+      required: true
+
+  - type: textarea
+    id: manifest
+    attributes:
+      label: Relevant part of vat.yaml
+      description: Redact any private URL. Only the shape matters.
+      render: yaml
