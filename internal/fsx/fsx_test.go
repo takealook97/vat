@@ -3,6 +3,7 @@ package fsx_test
 import (
 	"os"
 	"path/filepath"
+	"runtime"
 	"testing"
 
 	"github.com/takealook97/vat/internal/fsx"
@@ -160,6 +161,13 @@ func TestEnsureDirIsIdempotent(t *testing.T) {
 }
 
 func TestWriteFileAtomicAppliesTheRequestedMode(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		// Windows has no POSIX permission bits: os.Chmod there only toggles the
+		// read-only attribute, so a mode always reads back as 0666. The
+		// guarantee this test asserts genuinely does not hold on Windows, and
+		// docs/SECURITY_MODEL.md says so rather than pretending otherwise.
+		t.Skip("file modes are not POSIX on Windows")
+	}
 	// Arrange: a credential-adjacent file must not land world-readable because
 	// the umask happened to allow it.
 	path := filepath.Join(t.TempDir(), "restricted")

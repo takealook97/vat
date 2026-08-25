@@ -145,6 +145,18 @@ one. A tool that governs a workspace should not widen its attack surface.
 
 ---
 
+## Platform limits
+
+**File permissions on Windows.** `vat` writes files with an explicit mode, and
+on Unix that mode holds. Windows has no POSIX permission bits — Go's `os.Chmod`
+there only toggles the read-only attribute — so a file `vat` intends to create
+as `0600` is created with whatever the directory's ACL grants.
+
+Nothing `vat` writes contains a secret, so this is not a disclosure path in
+itself. It does mean that on Windows the mode reported by `vat doctor` for a
+credential file describes an attribute, not an access control, and should not be
+read as one. Use NTFS permissions on the credential repository instead.
+
 ## A threat this model does not cover
 
 **A compromised developer machine.** `vat` runs with your permissions and your
