@@ -40,6 +40,11 @@ The first release.
 - `vat fit` — a per-layer break-even advisor that recommends adopting nothing
   until the problem each layer solves is real.
 - `vat completion` for bash, zsh, and fish.
+- `vat exec` executes your command directly rather than re-parsing it through a
+  shell, so quoting survives; manifest checks, which are shell fragments by
+  contract, still run through one.
+- 22 lint rules, including `repo/remote-missing` for a repository that can never
+  be fetched or pushed.
 - JSON output on every reporting command, with lists always rendered as arrays
   and field names matching the manifest, and exit codes that distinguish
   "found problems" from "called wrong".

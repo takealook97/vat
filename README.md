@@ -321,8 +321,8 @@ never declared one.
 | `vat sync` | fetch, then fast-forward only what is safe |
 | `vat doctor` | judge the environment; never repairs it |
 | `vat lint` | enforce the rules mechanically; `--fix` regenerates |
-| `vat exec` | run a command across the workspace, in parallel |
-| `vat repo` | `add` `new` `adopt` `remove` `archive` `rename` `list` |
+| `vat exec` | run a command across the workspace, in parallel, with your quoting intact |
+| `vat repo` | `add` `new` `adopt` `remove` `archive` `unarchive` `rename` `list` |
 | `vat harness` | `render` `check` `roles` `role new` |
 | `vat brain` | `init` `new` `build` `check` `query` `review` `sweep` `promote` `supersede` `adopt` |
 | `vat changeset` | `new` `add` `verify` `show` `list` `close` `abandon` `undo-plan` |
@@ -332,8 +332,9 @@ never declared one.
 | `vat completion` | shell completion for bash, zsh, and fish |
 | `vat version` | the build identity, including the commit it came from |
 
-Everything that prints a table also prints `--json`. Exit codes are part of the
-interface: `0` clean, `1` found problems, `2` called wrong.
+Everything that prints a table also prints `--json`, with lists always rendered
+as arrays. Exit codes are part of the interface: `0` clean, `1` found errors,
+`2` called wrong. Warnings alone exit `0`.
 
 ---
 

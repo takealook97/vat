@@ -40,9 +40,15 @@ OK    CS-0001                   every repository verified
 ```
 
 Each repository's canonical checks from `vat.yaml` run, and each outcome is
-recorded against the exact revision it ran on. A dirty working tree is reported,
-because checks that pass over uncommitted changes prove nothing about the
-revision they would be filed under.
+recorded against the exact revision it ran on.
+
+A dirty working tree **refuses to verify**. Checks that pass over uncommitted
+changes prove nothing about the revision they would be filed under, and a record
+that looks verified either way is worse than no record. Commit or stash first.
+
+A changeset that is already closed also refuses: re-verifying would rewrite its
+status while its closing evidence stayed in the file, leaving a record claiming
+both at once.
 
 ```console
 $ vat changeset close CS-0001 --acceptance "cancel-then-refund passes end to end"

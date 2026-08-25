@@ -105,6 +105,10 @@ refs: [O-0003, D-0031]
 | `historical` | no | no |
 | `intent` | no | no |
 
+These three are the whole set; `vat brain new` rejects anything else rather than
+writing an unrecognised kind into a record where no check would ever look at it
+again.
+
 A statement about what happened does not decay. A statement about what is true
 right now does.
 
@@ -233,6 +237,9 @@ $ vat brain supersede D-0031 D-0042
 OK    D-0031    superseded by D-0042
 OK    D-0042    active, supersedes D-0031
 ```
+
+A record cannot supersede itself: that writes a chain pointing nowhere, and no
+`vat` command can repair it afterwards.
 
 The original is never edited to say something new — that would destroy the only
 account of why it once made sense. Both files are updated so the chain reads

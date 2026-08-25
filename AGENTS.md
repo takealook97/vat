@@ -51,6 +51,7 @@ internal/runner         command execution across repositories
 internal/frontmatter    YAML headers in Markdown
 internal/fsx            atomic writes
 internal/ui             terminal output
+internal/version        build metadata
 ```
 
 Dependencies flow one way: `cli` → everything else. `internal/brain` imports

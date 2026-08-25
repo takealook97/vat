@@ -117,6 +117,10 @@ asked to change, however good it otherwise is.
 | `internal/metrics` | measurement and the local ledger |
 | `internal/fit` | the adoption break-even advisor |
 | `internal/runner` | command execution across repositories |
+| `internal/frontmatter` | YAML headers in Markdown |
+| `internal/fsx` | atomic writes |
+| `internal/ui` | terminal output |
+| `internal/version` | build metadata |
 
 `internal/brain` deliberately imports neither `manifest` nor `gitx`. A workspace
 that never adopts the knowledge layer pays nothing for it, and the seam stays

@@ -7,7 +7,7 @@ Every command that prints a table also accepts `--json`.
 | Code | Meaning |
 | --- | --- |
 | `0` | ran and found nothing wrong |
-| `1` | ran correctly and found problems |
+| `1` | ran correctly and found problems (errors; warnings alone exit 0) |
 | `2` | the invocation itself was wrong |
 
 The distinction matters in CI: `1` means act on the findings, `2` means fix the
@@ -86,6 +86,7 @@ Fetches, then fast-forwards only what can be advanced without losing anything.
 | `DETACHED` | HEAD is not on a branch | |
 | `AHEAD` | local commits not pushed | |
 | `ARCHIVED` | excluded from updates | |
+| `PLANNED` | what `--dry-run` reports instead of acting | |
 | `MISSING` | absent and not cloned | yes |
 | `NOT_GIT` | directory exists but holds no repository | yes |
 | `REMOTE_MISMATCH` | origin points somewhere the manifest does not name | yes |
@@ -116,7 +117,7 @@ secret value.
 | credentials | files that look like plaintext secrets, encrypted count, age since last change |
 | brain | record counts, review queue, generated-file freshness |
 | changesets | open and overdue work |
-| network | `--network` only: platform auth, read-only reachability |
+| network | `--network` only: whether the GitHub CLI is authenticated, and the platform vat is running on |
 
 `--secret-max-age` defaults to 180 days; `0` disables the check.
 
@@ -137,6 +138,7 @@ The rules, and what each one prevents:
 | `repo/missing` | error / warn | a required repository never cloned |
 | `repo/not-a-repository` | error | a directory shadowing a governed repository |
 | `repo/remote-mismatch` | error | fetching from somewhere the manifest does not name |
+| `repo/remote-missing` | warn | a repository that can never be fetched or pushed |
 | `repo/default-branch-missing` | warn | a `develop` repository skipped by every update, silently |
 | `repo/checks-missing` | warn | a changeset with nothing to verify |
 | `harness/workspace-missing` | error | a workspace with no agent contract |
@@ -172,9 +174,21 @@ vat exec [--group <g>] [--role <r>] [--only <names>] [--checks]
 Runs a command in every selected repository, in parallel, with per-repository
 results. A failure in one is never hidden by success in another.
 
+**Your command is executed directly, not re-parsed by a shell.** Quoting
+survives, so `-- git commit -m "wip; cleanup"` commits with that message rather
+than also running a second command. Ask for a shell explicitly when you want
+one: `-- sh -c 'for f in *.go; do echo $f; done'`.
+
 `--checks` runs each repository's own canonical checks from the manifest instead
 of a command you supply — how to ask "is everything still green?" without
-knowing what each repository uses to answer that.
+knowing what each repository uses to answer that. Those are shell fragments by
+contract and do run through a shell.
+
+`--keep-going=false` abandons the remaining repositories after the first
+failure; they are reported as skipped, which is neither a pass nor a failure.
+
+A `--group` or `--role` that matches no repository is an error, not an empty
+run — in CI an empty run is a green build that tested nothing.
 
 ---
 
@@ -183,9 +197,14 @@ knowing what each repository uses to answer that.
 ```
 vat repo list    [--group <g>] [--role <r>] [--archived]
 vat repo add     <name> --origin <url> [--role <r>] [--group <g>] [--branch <b>]
-                        [--checks <cmds>] [--access <a>] [--path <dir>] [--no-clone]
-vat repo new     <name> [--role <r>] [--private] [--remote <url>] [--no-remote]
-vat repo adopt   <directory> [--role <r>] [--group <g>]
+                        [--checks <cmds>] [--access <a>] [--description <text>]
+                        [--required=false] [--path <dir>] [--no-clone]
+vat repo new     <name> [--role <r>] [--group <g>] [--branch <b>] [--checks <cmds>]
+                        [--access <a>] [--description <text>] [--private]
+                        [--remote <url>] [--no-remote]
+vat repo adopt   <directory> [--role <r>] [--group <g>] [--branch <b>]
+                        [--checks <cmds>] [--access <a>] [--description <text>]
+                        [--required=false]
 vat repo remove  <name> [--delete] [--force]
 vat repo archive <name>
 vat repo unarchive <name>
@@ -194,6 +213,9 @@ vat repo rename  <old> <new> [--keep-path]
 
 Every mutation moves the manifest, the `.gitignore` exclusion, and the generated
 harness together, because changing one without the others is the failure mode.
+
+Every flag is validated before anything is created, so a typo cannot leave a
+directory behind that is in neither the manifest nor `.gitignore`.
 
 `new` initialises the repository locally with a starter harness, commits it,
 creates the remote through the GitHub CLI unless `--no-remote`, and enrols it.
@@ -288,7 +310,9 @@ vat changeset undo-plan <id>
 because after it lands that can no longer be observed.
 
 `verify` runs each repository's canonical checks and records the outcome against
-the exact revision it ran on.
+the exact revision it ran on. It refuses on a dirty working tree, because
+results recorded against a revision that does not describe what was tested are
+worse than none, and refuses on a changeset that is already closed.
 
 `close` requires `--acceptance`, and it must describe something end to end.
 
@@ -312,6 +336,9 @@ vat evidence check [<id>]
 
 The contract a worker is given before it starts. `--markdown` renders the
 briefing to paste into a session.
+
+`new` refuses to overwrite an existing packet: silently replacing the acceptance
+criterion defeats the point of writing one down.
 
 Release authority is false unless explicitly granted.
 
@@ -338,6 +365,19 @@ vat fit [--repos n] [--contracts n] [--people n] [--agent-sessions n]
 Per-layer break-even verdict. Numbers are read from the workspace where they can
 be. `--contracts` is the important one: how many interfaces cross a repository
 boundary is what makes a multi-repo layout expensive, not repository count.
+
+---
+
+## vat version
+
+```
+vat version [--short]
+```
+
+The build identity: the semantic version, the commit it came from, when it was
+built, and the toolchain. A build with no linker stamps — one produced by
+`go install` — falls back to the module version and VCS metadata the Go
+toolchain records.
 
 ---
 
