@@ -562,3 +562,73 @@ func TestCompletionRendersForEverySupportedShell(t *testing.T) {
 		}
 	}
 }
+
+func TestEveryReportingCommandEmitsAnArrayNotNull(t *testing.T) {
+	// Arrange: --json is a documented interface. A consumer iterating the
+	// result should never have to special-case a null where an empty list is
+	// what actually happened.
+	h := newFixture(t, "payments")
+	h.mustRun("init", "--name", "acme", "--adopt")
+
+	commands := [][]string{
+		{"status"},
+		{"repo", "list"},
+		{"repo", "list", "--group", "nosuchgroup"},
+		{"lint", "--offline"},
+		{"changeset", "list"},
+		{"evidence", "list"},
+		{"harness", "roles"},
+		{"harness", "check"},
+	}
+
+	for _, args := range commands {
+		// Act
+		var out, errOut bytes.Buffer
+		env := &Env{
+			Printer: ui.NewWith(&out, &errOut, false),
+			Now:     testNow, Cwd: h.root, Root: h.root, JSON: true, Yes: true,
+		}
+		dispatch(context.Background(), env, Root(), args, nil)
+
+		// Assert
+		payload := strings.TrimSpace(out.String())
+		if payload == "" {
+			t.Errorf("`vat %s --json` printed nothing", strings.Join(args, " "))
+			continue
+		}
+		if payload == "null" || strings.Contains(payload, ": null") {
+			t.Errorf("`vat %s --json` emitted null where an empty list belongs:\n%s",
+				strings.Join(args, " "), payload)
+		}
+		var decoded any
+		if err := json.Unmarshal([]byte(payload), &decoded); err != nil {
+			t.Errorf("`vat %s --json` is not valid JSON: %v\n%s",
+				strings.Join(args, " "), err, payload)
+		}
+	}
+}
+
+func TestRepoListJSONUsesTheDocumentedFieldNames(t *testing.T) {
+	// Arrange: the manifest is written in snake_case, and its JSON projection
+	// has to match — otherwise the same field has two names depending on which
+	// way you read it.
+	h := newFixture(t, "payments")
+	h.mustRun("init", "--name", "acme", "--adopt")
+
+	// Act
+	var repos []map[string]any
+	h.runJSON(&repos, "repo", "list")
+
+	// Assert
+	if len(repos) != 1 {
+		t.Fatalf("repository count = %d, want 1", len(repos))
+	}
+	for _, key := range []string{"name", "origin", "role"} {
+		if _, found := repos[0][key]; !found {
+			t.Errorf("the JSON payload has no %q field: %v", key, repos[0])
+		}
+	}
+	if _, found := repos[0]["Name"]; found {
+		t.Error("the payload exposes Go field names rather than the documented ones")
+	}
+}

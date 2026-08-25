@@ -90,7 +90,9 @@ func Run(ctx context.Context, ws *workspace.Workspace, opts Options) (Report, er
 	if now.IsZero() {
 		now = time.Now()
 	}
-	var report Report
+	// An empty slice rather than nil: --json consumers iterate the result and
+	// should not have to special-case a null.
+	report := Report{Findings: []Finding{}}
 	add := func(findings ...Finding) {
 		for _, finding := range findings {
 			if !selected(finding.Rule, opts.Only) {

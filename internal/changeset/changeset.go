@@ -132,12 +132,12 @@ func LoadAll(root string) ([]Changeset, error) {
 	dir := filepath.Join(root, Dir)
 	entries, err := os.ReadDir(dir)
 	if os.IsNotExist(err) {
-		return nil, nil
+		return []Changeset{}, nil
 	}
 	if err != nil {
 		return nil, fmt.Errorf("read %s: %w", dir, err)
 	}
-	var sets []Changeset
+	sets := []Changeset{}
 	for _, entry := range entries {
 		if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".yaml") {
 			continue

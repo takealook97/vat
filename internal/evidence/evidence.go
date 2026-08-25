@@ -100,12 +100,12 @@ func Load(root, id string) (Packet, error) {
 func List(root string) ([]Packet, error) {
 	entries, err := os.ReadDir(filepath.Join(root, Dir))
 	if os.IsNotExist(err) {
-		return nil, nil
+		return []Packet{}, nil
 	}
 	if err != nil {
 		return nil, fmt.Errorf("read %s: %w", Dir, err)
 	}
-	var packets []Packet
+	packets := []Packet{}
 	for _, entry := range entries {
 		if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".yaml") {
 			continue

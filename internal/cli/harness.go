@@ -2,6 +2,7 @@ package cli
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"path/filepath"
 	"strings"
@@ -87,11 +88,22 @@ func harnessCheckCommand() *Command {
 			if err != nil {
 				return err
 			}
-			if len(report.Findings) == 0 {
+			switch {
+			case env.JSON:
+				encoder := json.NewEncoder(env.Printer.Out())
+				encoder.SetIndent("", "  ")
+				if err := encoder.Encode(report); err != nil {
+					return err
+				}
+			case len(report.Findings) == 0:
 				env.Printer.Status(ui.LevelOK, "harness", "every contract matches the manifest")
 				return nil
+			default:
+				renderLintReport(env, report)
 			}
-			renderLintReport(env, report)
+			if len(report.Findings) == 0 {
+				return nil
+			}
 			return findingsErrorf("Run `vat harness render` to bring them back in line.")
 		},
 	}
@@ -115,6 +127,18 @@ func harnessRolesCommand() *Command {
 			if err != nil {
 				return err
 			}
+			if env.JSON {
+				// Reported as data rather than prose, like every other command
+				// that prints a table. An empty workspace yields [], not null,
+				// so a consumer can iterate without a nil check.
+				listed := make([]roleSummary, 0, len(roles))
+				for _, role := range roles {
+					listed = append(listed, summariseRole(role))
+				}
+				encoder := json.NewEncoder(env.Printer.Out())
+				encoder.SetIndent("", "  ")
+				return encoder.Encode(listed)
+			}
 			if len(roles) == 0 {
 				env.Printer.Println("No roles defined.")
 				env.Printer.Hint("Create one with `vat harness role new <name>`.")
@@ -122,21 +146,47 @@ func harnessRolesCommand() *Command {
 			}
 			rows := make([][]string, 0, len(roles))
 			for _, role := range roles {
+				summary := summariseRole(role)
 				writes := "read-only"
-				if len(role.Writes) > 0 {
-					writes = strings.Join(role.Writes, ",")
-				}
-				adapters := make([]string, 0, 2)
-				for _, adapter := range harness.RenderAdapters(role) {
-					adapters = append(adapters, adapter.Runtime)
+				if len(summary.Writes) > 0 {
+					writes = strings.Join(summary.Writes, ",")
 				}
 				rows = append(rows, []string{
-					role.Name, role.Model, writes, strings.Join(adapters, ","), role.Description,
+					summary.Name, summary.Model, writes,
+					strings.Join(summary.Runtimes, ","), summary.Description,
 				})
 			}
 			env.Printer.Table([]string{"ROLE", "MODEL", "WRITES", "RUNTIMES", "DESCRIPTION"}, rows)
 			return nil
 		},
+	}
+}
+
+// roleSummary is the shape `vat harness roles` reports, in either form.
+type roleSummary struct {
+	Name        string   `json:"name"`
+	Title       string   `json:"title,omitempty"`
+	Description string   `json:"description,omitempty"`
+	Model       string   `json:"model,omitempty"`
+	Writes      []string `json:"writes"`
+	Reads       []string `json:"reads,omitempty"`
+	Runtimes    []string `json:"runtimes"`
+	Path        string   `json:"path,omitempty"`
+}
+
+func summariseRole(role harness.Role) roleSummary {
+	runtimes := make([]string, 0, 2)
+	for _, adapter := range harness.RenderAdapters(role) {
+		runtimes = append(runtimes, adapter.Runtime)
+	}
+	writes := role.Writes
+	if writes == nil {
+		writes = []string{}
+	}
+	return roleSummary{
+		Name: role.Name, Title: role.Title, Description: role.Description,
+		Model: role.Model, Writes: writes, Reads: role.Reads,
+		Runtimes: runtimes, Path: role.Path,
 	}
 }
 

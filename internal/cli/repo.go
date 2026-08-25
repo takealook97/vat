@@ -69,6 +69,11 @@ func repoListCommand() *Command {
 				return usageErrorf("%v", err)
 			}
 			if env.JSON {
+				// An empty slice rather than nil, so a consumer can iterate the
+				// result without a null check.
+				if repos == nil {
+					repos = []manifest.Repo{}
+				}
 				encoder := json.NewEncoder(env.Printer.Out())
 				encoder.SetIndent("", "  ")
 				return encoder.Encode(repos)

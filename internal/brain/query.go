@@ -54,7 +54,7 @@ func Query(store *Store, terms []string, opts QueryOptions) []Hit {
 		contextLines = 2
 	}
 
-	var hits []Hit
+	hits := []Hit{}
 	for _, record := range store.Records {
 		if record.Status.Terminal() && !opts.IncludeTerminal {
 			continue

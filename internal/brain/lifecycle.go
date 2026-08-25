@@ -32,9 +32,9 @@ type Transition struct {
 // re-checks it.
 func Sweep(store *Store, policy CheckPolicy, now time.Time, apply bool) ([]Transition, error) {
 	if policy.StaleAfterDays <= 0 {
-		return nil, nil
+		return []Transition{}, nil
 	}
-	var transitions []Transition
+	transitions := []Transition{}
 	for _, record := range store.CurrentStateClaims() {
 		if record.Status != StatusActive {
 			continue
