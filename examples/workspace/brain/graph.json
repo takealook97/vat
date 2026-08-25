@@ -1,0 +1,53 @@
+{
+  "generated_by": "vat brain build",
+  "nodes": [
+    {
+      "id": "D-0001",
+      "kind": "decision",
+      "status": "active",
+      "title": "Orders own their own idempotency keys",
+      "path": "decisions/D-0001-orders-own-their-idempotency-keys.md",
+      "refs": [
+        "O-0001"
+      ]
+    },
+    {
+      "id": "G-0001",
+      "kind": "gap",
+      "status": "stale",
+      "title": "Retries can double-submit an order",
+      "path": "gaps/G-0001-retries-can-double-submit.md",
+      "owned_by": "payments",
+      "source_ref": "payments@3f9a1c2e8b74:docs/ORDERING.md",
+      "observed_at": "2026-05-02",
+      "refs": [
+        "O-0001",
+        "D-0001"
+      ]
+    },
+    {
+      "id": "O-0001",
+      "kind": "goal",
+      "status": "active",
+      "title": "One order never becomes two",
+      "path": "goals/O-0001-one-order-never-becomes-two.md"
+    }
+  ],
+  "edges": [
+    {
+      "from": "D-0001",
+      "to": "O-0001",
+      "type": "refs"
+    },
+    {
+      "from": "G-0001",
+      "to": "O-0001",
+      "type": "refs"
+    },
+    {
+      "from": "G-0001",
+      "to": "D-0001",
+      "type": "refs"
+    }
+  ]
+}
