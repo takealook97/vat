@@ -1,0 +1,18 @@
+# Build output
+/dist/
+/bin/
+vat
+
+# Test and coverage artefacts
+*.out
+*.test
+coverage.html
+
+# Local, derived state
+.vat/
+
+# Editor and OS noise
+.DS_Store
+*.swp
+.idea/
+.vscode/
