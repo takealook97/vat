@@ -1,0 +1,153 @@
+// Package runner executes shell commands inside repositories, with the
+// bookkeeping every caller needs: which repository, what was run, how long it
+// took, and what it printed when it failed.
+package runner
+
+import (
+	"bytes"
+	"context"
+	"errors"
+	"fmt"
+	"os"
+	"os/exec"
+	"runtime"
+	"strings"
+	"sync"
+	"time"
+)
+
+// Result is one command execution.
+type Result struct {
+	Repo     string        `json:"repo"`
+	Command  string        `json:"command"`
+	Dir      string        `json:"-"`
+	ExitCode int           `json:"exit_code"`
+	Duration time.Duration `json:"-"`
+	Stdout   string        `json:"stdout,omitempty"`
+	Stderr   string        `json:"stderr,omitempty"`
+	Err      error         `json:"-"`
+}
+
+// OK reports whether the command succeeded.
+func (r Result) OK() bool { return r.Err == nil && r.ExitCode == 0 }
+
+// Output returns stderr when present, otherwise stdout, trimmed for display.
+func (r Result) Output() string {
+	if trimmed := strings.TrimSpace(r.Stderr); trimmed != "" {
+		return trimmed
+	}
+	return strings.TrimSpace(r.Stdout)
+}
+
+// FirstLine returns the first non-empty output line, for one-line reporting.
+func (r Result) FirstLine() string {
+	for _, line := range strings.Split(r.Output(), "\n") {
+		if trimmed := strings.TrimSpace(line); trimmed != "" {
+			return trimmed
+		}
+	}
+	if r.Err != nil {
+		return r.Err.Error()
+	}
+	return ""
+}
+
+// Job is one command to run in one directory.
+type Job struct {
+	Repo    string
+	Dir     string
+	Command string
+	Env     []string
+}
+
+// Options configure a run.
+type Options struct {
+	// Parallelism caps concurrent jobs. Commands are run through a shell, so
+	// unbounded concurrency can exhaust a machine.
+	Parallelism int
+	// Timeout bounds each individual command.
+	Timeout time.Duration
+	// Stream sends live output for a job to the caller as it completes.
+	Stream func(Result)
+}
+
+// Run executes every job, returning results in the order the jobs were given.
+func Run(ctx context.Context, jobs []Job, opts Options) []Result {
+	parallelism := opts.Parallelism
+	if parallelism <= 0 {
+		parallelism = 1
+	}
+	results := make([]Result, len(jobs))
+	semaphore := make(chan struct{}, parallelism)
+	var wg sync.WaitGroup
+	var streamMu sync.Mutex
+
+	for i, job := range jobs {
+		wg.Add(1)
+		go func(index int, job Job) {
+			defer wg.Done()
+			semaphore <- struct{}{}
+			defer func() { <-semaphore }()
+			result := RunOne(ctx, job, opts.Timeout)
+			results[index] = result
+			if opts.Stream != nil {
+				streamMu.Lock()
+				opts.Stream(result)
+				streamMu.Unlock()
+			}
+		}(i, job)
+	}
+	wg.Wait()
+	return results
+}
+
+// RunOne executes a single command through the platform shell.
+func RunOne(ctx context.Context, job Job, timeout time.Duration) Result {
+	started := time.Now()
+	runCtx := ctx
+	if timeout > 0 {
+		var cancel context.CancelFunc
+		runCtx, cancel = context.WithTimeout(ctx, timeout)
+		defer cancel()
+	}
+
+	shell, flag := shellCommand()
+	cmd := exec.CommandContext(runCtx, shell, flag, job.Command)
+	cmd.Dir = job.Dir
+	cmd.Env = append(os.Environ(), job.Env...)
+
+	var stdout, stderr bytes.Buffer
+	cmd.Stdout = &stdout
+	cmd.Stderr = &stderr
+
+	err := cmd.Run()
+	result := Result{
+		Repo: job.Repo, Command: job.Command, Dir: job.Dir,
+		Duration: time.Since(started),
+		Stdout:   stdout.String(), Stderr: stderr.String(),
+	}
+	if err != nil {
+		var exitErr *exec.ExitError
+		if errors.As(err, &exitErr) {
+			result.ExitCode = exitErr.ExitCode()
+			result.Err = fmt.Errorf("exit status %d", result.ExitCode)
+		} else {
+			result.ExitCode = -1
+			result.Err = err
+		}
+		if errors.Is(runCtx.Err(), context.DeadlineExceeded) {
+			result.Err = fmt.Errorf("timed out after %s", timeout)
+		}
+	}
+	return result
+}
+
+func shellCommand() (string, string) {
+	if runtime.GOOS == "windows" {
+		return "cmd", "/C"
+	}
+	if shell := os.Getenv("SHELL"); shell != "" {
+		return shell, "-c"
+	}
+	return "/bin/sh", "-c"
+}
