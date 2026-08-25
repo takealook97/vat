@@ -1,0 +1,21 @@
+# Build output
+/dist/
+/bin/
+# The binary built at the repository root. Anchored: an unanchored `vat`
+# would also exclude cmd/vat/, and the entry point would silently never
+# be committed.
+/vat
+
+# Test and coverage artefacts
+*.out
+*.test
+coverage.html
+
+# Local, derived state
+.vat/
+
+# Editor and OS noise
+.DS_Store
+*.swp
+.idea/
+.vscode/

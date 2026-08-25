@@ -1,0 +1,49 @@
+version: "2"
+
+run:
+  timeout: 5m
+
+linters:
+  enable:
+    - errcheck
+    - govet
+    - ineffassign
+    - staticcheck
+    - unused
+    - bodyclose
+    - copyloopvar
+    - errorlint
+    - goconst
+    - gocritic
+    - misspell
+    - nilerr
+    - prealloc
+    - revive
+    - unconvert
+    - unparam
+    - whitespace
+
+  settings:
+    goconst:
+      min-occurrences: 4
+    revive:
+      rules:
+        - name: exported
+          arguments: [checkPrivateReceivers]
+        - name: package-comments
+
+  exclusions:
+    rules:
+      # Test fixtures build deliberately awkward states; the readability rules
+      # that keep production code honest get in the way there.
+      - path: _test\.go
+        linters: [goconst, unparam, errcheck]
+
+      # Command names are a vocabulary, not repeated magic values. Hoisting
+      # "new" into a constant would obscure the command tree it describes.
+      - path: internal/cli/
+        linters: [goconst]
+
+formatters:
+  enable:
+    - gofmt
