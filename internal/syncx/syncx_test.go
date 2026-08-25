@@ -1,0 +1,310 @@
+package syncx_test
+
+import (
+	"context"
+	"os"
+	"os/exec"
+	"path/filepath"
+	"strings"
+	"testing"
+
+	"github.com/takealook97/vat/internal/manifest"
+	"github.com/takealook97/vat/internal/syncx"
+	"github.com/takealook97/vat/internal/workspace"
+)
+
+// git runs a git command in dir and fails the test if it errors.
+func git(t *testing.T, dir string, args ...string) string {
+	t.Helper()
+	cmd := exec.Command("git", args...)
+	cmd.Dir = dir
+	cmd.Env = append(os.Environ(),
+		"GIT_AUTHOR_NAME=test", "GIT_AUTHOR_EMAIL=test@example.com",
+		"GIT_COMMITTER_NAME=test", "GIT_COMMITTER_EMAIL=test@example.com",
+		"GIT_CONFIG_GLOBAL=/dev/null", "GIT_CONFIG_SYSTEM=/dev/null",
+	)
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("git %v in %s: %v\n%s", args, dir, err, output)
+	}
+	return string(output)
+}
+
+// readNormalised reads a file with line endings collapsed to LF. On Windows,
+// git's autocrlf setting rewrites them on checkout, and the behaviour under test
+// is that the tree advanced — not which newline convention the platform uses.
+func readNormalised(t *testing.T, path string) string {
+	t.Helper()
+	content, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("read %s: %v", path, err)
+	}
+	return strings.ReplaceAll(string(content), "\r\n", "\n")
+}
+
+func commit(t *testing.T, dir, name, content string) {
+	t.Helper()
+	if err := os.WriteFile(filepath.Join(dir, name), []byte(content), 0o644); err != nil {
+		t.Fatalf("write: %v", err)
+	}
+	git(t, dir, "add", "-A")
+	git(t, dir, "commit", "-m", "change "+name)
+}
+
+// fixture builds a workspace with one repository cloned from a local upstream,
+// which makes fetch and fast-forward real operations without a network.
+func fixture(t *testing.T) (*workspace.Workspace, string, string) {
+	t.Helper()
+	base := t.TempDir()
+	upstream := filepath.Join(base, "upstream")
+	if err := os.MkdirAll(upstream, 0o755); err != nil {
+		t.Fatalf("create: %v", err)
+	}
+	git(t, upstream, "init", "--quiet", "--initial-branch", "main", ".")
+	commit(t, upstream, "README.md", "one\n")
+
+	root := filepath.Join(base, "workspace")
+	if err := os.MkdirAll(root, 0o755); err != nil {
+		t.Fatalf("create: %v", err)
+	}
+	clone := filepath.Join(root, "service")
+	git(t, root, "clone", "--quiet", upstream, "service")
+
+	built := manifest.Default("test")
+	built = manifest.WithRepo(built, manifest.Repo{
+		Name: "service", Origin: upstream, Role: manifest.RoleProduct, Required: true,
+	})
+	if err := manifest.Save(filepath.Join(root, manifest.FileName), built); err != nil {
+		t.Fatalf("Save: %v", err)
+	}
+	ws, err := workspace.OpenAt(root)
+	if err != nil {
+		t.Fatalf("OpenAt: %v", err)
+	}
+	return ws, upstream, clone
+}
+
+func runSync(t *testing.T, ws *workspace.Workspace, opts syncx.Options) syncx.Result {
+	t.Helper()
+	report := syncx.Run(context.Background(), ws, ws.Manifest.Active(), opts)
+	if len(report.Results) != 1 {
+		t.Fatalf("result count = %d, want 1", len(report.Results))
+	}
+	return report.Results[0]
+}
+
+func TestACleanBranchBehindUpstreamIsFastForwarded(t *testing.T) {
+	// Arrange
+	ws, upstream, clone := fixture(t)
+	commit(t, upstream, "README.md", "two\n")
+
+	// Act
+	result := runSync(t, ws, syncx.Options{})
+
+	// Assert
+	if result.State != syncx.StateUpdated {
+		t.Fatalf("state = %s, want UPDATED (detail: %s)", result.State, result.Detail)
+	}
+	if got := readNormalised(t, filepath.Join(clone, "README.md")); got != "two\n" {
+		t.Errorf("working tree was not advanced: %q", got)
+	}
+}
+
+func TestADirtyWorkingTreeIsReportedAndLeftUntouched(t *testing.T) {
+	// Arrange: a sync that stashed or reset here would destroy work that exists
+	// nowhere else.
+	ws, upstream, clone := fixture(t)
+	commit(t, upstream, "README.md", "two\n")
+	if err := os.WriteFile(filepath.Join(clone, "README.md"), []byte("local edit\n"), 0o644); err != nil {
+		t.Fatalf("write: %v", err)
+	}
+
+	// Act
+	result := runSync(t, ws, syncx.Options{})
+
+	// Assert
+	if result.State != syncx.StateDirty {
+		t.Fatalf("state = %s, want DIRTY", result.State)
+	}
+	if result.State.Failure() {
+		t.Error("a dirty tree is a normal working state, not a failure")
+	}
+	if got := readNormalised(t, filepath.Join(clone, "README.md")); got != "local edit\n" {
+		t.Errorf("the local edit was destroyed: %q", got)
+	}
+}
+
+func TestAFeatureBranchIsReportedAndNeverCheckedOutAway(t *testing.T) {
+	// Arrange
+	ws, upstream, clone := fixture(t)
+	commit(t, upstream, "README.md", "two\n")
+	git(t, clone, "checkout", "--quiet", "-b", "feature")
+
+	// Act
+	result := runSync(t, ws, syncx.Options{})
+
+	// Assert
+	if result.State != syncx.StateBranch {
+		t.Fatalf("state = %s, want BRANCH", result.State)
+	}
+	if current := git(t, clone, "rev-parse", "--abbrev-ref", "HEAD"); current[:7] != "feature" {
+		t.Errorf("the branch was changed to %q", current)
+	}
+}
+
+func TestLocalCommitsAheadAreReportedAndNeverPushed(t *testing.T) {
+	// Arrange
+	ws, _, clone := fixture(t)
+	commit(t, clone, "local.md", "mine\n")
+
+	// Act
+	result := runSync(t, ws, syncx.Options{})
+
+	// Assert
+	if result.State != syncx.StateAhead {
+		t.Fatalf("state = %s, want AHEAD", result.State)
+	}
+	if result.Ahead != 1 {
+		t.Errorf("ahead = %d, want 1", result.Ahead)
+	}
+}
+
+func TestDivergedHistoryIsAFailureRatherThanAnAutomaticMerge(t *testing.T) {
+	// Arrange
+	ws, upstream, clone := fixture(t)
+	commit(t, upstream, "README.md", "theirs\n")
+	commit(t, clone, "README.md", "mine\n")
+
+	// Act
+	result := runSync(t, ws, syncx.Options{})
+
+	// Assert
+	if result.State != syncx.StateDiverged {
+		t.Fatalf("state = %s, want DIVERGED", result.State)
+	}
+	if !result.State.Failure() {
+		t.Error("diverged history must fail the run; merging here would guess at intent")
+	}
+}
+
+func TestAnOriginPointingElsewhereFailsAndIsNeverRewritten(t *testing.T) {
+	// Arrange
+	ws, _, clone := fixture(t)
+	git(t, clone, "remote", "set-url", "origin", "https://example.com/somewhere-else.git")
+
+	// Act
+	result := runSync(t, ws, syncx.Options{})
+
+	// Assert
+	if result.State != syncx.StateRemoteMismatch {
+		t.Fatalf("state = %s, want REMOTE_MISMATCH", result.State)
+	}
+	after := git(t, clone, "remote", "get-url", "origin")
+	if after[:5] != "https" {
+		t.Errorf("the remote was rewritten to %q; a mismatch is a supply-chain signal", after)
+	}
+}
+
+func TestAMissingRepositoryIsCloned(t *testing.T) {
+	// Arrange
+	ws, _, clone := fixture(t)
+	if err := os.RemoveAll(clone); err != nil {
+		t.Fatalf("remove: %v", err)
+	}
+
+	// Act
+	result := runSync(t, ws, syncx.Options{})
+
+	// Assert
+	if result.State != syncx.StateCloned {
+		t.Fatalf("state = %s, want CLONED (detail: %s)", result.State, result.Detail)
+	}
+	if _, err := os.Stat(filepath.Join(clone, "README.md")); err != nil {
+		t.Errorf("the clone is missing its content: %v", err)
+	}
+}
+
+func TestADirectoryThatIsNotARepositoryIsNeverOverwritten(t *testing.T) {
+	// Arrange: it may hold work that was never committed anywhere.
+	ws, _, clone := fixture(t)
+	if err := os.RemoveAll(clone); err != nil {
+		t.Fatalf("remove: %v", err)
+	}
+	if err := os.MkdirAll(clone, 0o755); err != nil {
+		t.Fatalf("create: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(clone, "notes.txt"), []byte("unsaved\n"), 0o644); err != nil {
+		t.Fatalf("write: %v", err)
+	}
+
+	// Act
+	result := runSync(t, ws, syncx.Options{})
+
+	// Assert
+	if result.State != syncx.StateNotGit {
+		t.Fatalf("state = %s, want NOT_GIT", result.State)
+	}
+	if _, err := os.Stat(filepath.Join(clone, "notes.txt")); err != nil {
+		t.Errorf("the existing directory was destroyed: %v", err)
+	}
+}
+
+func TestADryRunChangesNothingAndContactsNothing(t *testing.T) {
+	// Arrange
+	ws, upstream, clone := fixture(t)
+	commit(t, upstream, "README.md", "two\n")
+	before := git(t, clone, "rev-parse", "HEAD")
+
+	// Act
+	result := runSync(t, ws, syncx.Options{DryRun: true})
+
+	// Assert
+	if result.State != syncx.StatePlanned {
+		t.Fatalf("state = %s, want PLANNED", result.State)
+	}
+	if after := git(t, clone, "rev-parse", "HEAD"); after != before {
+		t.Error("a dry run advanced the repository")
+	}
+}
+
+func TestARepositoryOnADeclaredNonDefaultBranchIsStillAdvanced(t *testing.T) {
+	// Arrange: a repository whose default is "develop" would otherwise be
+	// skipped forever with a note nobody reads.
+	ws, upstream, clone := fixture(t)
+	git(t, upstream, "checkout", "--quiet", "-b", "develop")
+	commit(t, upstream, "README.md", "two\n")
+	git(t, clone, "fetch", "--quiet", "origin")
+	git(t, clone, "checkout", "--quiet", "-b", "develop", "--track", "origin/develop")
+	git(t, clone, "reset", "--quiet", "--hard", "HEAD~1")
+
+	repo, _ := ws.Manifest.Find("service")
+	repo.DefaultBranch = "develop"
+	ws.Manifest = manifest.WithRepo(ws.Manifest, repo)
+
+	// Act
+	result := runSync(t, ws, syncx.Options{})
+
+	// Assert
+	if result.State != syncx.StateUpdated {
+		t.Fatalf("state = %s, want UPDATED (detail: %s)", result.State, result.Detail)
+	}
+}
+
+func TestAnArchivedRepositoryIsExcludedFromUpdates(t *testing.T) {
+	// Arrange
+	ws, _, _ := fixture(t)
+	repo, _ := ws.Manifest.Find("service")
+	repo.Archived = true
+	ws.Manifest = manifest.WithRepo(ws.Manifest, repo)
+
+	// Act
+	report := syncx.Run(context.Background(), ws, ws.Manifest.Repos, syncx.Options{})
+
+	// Assert
+	if report.Results[0].State != syncx.StateArchived {
+		t.Errorf("state = %s, want ARCHIVED", report.Results[0].State)
+	}
+	if report.Failures != 0 {
+		t.Errorf("an archived repository counted as a failure")
+	}
+}
