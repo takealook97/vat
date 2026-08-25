@@ -1,0 +1,42 @@
+name: Feature request
+description: Propose a capability vat does not have.
+labels: [enhancement]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        The strongest proposals name a failure that already happened to you.
+        vat deliberately refuses features that only *might* be useful.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: The problem
+      description: What went wrong, or what you cannot currently find out?
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: What vat should do
+      description: Ideally as a command and its output.
+      render: console
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: What you do instead today
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: principles
+    attributes:
+      label: Fit
+      options:
+        - label: This can be checked mechanically, not just documented.
+        - label: This does not collapse reading, judging, and acting into one permission.
+        - label: This does not silently modify a working tree.

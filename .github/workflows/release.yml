@@ -1,0 +1,58 @@
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: build and publish
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: stable
+          cache: true
+
+      - name: Build every platform
+        env:
+          VERSION: ${{ github.ref_name }}
+        run: |
+          mkdir -p dist
+          COMMIT=$(git rev-parse HEAD)
+          BUILD_DATE=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+          MODULE=github.com/takealook97/vat
+          LDFLAGS="-s -w \
+            -X ${MODULE}/internal/version.Version=${VERSION} \
+            -X ${MODULE}/internal/version.Commit=${COMMIT} \
+            -X ${MODULE}/internal/version.Date=${BUILD_DATE}"
+          for target in darwin/amd64 darwin/arm64 linux/amd64 linux/arm64 windows/amd64; do
+            os="${target%/*}"; arch="${target#*/}"; ext=""
+            [ "$os" = windows ] && ext=".exe"
+            GOOS="$os" GOARCH="$arch" go build -trimpath -ldflags "$LDFLAGS" \
+              -o "dist/vat_${os}_${arch}${ext}" ./cmd/vat
+          done
+
+      - name: Package and checksum
+        working-directory: dist
+        run: |
+          for file in vat_*; do
+            case "$file" in
+              *.exe) zip "${file%.exe}.zip" "$file" && rm "$file" ;;
+              *) tar -czf "${file}.tar.gz" "$file" && rm "$file" ;;
+            esac
+          done
+          sha256sum * > checksums.txt
+          cat checksums.txt
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: dist/*
+          generate_release_notes: true
