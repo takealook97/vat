@@ -110,8 +110,16 @@ func TestValidateRejectsEveryPathThatEscapesTheWorkspace(t *testing.T) {
 		"../outside",
 		"sub/../../outside",
 		"a/b/../../../outside",
-		"/etc",
 		"..",
+		// Root-relative and volume-relative forms. These must be rejected on
+		// every platform, not only the one where filepath.IsAbs happens to
+		// recognise them: a manifest is read on every machine.
+		"/etc",
+		`\Windows`,
+		`C:\Windows`,
+		"C:temp",
+		`..\outside`,
+		"   ",
 	}
 
 	for _, path := range escapes {

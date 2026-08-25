@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"io/fs"
 	"os"
-	"path/filepath"
+	"path"
 	"strings"
 
 	"gopkg.in/yaml.v3"
@@ -167,17 +167,30 @@ func Validate(m Manifest) error {
 // prefix but resolves above the root, and everything downstream then operates
 // there — cloning, writing a harness, and, with `repo remove --delete`,
 // deleting it.
+//
+// The comparison is done in one slash-separated form on purpose. A manifest is
+// committed and read on every machine, so a path rejected on one platform has
+// to be rejected on all of them — and filepath's helpers are platform-specific:
+// "/etc" is absolute on Unix and merely root-relative on Windows, and a "C:"
+// prefix means nothing to filepath.VolumeName off Windows.
 func containedPath(dir string) bool {
-	cleaned := filepath.Clean(dir)
-	if filepath.IsAbs(cleaned) || cleaned == "" {
+	trimmed := strings.TrimSpace(dir)
+	if trimmed == "" {
 		return false
 	}
-	if cleaned == ".." || strings.HasPrefix(cleaned, ".."+string(filepath.Separator)) {
+	slashed := strings.ReplaceAll(trimmed, `\`, "/")
+	if strings.HasPrefix(slashed, "/") {
 		return false
 	}
-	// A Windows volume-relative path such as "C:foo" is neither absolute nor
-	// parent-relative, yet it escapes the root just as effectively.
-	return filepath.VolumeName(cleaned) == ""
+	if len(slashed) >= 2 && slashed[1] == ':' && isASCIILetter(slashed[0]) {
+		return false
+	}
+	cleaned := path.Clean(slashed)
+	return cleaned != ".." && !strings.HasPrefix(cleaned, "../")
+}
+
+func isASCIILetter(c byte) bool {
+	return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z')
 }
 
 func countRole(m Manifest, role Role) int {
