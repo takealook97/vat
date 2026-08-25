@@ -5,6 +5,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/takealook97/vat/internal/manifest"
@@ -27,6 +28,18 @@ func git(t *testing.T, dir string, args ...string) string {
 		t.Fatalf("git %v in %s: %v\n%s", args, dir, err, output)
 	}
 	return string(output)
+}
+
+// readNormalised reads a file with line endings collapsed to LF. On Windows,
+// git's autocrlf setting rewrites them on checkout, and the behaviour under test
+// is that the tree advanced — not which newline convention the platform uses.
+func readNormalised(t *testing.T, path string) string {
+	t.Helper()
+	content, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("read %s: %v", path, err)
+	}
+	return strings.ReplaceAll(string(content), "\r\n", "\n")
 }
 
 func commit(t *testing.T, dir, name, content string) {
@@ -92,12 +105,8 @@ func TestACleanBranchBehindUpstreamIsFastForwarded(t *testing.T) {
 	if result.State != syncx.StateUpdated {
 		t.Fatalf("state = %s, want UPDATED (detail: %s)", result.State, result.Detail)
 	}
-	content, err := os.ReadFile(filepath.Join(clone, "README.md"))
-	if err != nil {
-		t.Fatalf("read: %v", err)
-	}
-	if string(content) != "two\n" {
-		t.Errorf("working tree was not advanced: %q", content)
+	if got := readNormalised(t, filepath.Join(clone, "README.md")); got != "two\n" {
+		t.Errorf("working tree was not advanced: %q", got)
 	}
 }
 
@@ -120,9 +129,8 @@ func TestADirtyWorkingTreeIsReportedAndLeftUntouched(t *testing.T) {
 	if result.State.Failure() {
 		t.Error("a dirty tree is a normal working state, not a failure")
 	}
-	content, _ := os.ReadFile(filepath.Join(clone, "README.md"))
-	if string(content) != "local edit\n" {
-		t.Errorf("the local edit was destroyed: %q", content)
+	if got := readNormalised(t, filepath.Join(clone, "README.md")); got != "local edit\n" {
+		t.Errorf("the local edit was destroyed: %q", got)
 	}
 }
 
