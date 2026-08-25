@@ -105,7 +105,8 @@ func renderLintReport(env *Env, report lint.Report) {
 	printer := env.Printer
 	if len(report.Findings) == 0 {
 		printer.Status(ui.LevelOK, "lint",
-			fmt.Sprintf("%d rules checked, nothing to report", report.Checked))
+			fmt.Sprintf("%s checked, nothing to report",
+				pluralise(report.Checked, "rule", "rules")))
 		return
 	}
 	for _, finding := range report.Findings {
@@ -131,9 +132,12 @@ func renderLintReport(env *Env, report lint.Report) {
 	} else if warnings > 0 {
 		level = ui.LevelWarn
 	}
-	printer.Status(level, "lint", fmt.Sprintf("%d errors, %d warnings across %d rules",
-		errors, warnings, report.Checked))
+	printer.Status(level, "lint", fmt.Sprintf("%s, %s across %s",
+		pluralise(errors, "error", "errors"),
+		pluralise(warnings, "warning", "warnings"),
+		pluralise(report.Checked, "rule", "rules")))
 	if fixable := report.Fixable(); fixable > 0 {
-		printer.Hint("%d of these can be repaired with `vat lint --fix`.", fixable)
+		printer.Hint("%s can be repaired with `vat lint --fix`.",
+			pluralise(fixable, "one of these", "of these"))
 	}
 }

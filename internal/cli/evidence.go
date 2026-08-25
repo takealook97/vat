@@ -3,6 +3,7 @@ package cli
 import (
 	"context"
 	"encoding/json"
+	"path/filepath"
 	"strings"
 
 	"github.com/takealook97/vat/internal/evidence"
@@ -52,7 +53,7 @@ func evidenceNewCommand() *Command {
 func runEvidenceNew(ctx context.Context, env *Env, args []string) error {
 	set := newFlagSet("evidence new")
 	repos := set.String("repos", "", "repositories the worker may write to (required)")
-	acceptance := set.String("acceptance", "", "observable outcomes that settle it, comma-separated")
+	acceptance := set.String("acceptance", "", "observable outcomes that settle it, comma-separated (strongly recommended)")
 	nonGoals := set.String("non-goal", "", "things explicitly out of scope")
 	contracts := set.String("contract", "", "interfaces to honour or change deliberately")
 	refs := set.String("refs", "", "brain record identifiers that authorised this")
@@ -79,6 +80,13 @@ func runEvidenceNew(ctx context.Context, env *Env, args []string) error {
 	scope := splitList(*repos)
 	if len(scope) == 0 {
 		return usageErrorf("--repos is required: which repositories may the worker write to?")
+	}
+	// Overwriting silently replaced the acceptance criterion — the one thing
+	// the packet exists to fix before work starts — with whatever the second
+	// invocation happened to pass.
+	if fsx.Exists(filepath.Join(ws.Root, evidence.Path(id))) {
+		return usageErrorf("%s already exists at %s; choose another identifier",
+			id, evidence.Path(id))
 	}
 
 	packet := evidence.New(id, objective, scope, env.Now)
@@ -228,24 +236,45 @@ func evidenceCheckCommand() *Command {
 			if err != nil {
 				return err
 			}
+			type packetReport struct {
+				ID       string   `json:"id"`
+				Complete bool     `json:"complete"`
+				Problems []string `json:"problems"`
+			}
+			reports := []packetReport{}
 			problems := 0
 			for _, packet := range packets {
 				if set.NArg() == 1 && packet.ID != set.Arg(0) {
 					continue
 				}
 				found := evidence.Validate(packet)
-				if len(found) == 0 {
-					env.Printer.Status(ui.LevelOK, packet.ID, "complete")
-					continue
+				if found == nil {
+					found = []string{}
 				}
-				for _, problem := range found {
-					env.Printer.Status(ui.LevelWarn, packet.ID, problem)
-					problems++
+				problems += len(found)
+				reports = append(reports, packetReport{
+					ID: packet.ID, Complete: len(found) == 0, Problems: found,
+				})
+			}
+			if env.JSON {
+				encoder := json.NewEncoder(env.Printer.Out())
+				encoder.SetIndent("", "  ")
+				if err := encoder.Encode(reports); err != nil {
+					return err
+				}
+			} else {
+				for _, report := range reports {
+					if report.Complete {
+						env.Printer.Status(ui.LevelOK, report.ID, "complete")
+						continue
+					}
+					for _, problem := range report.Problems {
+						env.Printer.Status(ui.LevelWarn, report.ID, problem)
+					}
 				}
 			}
-			if problems > 0 {
-				return findingsErrorf("")
-			}
+			// An incomplete packet is a warning, like every other warning-only
+			// finding in vat: it exits 0 and says what is missing.
 			return nil
 		},
 	}

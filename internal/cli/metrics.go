@@ -85,6 +85,14 @@ func runMetrics(ctx context.Context, env *Env, args []string) error {
 		return err
 	}
 
+	// Recorded first, so the trend line and the "no earlier snapshot" hint
+	// cannot contradict each other in the same output.
+	if *record {
+		if err := metrics.Append(ws, snapshot); err != nil {
+			return err
+		}
+	}
+
 	if env.JSON {
 		encoder := json.NewEncoder(env.Printer.Out())
 		encoder.SetIndent("", "  ")
@@ -111,9 +119,6 @@ func runMetrics(ctx context.Context, env *Env, args []string) error {
 	}
 
 	if *record {
-		if err := metrics.Append(ws, snapshot); err != nil {
-			return err
-		}
 		env.Printer.Status(ui.LevelOK, "ledger", "snapshot recorded")
 	}
 	return nil

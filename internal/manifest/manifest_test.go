@@ -120,6 +120,12 @@ func TestValidateRejectsEveryPathThatEscapesTheWorkspace(t *testing.T) {
 		"C:temp",
 		`..\outside`,
 		"   ",
+		// "." resolves to the workspace root. A repository whose directory is
+		// the root turns `repo remove --delete` into deleting the entire
+		// workspace, every governed repository's working tree with it.
+		".",
+		"./",
+		"a/..",
 	}
 
 	for _, path := range escapes {

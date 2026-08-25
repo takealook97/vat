@@ -18,6 +18,7 @@ import (
 
 	"github.com/takealook97/vat/internal/frontmatter"
 	"github.com/takealook97/vat/internal/gitx"
+	"github.com/takealook97/vat/internal/manifest"
 	"github.com/takealook97/vat/internal/ui"
 	"github.com/takealook97/vat/internal/version"
 	"github.com/takealook97/vat/internal/workspace"
@@ -219,8 +220,11 @@ func dispatch(ctx context.Context, env *Env, command *Command, args []string, pa
 			}
 		}
 		if command.Run == nil {
-			env.Printer.Errorf("unknown command %q", strings.Join(append(path[1:], name), " "))
+			full := strings.Join(append(path[1:], name), " ")
+			env.Printer.Errorf("unknown command %q", full)
 			suggest(env.Printer, command, name)
+			env.Printer.Hint("Run `%s --help` for the commands that exist.",
+				strings.Join(path, " "))
 			return ExitUsage
 		}
 	}
@@ -240,6 +244,9 @@ func dispatch(ctx context.Context, env *Env, command *Command, args []string, pa
 	switch {
 	case err == nil:
 		return ExitOK
+	case errors.Is(err, ErrHelpRequested):
+		printHelp(env.Printer, command, path)
+		return ExitOK
 	case isUsageError(err):
 		env.Printer.Errorf("%v", err)
 		env.Printer.Hint("\n%s", usageLine(command))
@@ -250,7 +257,7 @@ func dispatch(ctx context.Context, env *Env, command *Command, args []string, pa
 			env.Printer.Hint("\n%s", message)
 		}
 		return ExitFindings
-	case errors.Is(err, workspace.ErrNoWorkspace):
+	case errors.Is(err, workspace.ErrNoWorkspace), errors.Is(err, manifest.ErrNotFound):
 		env.Printer.Errorf("%v", err)
 		env.Printer.Hint("\nRun `vat init` here, or `cd` into a workspace.")
 		return ExitUsage
@@ -362,8 +369,19 @@ func newFlagSet(name string) *flag.FlagSet {
 	return set
 }
 
+// ErrHelpRequested signals that the caller asked for help rather than misusing
+// the command.
+var ErrHelpRequested = errors.New("help requested")
+
 func parseFlags(set *flag.FlagSet, args []string) error {
 	if err := set.Parse(permute(set, args)); err != nil {
+		// A command nested three levels deep reaches its own flag set before
+		// the dispatcher sees --help, and Go's package reports that as the
+		// error string "flag: help requested". Left alone it surfaced as a
+		// usage failure with an internal message.
+		if errors.Is(err, flag.ErrHelp) {
+			return ErrHelpRequested
+		}
 		return usageErrorf("%v", err)
 	}
 	return nil
@@ -454,4 +472,13 @@ func renderFrontmatter(metadata any, body string) ([]byte, error) {
 // to the evidence it was read from.
 func headRevision(ctx context.Context, dir string) (string, error) {
 	return gitx.HeadRevision(ctx, dir)
+}
+
+// pluralise renders a count with the right noun form, so output never reads
+// "1 repository/repositories".
+func pluralise(count int, singular, plural string) string {
+	if count == 1 {
+		return fmt.Sprintf("%d %s", count, singular)
+	}
+	return fmt.Sprintf("%d %s", count, plural)
 }

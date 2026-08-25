@@ -16,7 +16,7 @@ func statusCommand() *Command {
 	return &Command{
 		Name:    "status",
 		Summary: "Show branch, cleanliness, and revision for every repository",
-		Usage:   "vat status [--group <g>] [--role <r>] [--dirty] [--fetch]",
+		Usage:   "vat status [--only <names>] [--group <g>] [--role <r>] [--dirty] [--fetch] [--archived]",
 		Long: `Print the current state of every governed repository on one screen.
 
 By default nothing touches the network, so this is safe to run constantly. With
@@ -232,6 +232,8 @@ func renderStatusTable(env *Env, ws *workspace.Workspace, statuses []repoStatus)
 		summary = append(summary, fmt.Sprintf("%d behind", behind))
 	}
 	env.Printer.Hint("\n%s · workspace %s", strings.Join(summary, " · "), ws.Manifest.Workspace.Name)
+	// Suggested only when there is something for it to advance; recommending it
+	// while everything is ahead or diverged proposes a no-op.
 	if behind > 0 || missing > 0 {
 		env.Printer.Hint("Run `vat sync` to fast-forward what can be advanced safely.")
 	}

@@ -111,7 +111,7 @@ type repoFlags struct {
 
 func bindRepoFlags(set *flag.FlagSet) repoFlags {
 	return repoFlags{
-		role:        set.String("role", string(manifest.RoleProduct), "product|brain|credential|docs|agent|infra"),
+		role:        set.String("role", string(manifest.RoleProduct), "one of: "+manifest.RoleNames()),
 		group:       set.String("group", "", "group name, for selecting a slice of the workspace"),
 		branch:      set.String("branch", "", "default branch (default: the workspace default)"),
 		checks:      set.String("checks", "", "canonical check commands, comma-separated"),
@@ -125,7 +125,7 @@ func (f repoFlags) apply(repo manifest.Repo) (manifest.Repo, error) {
 	out := repo
 	role := manifest.Role(*f.role)
 	if !role.Valid() {
-		return out, usageErrorf("unknown role %q", *f.role)
+		return out, usageErrorf("unknown role %q (valid: %s)", *f.role, manifest.RoleNames())
 	}
 	out.Role = role
 	out.Group = *f.group
@@ -141,7 +141,7 @@ func repoAddCommand() *Command {
 	return &Command{
 		Name:    "add",
 		Summary: "Enrol an existing remote repository and clone it",
-		Usage:   "vat repo add <name> --origin <url> [--role <r>] [--group <g>] [--no-clone]",
+		Usage:   "vat repo add <name> --origin <url> [--role <r>] [--group <g>] [--branch <b>] [--checks <cmds>] [--access <a>] [--description <text>] [--required=false] [--path <dir>] [--no-clone]",
 		Long: `Bring an existing remote repository under the workspace.
 
 The manifest entry, the .gitignore exclusion, and the generated harness are
@@ -211,7 +211,7 @@ func repoNewCommand() *Command {
 	return &Command{
 		Name:    "new",
 		Summary: "Create a brand-new repository, scaffold it, and enrol it",
-		Usage:   "vat repo new <name> [--role <r>] [--private] [--remote <url>] [--no-remote]",
+		Usage:   "vat repo new <name> [--role <r>] [--group <g>] [--branch <b>] [--checks <cmds>] [--access <a>] [--description <text>] [--private] [--remote <url>] [--no-remote]",
 		Long: `Create a repository that does not exist yet.
 
 It is initialised locally with a starter harness, a README, and a .gitignore,
@@ -254,6 +254,14 @@ func runRepoNew(ctx context.Context, env *Env, args []string) error {
 	dir := filepath.Join(ws.Root, name)
 	if fsx.Exists(dir) {
 		return usageErrorf("%s already exists; use `vat repo adopt %s` instead", ws.Rel(dir), name)
+	}
+
+	// Everything is validated before the first directory is created. Creating
+	// first meant a typo in --role left an initialised git repository behind
+	// that was in neither the manifest nor .gitignore, and that the retry then
+	// refused to overwrite.
+	if _, err := fields.apply(manifest.Repo{Name: name, Origin: "placeholder"}); err != nil {
+		return err
 	}
 
 	originURL := *remote
@@ -368,7 +376,7 @@ func repoAdoptCommand() *Command {
 	return &Command{
 		Name:    "adopt",
 		Summary: "Enrol a repository that is already on disk",
-		Usage:   "vat repo adopt <directory> [--role <r>] [--group <g>]",
+		Usage:   "vat repo adopt <directory> [--role <r>] [--group <g>] [--branch <b>] [--checks <cmds>] [--access <a>] [--description <text>] [--required=false]",
 		Long: `Bring a repository already sitting in the workspace under the manifest.
 
 Its origin and current branch are read and recorded as they are. Nothing is
@@ -410,7 +418,7 @@ func runRepoAdopt(ctx context.Context, env *Env, args []string) error {
 	if isFlagSet(set, "role") {
 		role := manifest.Role(*fields.role)
 		if !role.Valid() {
-			return usageErrorf("unknown role %q", *fields.role)
+			return usageErrorf("unknown role %q (valid: %s)", *fields.role, manifest.RoleNames())
 		}
 		repo.Role = role
 	}
@@ -422,6 +430,17 @@ func runRepoAdopt(ctx context.Context, env *Env, args []string) error {
 	}
 	if isFlagSet(set, "description") {
 		repo.Description = *fields.description
+	}
+	// These were bound and then silently dropped, so `--required=false` still
+	// wrote required: true.
+	if isFlagSet(set, "branch") {
+		repo.DefaultBranch = *fields.branch
+	}
+	if isFlagSet(set, "access") {
+		repo.Access = *fields.access
+	}
+	if isFlagSet(set, "required") {
+		repo.Required = *fields.required
 	}
 
 	next := manifest.WithRepo(ws.Manifest, repo)
@@ -520,6 +539,30 @@ func runRepoRemove(ctx context.Context, env *Env, args []string) error {
 		}
 	}
 
+	// The prompt comes before the manifest changes. Asking afterwards meant
+	// declining left the repository de-registered and dropped from the managed
+	// .gitignore region, so the still-present directory became
+	// untracked-but-not-ignored and the workspace's next `git add .` absorbed it.
+	deleteApproved := false
+	if *deleteFiles && fsx.Exists(dir) {
+		// This is the one call in vat that deletes a tree, so it checks
+		// containment itself rather than trusting validation upstream.
+		if !strictlyBelow(ws.Root, dir) {
+			return findingsErrorf(
+				"Refusing to delete %s: it is the workspace root, or outside it.", dir)
+		}
+		// Deleting a working tree is irreversible, so --yes deliberately does
+		// not cover it. This prompt is the last thing between a typo and lost
+		// work.
+		deleteApproved = confirm(env,
+			fmt.Sprintf("Permanently delete %s and everything in it?", ws.Rel(dir)))
+		if !deleteApproved {
+			env.Printer.Status(ui.LevelSkip, name,
+				"deletion declined; nothing was changed")
+			return nil
+		}
+	}
+
 	next, removed := manifest.WithoutRepo(ws.Manifest, name)
 	if !removed {
 		return usageErrorf("%s is not in %s", name, manifest.FileName)
@@ -529,37 +572,49 @@ func runRepoRemove(ctx context.Context, env *Env, args []string) error {
 	}
 	env.Printer.Status(ui.LevelOK, name, "removed from the manifest")
 
-	if *deleteFiles && fsx.Exists(dir) {
-		// Deleting a working tree is irreversible, so --yes deliberately does
-		// not cover it. This prompt is the last thing between a typo and lost
-		// work.
-		if !confirm(env, fmt.Sprintf("Permanently delete %s and everything in it?", ws.Rel(dir))) {
-			env.Printer.Status(ui.LevelSkip, name, "directory left on disk")
-			return renderAfterChange(env, ws.Root)
-		}
+	switch {
+	case deleteApproved:
 		if err := os.RemoveAll(dir); err != nil {
 			return fmt.Errorf("delete %s: %w", dir, err)
 		}
 		env.Printer.Status(ui.LevelOK, name, "directory deleted")
-	} else if fsx.Exists(dir) {
+	case fsx.Exists(dir):
 		env.Printer.Hint("      → %s is still on disk; delete it yourself when you are sure.", ws.Rel(dir))
 	}
 	return renderAfterChange(env, ws.Root)
 }
 
 // unsavedWork reports everything in a repository that exists nowhere else.
+// unsavedWork reports everything in a repository that exists nowhere else.
+//
+// Every check fails closed. A git command that cannot answer — a locked index,
+// a dubious-ownership refusal, a corrupt repository — is reported as a risk
+// rather than as an absence of one, because the alternative is deleting a tree
+// whose contents could not be inspected.
 func unsavedWork(ctx context.Context, dir string) []string {
 	var risks []string
-	if dirty, err := gitx.IsDirty(ctx, dir); err == nil && dirty {
+	dirty, err := gitx.IsDirty(ctx, dir)
+	switch {
+	case err != nil:
+		risks = append(risks, "git cannot read the working tree state")
+	case dirty:
 		risks = append(risks, "uncommitted changes in the working tree")
 	}
-	if unpushed, err := gitx.UnpushedCommits(ctx, dir); err == nil && unpushed > 0 {
-		risks = append(risks, fmt.Sprintf("%d commit(s) not on any remote", unpushed))
+	unpushed, err := gitx.UnpushedCommits(ctx, dir)
+	switch {
+	case err != nil:
+		risks = append(risks, "git cannot tell which commits are on a remote")
+	case unpushed > 0:
+		risks = append(risks, pluralise(unpushed, "commit", "commits")+" not on any remote")
 	}
 	// Stashes are invisible to `git status`, which is exactly why they are the
 	// work most often destroyed by a cleanup.
-	if stashes, err := gitx.StashCount(ctx, dir); err == nil && stashes > 0 {
-		risks = append(risks, fmt.Sprintf("%d stash entry/entries", stashes))
+	stashes, err := gitx.StashCount(ctx, dir)
+	switch {
+	case err != nil:
+		risks = append(risks, "git cannot read the stash list")
+	case stashes > 0:
+		risks = append(risks, pluralise(stashes, "stash entry", "stash entries"))
 	}
 	return risks
 }
@@ -666,7 +721,23 @@ func runRepoRename(ctx context.Context, env *Env, args []string) error {
 		updated.Path = repo.Dir()
 	} else {
 		updated.Path = ""
-		newDir := filepath.Join(ws.Root, newName)
+	}
+
+	// The manifest is validated before anything moves. Renaming first and
+	// validating after would relocate a working tree for a name the manifest
+	// then rejects, leaving it outside the workspace with nothing pointing at
+	// it — `vat repo rename payments ../../payments` did exactly that.
+	without, _ := manifest.WithoutRepo(ws.Manifest, oldName)
+	next := manifest.WithRepo(without, updated)
+	if err := manifest.Validate(next); err != nil {
+		return usageErrorf("%v", err)
+	}
+
+	if !*keepPath {
+		newDir := ws.RepoPath(updated)
+		if !strictlyBelow(ws.Root, newDir) {
+			return usageErrorf("%s would sit outside the workspace", newName)
+		}
 		if fsx.Exists(oldDir) {
 			if fsx.Exists(newDir) {
 				return usageErrorf("%s already exists on disk", ws.Rel(newDir))
@@ -677,8 +748,7 @@ func runRepoRename(ctx context.Context, env *Env, args []string) error {
 		}
 	}
 
-	next, _ := manifest.WithoutRepo(ws.Manifest, oldName)
-	if err := commitManifest(env, ws, manifest.WithRepo(next, updated)); err != nil {
+	if err := commitManifest(env, ws, next); err != nil {
 		return err
 	}
 	env.Printer.Status(ui.LevelOK, newName, "renamed from "+oldName)
@@ -715,6 +785,52 @@ func renderAfterChange(env *Env, root string) error {
 		env.Printer.Status(ui.LevelOK, file, "regenerated")
 	}
 	return nil
+}
+
+// strictlyBelow reports whether target sits inside root and is not root
+// itself.
+//
+// Both sides are resolved through symlinks first, so a link pointing out of the
+// workspace is caught. The target usually exists, but the answer has to be
+// correct for a path that does not, so resolution falls back to the nearest
+// existing ancestor and re-appends the remainder.
+func strictlyBelow(root, target string) bool {
+	resolvedRoot, err := filepath.EvalSymlinks(root)
+	if err != nil {
+		return false
+	}
+	resolvedTarget := resolveExisting(target)
+	relative, err := filepath.Rel(resolvedRoot, resolvedTarget)
+	if err != nil {
+		return false
+	}
+	if relative == "." || relative == "" {
+		return false
+	}
+	return relative != ".." && !strings.HasPrefix(relative, ".."+string(filepath.Separator))
+}
+
+// resolveExisting resolves the longest existing prefix of a path and rejoins
+// whatever remains, so a not-yet-created directory still resolves through any
+// symlinked ancestor.
+func resolveExisting(target string) string {
+	absolute, err := filepath.Abs(target)
+	if err != nil {
+		return filepath.Clean(target)
+	}
+	remainder := ""
+	current := absolute
+	for {
+		if resolved, err := filepath.EvalSymlinks(current); err == nil {
+			return filepath.Join(resolved, remainder)
+		}
+		parent := filepath.Dir(current)
+		if parent == current {
+			return absolute
+		}
+		remainder = filepath.Join(filepath.Base(current), remainder)
+		current = parent
+	}
 }
 
 func confirm(env *Env, question string) bool {

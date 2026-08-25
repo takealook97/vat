@@ -5,6 +5,7 @@
 package manifest
 
 import (
+	"errors"
 	"fmt"
 	"sort"
 	"strings"
@@ -42,6 +43,9 @@ const (
 func Roles() []Role {
 	return []Role{RoleProduct, RoleBrain, RoleCredential, RoleDocs, RoleAgent, RoleInfra}
 }
+
+// RoleNames lists every valid role, for help text and error messages.
+func RoleNames() string { return joinRoleNames() }
 
 // Valid reports whether r is a role vat understands.
 func (r Role) Valid() bool {
@@ -339,7 +343,55 @@ func (m Manifest) Select(sel Selector) ([]Repo, error) {
 		sort.Strings(missing)
 		return nil, fmt.Errorf("no such repository in %s: %s", FileName, strings.Join(missing, ", "))
 	}
+	// A group or role that matches nothing is almost always a typo. Returning
+	// an empty set let `vat exec --group backedn -- make test` report success
+	// in CI having tested nothing at all.
+	if len(selected) == 0 && !sel.Empty() {
+		if problem := unmatchedFilter(m, sel); problem != "" {
+			return nil, errors.New(problem)
+		}
+	}
 	return selected, nil
+}
+
+// unmatchedFilter names the group or role that selected nothing, and lists
+// what does exist so the typo is obvious.
+func unmatchedFilter(m Manifest, sel Selector) string {
+	for _, group := range sel.Groups {
+		if !anyRepo(m, func(repo Repo) bool { return strings.EqualFold(repo.Group, group) }) {
+			known := m.Groups()
+			if len(known) == 0 {
+				return fmt.Sprintf("no repository is in group %q; no groups are defined in %s",
+					group, FileName)
+			}
+			return fmt.Sprintf("no repository is in group %q (defined groups: %s)",
+				group, strings.Join(known, ", "))
+		}
+	}
+	for _, role := range sel.Roles {
+		if !anyRepo(m, func(repo Repo) bool { return strings.EqualFold(string(repo.Role), role) }) {
+			return fmt.Sprintf("no repository has role %q (valid roles: %s)", role, joinRoleNames())
+		}
+	}
+	return ""
+}
+
+func anyRepo(m Manifest, predicate func(Repo) bool) bool {
+	for _, repo := range m.Repos {
+		if predicate(repo) {
+			return true
+		}
+	}
+	return false
+}
+
+// joinRoleNames lists every valid role, for an error message.
+func joinRoleNames() string {
+	names := make([]string, 0, len(Roles()))
+	for _, role := range Roles() {
+		names = append(names, string(role))
+	}
+	return strings.Join(names, ", ")
 }
 
 func matches(repo Repo, sel Selector) bool {

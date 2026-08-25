@@ -10,6 +10,10 @@ import (
 	"github.com/takealook97/vat/internal/fsx"
 )
 
+// maxFileNameBytes is the conservative limit every mainstream filesystem
+// accepts for a single path component.
+const maxFileNameBytes = 200
+
 // Init creates the directory layout and starter documents of a brain
 // repository. It never overwrites a file that already exists, so running it on
 // an existing repository is safe and additive.
@@ -276,6 +280,13 @@ func Create(root string, input NewRecordInput) (string, error) {
 	path := filepath.Join(root, filepath.FromSlash(relative))
 	if fsx.Exists(path) {
 		return "", fmt.Errorf("%s already exists", relative)
+	}
+	// A very long title produced a filename the operating system refused, and
+	// the failure surfaced as a misleading "already exists" naming a file that
+	// was never created.
+	if len(filepath.Base(path)) > maxFileNameBytes {
+		return "", fmt.Errorf("the title is too long for a filename (%d bytes, limit %d); shorten it",
+			len(filepath.Base(path)), maxFileNameBytes)
 	}
 	if err := fsx.WriteFileAtomic(path, rendered, fsx.DefaultFileMode); err != nil {
 		return "", err

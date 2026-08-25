@@ -205,6 +205,14 @@ func runChangesetVerify(ctx context.Context, env *Env, args []string) error {
 	if len(current.Repositories) == 0 {
 		return usageErrorf("%s has no repositories enrolled", current.ID)
 	}
+	// Verifying a finished changeset rewrote its status back to "verified"
+	// while its closing evidence stayed in the file, leaving a record that
+	// claimed both at once.
+	if !current.Status.Open() {
+		return usageErrorf(
+			"%s is %s; verifying it would contradict its own closing record.\n"+
+				"  Open a new changeset for further work.", current.ID, current.Status)
+	}
 
 	failures := 0
 	for _, participant := range current.Repositories {
@@ -235,10 +243,19 @@ func runChangesetVerify(ctx context.Context, env *Env, args []string) error {
 			continue
 		}
 		if dirty {
-			// Checks that pass over uncommitted changes prove nothing about
-			// the revision they would be recorded against.
-			env.Printer.Status(ui.LevelWarn, participant.Name,
-				"working tree is dirty; results would not describe "+shortRev(revision))
+			// Recording a pass here would file results against a revision that
+			// does not describe what was tested — the exact claim a changeset
+			// exists to make. Reporting it and continuing was worse than
+			// refusing, because the record looked verified either way.
+			env.Printer.Status(ui.LevelFail, participant.Name,
+				"working tree is dirty; results would not describe "+shortRev(revision)+
+					". Commit or stash, then verify")
+			failures++
+			updated := participant
+			updated.Revision = ""
+			updated.Checks = nil
+			current = changeset.WithParticipant(current, updated)
+			continue
 		}
 		updated := participant
 		updated.Revision = revision
@@ -415,7 +432,7 @@ func changesetCloseCommand() *Command {
 	return &Command{
 		Name:    "close",
 		Summary: "Close a verified changeset with its integration outcome",
-		Usage:   `vat changeset close <id> --acceptance "..." [--approved-by <name>]`,
+		Usage:   `vat changeset close <id> --acceptance "..." [--approved-by <name>] [--force]`,
 		Long: `Close a changeset.
 
 An acceptance statement is required, and it must describe something end to end.
@@ -489,6 +506,9 @@ func changesetAbandonCommand() *Command {
 			current, err := changeset.Load(ws.Root, set.Arg(0))
 			if err != nil {
 				return usageErrorf("%v", err)
+			}
+			if !current.Status.Open() {
+				return usageErrorf("%s is already %s", current.ID, current.Status)
 			}
 			current.Status = changeset.StatusAbandoned
 			current.ClosedAt = env.Now.Format("2006-01-02")

@@ -1,6 +1,7 @@
 package harness
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -97,6 +98,32 @@ func LoadRoles(root string) ([]Role, error) {
 	return roles, nil
 }
 
+// ErrInvalidRoleName is returned for a role whose name could escape the
+// directories adapters are written into.
+var ErrInvalidRoleName = errors.New("invalid role name")
+
+// ValidRoleName reports whether a name is safe to build an adapter path from.
+//
+// The name is pasted into a file path and the adapter is then written whole,
+// with no region markers to limit the damage. An unchecked "../../AGENTS" would
+// replace the hand-written workspace contract with a generated stub, and
+// "../../../x" would leave the workspace entirely — both reachable from
+// `vat lint --fix`, which is supposed to regenerate only what it generated.
+func ValidRoleName(name string) bool {
+	if name == "" || len(name) > 64 {
+		return false
+	}
+	for _, r := range name {
+		switch {
+		case r >= 'a' && r <= 'z', r >= 'A' && r <= 'Z', r >= '0' && r <= '9':
+		case r == '-', r == '_':
+		default:
+			return false
+		}
+	}
+	return true
+}
+
 // LoadRole reads one role definition.
 func LoadRole(path string) (Role, error) {
 	data, err := os.ReadFile(path)
@@ -115,6 +142,10 @@ func LoadRole(path string) (Role, error) {
 	}
 	if role.Title == "" {
 		role.Title = frontmatter.Title(doc.Body)
+	}
+	if !ValidRoleName(role.Name) {
+		return Role{}, fmt.Errorf("%w %q in %s: use letters, digits, '-', and '_' only",
+			ErrInvalidRoleName, role.Name, path)
 	}
 	return role, nil
 }
@@ -233,6 +264,13 @@ func WriteAdapters(root string, roles []Role) ([]string, error) {
 	var changed []string
 	for _, role := range roles {
 		for _, adapter := range RenderAdapters(role) {
+			// An adapter is written whole, with no markers bounding the damage,
+			// so the destination is checked independently of the name
+			// validation upstream.
+			if !withinRoot(adapter.Path) {
+				return nil, fmt.Errorf("%w: adapter for %q would be written to %s",
+					ErrInvalidRoleName, role.Name, adapter.Path)
+			}
 			path := filepath.Join(root, adapter.Path)
 			current, _, err := fsx.ReadFileIfExists(path)
 			if err != nil {
@@ -249,6 +287,16 @@ func WriteAdapters(root string, roles []Role) ([]string, error) {
 	}
 	sort.Strings(changed)
 	return changed, nil
+}
+
+// withinRoot reports whether a workspace-relative path stays inside the
+// workspace once normalised.
+func withinRoot(relative string) bool {
+	cleaned := filepath.Clean(relative)
+	if filepath.IsAbs(cleaned) {
+		return false
+	}
+	return cleaned != ".." && !strings.HasPrefix(cleaned, ".."+string(filepath.Separator))
 }
 
 // AdapterDrift returns the adapters whose on-disk content no longer matches

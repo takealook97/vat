@@ -390,7 +390,7 @@ func checkBrain(ws *workspace.Workspace, now time.Time) []Finding {
 	case overdue > 0:
 		findings = append(findings, Finding{
 			Section: sectionBrain, Subject: "review queue", Status: StatusWarn,
-			Detail: fmt.Sprintf("%d of %d items past the %d-day window",
+			Detail: fmt.Sprintf("%d of %d past the %d-day window",
 				overdue, len(queue), policy.ReviewSLADays),
 			Fix: "vat brain review",
 		})

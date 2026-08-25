@@ -161,6 +161,21 @@ const (
 	ClaimIntent ClaimKind = "intent"
 )
 
+// Valid reports whether k is a claim kind vat understands.
+func (k ClaimKind) Valid() bool {
+	switch k {
+	case ClaimCurrentState, ClaimHistorical, ClaimIntent:
+		return true
+	default:
+		return false
+	}
+}
+
+// ClaimKinds lists the valid claim kinds for an error message.
+func ClaimKinds() string {
+	return string(ClaimCurrentState) + ", " + string(ClaimHistorical) + ", " + string(ClaimIntent)
+}
+
 // Metadata is the front matter of an atomic record.
 type Metadata struct {
 	ID     string `yaml:"id"`

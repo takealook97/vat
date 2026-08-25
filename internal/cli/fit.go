@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 
 	"github.com/takealook97/vat/internal/fit"
+	"github.com/takealook97/vat/internal/harness"
 	"github.com/takealook97/vat/internal/manifest"
 	"github.com/takealook97/vat/internal/ui"
 	"github.com/takealook97/vat/internal/workspace"
@@ -14,7 +15,7 @@ func fitCommand() *Command {
 	return &Command{
 		Name:    "fit",
 		Summary: "Decide which layers are worth adopting yet",
-		Usage:   "vat fit [--repos n] [--contracts n] [--people n] [--decisions-lost]",
+		Usage:   "vat fit [--repos n] [--contracts n] [--people n] [--agent-sessions n] [--secret-repos n] [--decisions-lost]",
 		Long: `Say where the break-even point is, per layer.
 
 Every layer here is overhead until the problem it solves is real. One developer
@@ -46,6 +47,15 @@ func runFit(ctx context.Context, env *Env, args []string) error {
 		return err
 	}
 
+	for name, value := range map[string]int{
+		"--repos": *repos, "--contracts": *contracts, "--people": *people,
+		"--agent-sessions": *sessions, "--secret-repos": *secretRepos,
+	} {
+		if value < 0 {
+			return usageErrorf("%s cannot be negative", name)
+		}
+	}
+
 	signals := fit.Signals{
 		Repositories:  *repos,
 		Contracts:     *contracts,
@@ -62,6 +72,12 @@ func runFit(ctx context.Context, env *Env, args []string) error {
 		}
 		if signals.SecretRepos == 0 {
 			signals.SecretRepos = countCredentialRepos(ws)
+		}
+		// A workspace that already defines agent roles is one where agents are
+		// in the loop, whatever the caller typed. Advising against a layer that
+		// is visibly already in use reads as the tool not looking.
+		if signals.AgentSessions == 0 && definesRoles(ws) {
+			signals.AgentSessions = 1
 		}
 	} else if signals.Repositories == 0 {
 		return usageErrorf("not in a workspace; pass --repos to describe your situation")
@@ -90,6 +106,12 @@ func runFit(ctx context.Context, env *Env, args []string) error {
 	env.Printer.Heading("Conclusion")
 	env.Printer.Println(fit.Summary(verdicts))
 	return nil
+}
+
+// definesRoles reports whether the workspace has any agent role defined.
+func definesRoles(ws *workspace.Workspace) bool {
+	roles, err := harness.LoadRoles(ws.Root)
+	return err == nil && len(roles) > 0
 }
 
 func countCredentialRepos(ws *workspace.Workspace) int {

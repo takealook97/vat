@@ -573,7 +573,6 @@ func TestEveryReportingCommandEmitsAnArrayNotNull(t *testing.T) {
 	commands := [][]string{
 		{"status"},
 		{"repo", "list"},
-		{"repo", "list", "--group", "nosuchgroup"},
 		{"lint", "--offline"},
 		{"changeset", "list"},
 		{"evidence", "list"},
@@ -630,5 +629,243 @@ func TestRepoListJSONUsesTheDocumentedFieldNames(t *testing.T) {
 	}
 	if _, found := repos[0]["Name"]; found {
 		t.Error("the payload exposes Go field names rather than the documented ones")
+	}
+}
+
+func TestARepositoryPathCannotBeTheWorkspaceRoot(t *testing.T) {
+	// Arrange: accepting "." makes every operation on that repository an
+	// operation on the whole workspace, and `repo remove --delete` a way to
+	// delete every governed repository's working tree at once.
+	h := newFixture(t, "payments")
+	h.mustRun("init", "--name", "acme", "--adopt")
+
+	// Act
+	code, output := h.run("repo", "add", "danger",
+		"--origin", "https://example.com/acme/danger.git", "--path", ".", "--no-clone")
+
+	// Assert
+	if code == ExitOK {
+		t.Fatalf("a repository rooted at the workspace was accepted:\n%s", output)
+	}
+	manifestText, err := os.ReadFile(h.path("vat.yaml"))
+	if err != nil {
+		t.Fatalf("read: %v", err)
+	}
+	if strings.Contains(string(manifestText), "danger") {
+		t.Error("the rejected repository was written to the manifest anyway")
+	}
+}
+
+func TestStrictlyBelowRefusesTheRootAndAnythingOutsideIt(t *testing.T) {
+	// Arrange: this is the guard standing between `repo remove --delete` and
+	// os.RemoveAll, so it is asserted directly rather than only through the
+	// manifest that normally prevents reaching it.
+	root := t.TempDir()
+	inside := filepath.Join(root, "payments")
+	if err := os.MkdirAll(inside, 0o755); err != nil {
+		t.Fatalf("create: %v", err)
+	}
+	outside := t.TempDir()
+
+	cases := []struct {
+		path  string
+		below bool
+	}{
+		{inside, true},
+		{filepath.Join(inside, "nested"), true},
+		{root, false},
+		{outside, false},
+		{filepath.Dir(root), false},
+	}
+
+	for _, testCase := range cases {
+		// Act & Assert
+		if got := strictlyBelow(root, testCase.path); got != testCase.below {
+			t.Errorf("strictlyBelow(%q, %q) = %v, want %v",
+				root, testCase.path, got, testCase.below)
+		}
+	}
+}
+
+func TestAGroupThatMatchesNothingIsAnErrorNotAnEmptyRun(t *testing.T) {
+	// Arrange: `vat exec --group backedn -- make test` used to print "Nothing
+	// to run." and exit 0, which in CI is a green build that tested nothing.
+	h := newFixture(t, "payments")
+	h.mustRun("init", "--name", "acme", "--adopt")
+
+	// Act
+	code, output := h.run("exec", "--group", "backedn", "--", "true")
+
+	// Assert
+	if code != ExitUsage {
+		t.Errorf("exit code = %d, want %d; an unmatched group is a typo", code, ExitUsage)
+	}
+	if !strings.Contains(output, "backedn") {
+		t.Errorf("the error does not name the group that matched nothing:\n%s", output)
+	}
+}
+
+func TestExecDoesNotReinterpretTheCallersQuoting(t *testing.T) {
+	// Arrange: joining argv back into a string handed the caller's quoting to a
+	// second shell, so `-- git commit -m "wip; rm -rf build"` ran the rm.
+	h := newFixture(t, "payments")
+	h.mustRun("init", "--name", "acme", "--adopt")
+	canary := h.path("payments", "canary.txt")
+	if err := os.WriteFile(canary, []byte("intact\n"), 0o644); err != nil {
+		t.Fatalf("write: %v", err)
+	}
+
+	// Act
+	output := h.mustRun("exec", "--only", "payments", "--", "echo", "safe; rm "+canary)
+
+	// Assert
+	if _, err := os.Stat(canary); err != nil {
+		t.Fatalf("the second command ran: the canary was deleted (%v)\n%s", err, output)
+	}
+	if !strings.Contains(output, "safe; rm ") {
+		t.Errorf("the argument was not passed through literally:\n%s", output)
+	}
+}
+
+func TestChangesetVerifyRefusesOnADirtyTree(t *testing.T) {
+	// Arrange: recording a pass would file results against a revision that does
+	// not describe what was tested, which is the one claim a changeset makes.
+	h := newFixture(t, "payments")
+	h.mustRun("init", "--name", "acme", "--adopt")
+	addCheck(t, h, "payments", "true")
+	h.mustRun("changeset", "new", "Do a thing", "--repos", "payments")
+	if err := os.WriteFile(h.path("payments", "dirty.txt"), []byte("x"), 0o644); err != nil {
+		t.Fatalf("write: %v", err)
+	}
+
+	// Act
+	code, output := h.run("changeset", "verify", "CS-0001")
+
+	// Assert
+	if code != ExitFindings {
+		t.Errorf("exit code = %d, want %d; a dirty tree must not verify", code, ExitFindings)
+	}
+	if !strings.Contains(output, "dirty") {
+		t.Errorf("the refusal does not say why:\n%s", output)
+	}
+}
+
+func TestChangesetVerifyRefusesOnAClosedChangeset(t *testing.T) {
+	// Arrange: re-verifying rewrote status back to "verified" while the closing
+	// evidence stayed in the file, leaving a record claiming both at once.
+	h := newFixture(t, "payments")
+	h.mustRun("init", "--name", "acme", "--adopt")
+	addCheck(t, h, "payments", "true")
+	commitAll(t, h, "payments")
+	h.mustRun("changeset", "new", "Do a thing", "--repos", "payments")
+	h.mustRun("changeset", "verify", "CS-0001")
+	h.mustRun("changeset", "close", "CS-0001", "--acceptance", "it works end to end")
+
+	// Act
+	code, output := h.run("changeset", "verify", "CS-0001")
+
+	// Assert
+	if code == ExitOK {
+		t.Errorf("verifying a closed changeset succeeded:\n%s", output)
+	}
+}
+
+func TestEvidenceNewRefusesToOverwriteAPacket(t *testing.T) {
+	// Arrange: overwriting silently replaced the acceptance criterion, which is
+	// the one thing the packet exists to fix before work starts.
+	h := newFixture(t, "payments")
+	h.mustRun("init", "--name", "acme", "--adopt")
+	h.mustRun("evidence", "new", "EP-001", "First", "--repos", "payments",
+		"--acceptance", "the original criterion")
+
+	// Act
+	code, _ := h.run("evidence", "new", "EP-001", "Second", "--repos", "payments")
+
+	// Assert
+	if code != ExitUsage {
+		t.Errorf("exit code = %d, want %d", code, ExitUsage)
+	}
+	content, err := os.ReadFile(h.path("evidence", "EP-001.yaml"))
+	if err != nil {
+		t.Fatalf("read: %v", err)
+	}
+	if !strings.Contains(string(content), "the original criterion") {
+		t.Error("the original acceptance criterion was overwritten")
+	}
+}
+
+func TestARoleNameCannotEscapeTheAdapterDirectories(t *testing.T) {
+	// Arrange: an adapter is written whole with no markers, so a traversing
+	// name would replace a hand-written file — reachable from `lint --fix`.
+	h := newFixture(t)
+	h.mustRun("init", "--name", "acme")
+	rolePath := h.path(".agents", "roles", "escape.md")
+	if err := os.MkdirAll(filepath.Dir(rolePath), 0o755); err != nil {
+		t.Fatalf("create: %v", err)
+	}
+	body := "---\nname: ../../AGENTS\ndescription: escape\n---\n\n# escape\n"
+	if err := os.WriteFile(rolePath, []byte(body), 0o644); err != nil {
+		t.Fatalf("write: %v", err)
+	}
+	contractBefore, err := os.ReadFile(h.path("AGENTS.md"))
+	if err != nil {
+		t.Fatalf("read: %v", err)
+	}
+
+	// Act
+	code, output := h.run("harness", "render")
+
+	// Assert
+	if code == ExitOK {
+		t.Errorf("a traversing role name was accepted:\n%s", output)
+	}
+	contractAfter, err := os.ReadFile(h.path("AGENTS.md"))
+	if err != nil {
+		t.Fatalf("read: %v", err)
+	}
+	if string(contractAfter) != string(contractBefore) {
+		t.Error("the workspace contract was overwritten by a generated adapter")
+	}
+}
+
+func TestBrainSupersedeRefusesARecordSupersedingItself(t *testing.T) {
+	// Arrange: it wrote a chain pointing nowhere, and `brain check` then failed
+	// permanently with no vat command able to clear it.
+	h := newFixture(t, "brain")
+	h.mustRun("init", "--name", "acme", "--adopt")
+	h.mustRun("brain", "init")
+	h.mustRun("brain", "new", "decision", "--title", "Use SQLite")
+
+	// Act
+	code, output := h.run("brain", "supersede", "D-0001", "D-0001")
+
+	// Assert
+	if code != ExitUsage {
+		t.Errorf("exit code = %d, want %d:\n%s", code, ExitUsage, output)
+	}
+	h.mustRun("brain", "check")
+}
+
+// commitAll commits whatever `init --adopt` left in a repository, so a test
+// about something else does not trip the dirty-tree guard.
+func commitAll(t *testing.T, h *workspaceFixture, name string) {
+	t.Helper()
+	git(t, h.path(name), "add", "-A")
+	git(t, h.path(name), "commit", "--quiet", "-m", "adopt")
+}
+
+// addCheck gives a repository a canonical check so a changeset can verify it.
+func addCheck(t *testing.T, h *workspaceFixture, name, command string) {
+	t.Helper()
+	path := h.path("vat.yaml")
+	content, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("read: %v", err)
+	}
+	updated := strings.Replace(string(content),
+		"    - name: "+name+"\n",
+		"    - name: "+name+"\n      checks:\n        - "+command+"\n", 1)
+	if err := os.WriteFile(path, []byte(updated), 0o644); err != nil {
+		t.Fatalf("write: %v", err)
 	}
 }

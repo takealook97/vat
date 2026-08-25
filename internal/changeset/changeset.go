@@ -10,6 +10,7 @@
 package changeset
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -108,6 +109,9 @@ const Dir = "changesets"
 
 var idPattern = regexp.MustCompile(`^CS-(\d+)$`)
 
+// ErrNotFound is returned when no changeset exists for an identifier.
+var ErrNotFound = errors.New("no such changeset")
+
 // Path returns the file a changeset lives in, relative to the workspace root.
 func Path(id string) string { return filepath.Join(Dir, id+".yaml") }
 
@@ -115,6 +119,11 @@ func Path(id string) string { return filepath.Join(Dir, id+".yaml") }
 func Load(root, id string) (Changeset, error) {
 	path := filepath.Join(root, Path(id))
 	data, err := os.ReadFile(path)
+	if os.IsNotExist(err) {
+		// The absolute path is dropped: the identifier is what the user typed
+		// and the only part they can act on.
+		return Changeset{}, fmt.Errorf("%w: %s", ErrNotFound, id)
+	}
 	if err != nil {
 		return Changeset{}, fmt.Errorf("read changeset %s: %w", id, err)
 	}

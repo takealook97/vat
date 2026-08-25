@@ -121,7 +121,7 @@ func Validate(m Manifest) error {
 		}
 		if !repo.Role.Valid() {
 			problems = append(problems, fmt.Sprintf("%s: unknown role %q (valid: %s)",
-				where, repo.Role, joinRoles()))
+				where, repo.Role, joinRoleNames()))
 		}
 		dir := repo.Dir()
 		if seenPaths[dir] {
@@ -186,7 +186,13 @@ func containedPath(dir string) bool {
 		return false
 	}
 	cleaned := path.Clean(slashed)
-	return cleaned != ".." && !strings.HasPrefix(cleaned, "../")
+	if cleaned == ".." || strings.HasPrefix(cleaned, "../") {
+		return false
+	}
+	// "." resolves to the workspace root. A repository whose directory is the
+	// root turns every operation on it into an operation on the whole
+	// workspace, and `repo remove --delete` into deleting all of it.
+	return cleaned != "." && cleaned != "/"
 }
 
 func isASCIILetter(c byte) bool {
@@ -201,14 +207,6 @@ func countRole(m Manifest, role Role) int {
 		}
 	}
 	return count
-}
-
-func joinRoles() string {
-	names := make([]string, 0, len(Roles()))
-	for _, role := range Roles() {
-		names = append(names, string(role))
-	}
-	return strings.Join(names, ", ")
 }
 
 func validRepoName(name string) bool {

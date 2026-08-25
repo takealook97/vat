@@ -102,7 +102,14 @@ func Run(ctx context.Context, ws *workspace.Workspace, opts Options) (Report, er
 		}
 	}
 
-	report.Checked = len(RuleNames())
+	// The count reflects the rules this run actually evaluated, so `--only`
+	// does not claim to have checked the whole set.
+	report.Checked = 0
+	for _, rule := range RuleNames() {
+		if selected(rule, opts.Only) {
+			report.Checked++
+		}
+	}
 
 	add(checkGitignore(ws)...)
 	add(checkWorkspaceGit(ws)...)
@@ -160,6 +167,7 @@ func RuleNames() []string {
 		"repo/missing",
 		"repo/not-a-repository",
 		"repo/remote-mismatch",
+		"repo/remote-missing",
 		"repo/default-branch-missing",
 		"repo/checks-missing",
 		"harness/workspace-missing",
@@ -241,9 +249,13 @@ func checkRepositories(ctx context.Context, ws *workspace.Workspace) []Finding {
 		}
 		actual, err := gitx.RemoteURL(ctx, dir, "origin")
 		if err != nil {
+			// Nothing mismatches when there is no remote at all, and this is
+			// the state `vat repo new --no-remote` deliberately leaves behind.
 			findings = append(findings, Finding{
-				Rule: "repo/remote-mismatch", Severity: SeverityError, Subject: repo.Name,
-				Message: "no origin remote configured",
+				Rule: "repo/remote-missing", Severity: SeverityWarn, Subject: repo.Name,
+				Message: "no origin remote is configured, so it can never be fetched or pushed",
+				Fix: fmt.Sprintf("git -C %s remote add origin %s",
+					repo.Dir(), gitx.Redact(repo.Origin)),
 			})
 		} else if !gitx.SameRemote(actual, repo.Origin) {
 			findings = append(findings, Finding{

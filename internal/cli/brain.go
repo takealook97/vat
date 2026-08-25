@@ -180,7 +180,11 @@ func runBrainNew(ctx context.Context, env *Env, args []string) error {
 		input.ID = store.NextID(kind)
 	}
 	if *claim != "" {
-		input.ClaimKind = brain.ClaimKind(*claim)
+		kind := brain.ClaimKind(*claim)
+		if !kind.Valid() {
+			return usageErrorf("unknown claim kind %q (want %s)", *claim, brain.ClaimKinds())
+		}
+		input.ClaimKind = kind
 	}
 	if input.ClaimKind == brain.ClaimCurrentState {
 		if *owner == "" {
@@ -283,7 +287,8 @@ are run in a loop while cleaning up a repository.`,
 				}
 			case len(findings) == 0:
 				env.Printer.Status(ui.LevelOK, "brain",
-					fmt.Sprintf("%d records, nothing to report", len(store.Records)))
+					fmt.Sprintf("%s, nothing to report",
+						pluralise(len(store.Records), "record", "records")))
 			default:
 				for _, finding := range findings {
 					level := ui.LevelWarn
@@ -300,9 +305,14 @@ are run in a loop while cleaning up a repository.`,
 					}
 				}
 				env.Printer.Heading("Result")
-				env.Printer.Status(ui.LevelInfo, "brain",
-					fmt.Sprintf("%d errors, %d warnings",
-						brain.Errors(findings), len(findings)-brain.Errors(findings)))
+				level := ui.LevelWarn
+				if brain.Errors(findings) > 0 {
+					level = ui.LevelFail
+				}
+				env.Printer.Status(level, "brain",
+					fmt.Sprintf("%s, %s",
+						pluralise(brain.Errors(findings), "error", "errors"),
+						pluralise(len(findings)-brain.Errors(findings), "warning", "warnings")))
 			}
 			if brain.Errors(findings) > 0 {
 				return findingsErrorf("")
@@ -372,8 +382,8 @@ are auditing why something was decided rather than asking what is true now.`,
 					env.Printer.Hint("      │ %s", truncate(line, 96))
 				}
 			}
-			env.Printer.Hint("\n%d results. Open the records themselves; this is an index, not an answer.",
-				len(hits))
+			env.Printer.Hint("\n%s. Open the records themselves; this is an index, not an answer.",
+				pluralise(len(hits), "result", "results"))
 			return nil
 		},
 	}
@@ -497,8 +507,8 @@ that keeps the layer honest across years rather than months.`,
 			if !*apply {
 				env.Printer.Hint("\nNothing written. Re-run with --apply to record these.")
 			} else {
-				env.Printer.Hint("\n%d claims demoted. Run `vat brain build` to refresh the index.",
-					len(transitions))
+				env.Printer.Hint("\n%s demoted. Run `vat brain build` to refresh the index.",
+					pluralise(len(transitions), "claim", "claims"))
 			}
 			return nil
 		},
@@ -575,6 +585,12 @@ made sense.`,
 			replacement, ok := index[set.Arg(1)]
 			if !ok {
 				return usageErrorf("no record with id %q", set.Arg(1))
+			}
+			// Superseding a record with itself wrote a chain that points
+			// nowhere, and `brain check` then failed permanently with no vat
+			// command able to clear it.
+			if previous.ID == replacement.ID {
+				return usageErrorf("%s cannot supersede itself", previous.ID)
 			}
 			if err := brain.Supersede(store.Root, previous, replacement); err != nil {
 				return err

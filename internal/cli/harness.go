@@ -99,9 +99,22 @@ func harnessCheckCommand() *Command {
 				env.Printer.Status(ui.LevelOK, "harness", "every contract matches the manifest")
 				return nil
 			default:
-				renderLintReport(env, report)
+				for _, finding := range report.Findings {
+					level := ui.LevelWarn
+					if finding.Severity == lint.SeverityError {
+						level = ui.LevelFail
+					}
+					subject := finding.Rule
+					if finding.Subject != "" {
+						subject = finding.Rule + " · " + finding.Subject
+					}
+					env.Printer.Status(level, subject, finding.Message)
+				}
 			}
-			if len(report.Findings) == 0 {
+			// Warnings alone do not fail, matching `vat lint`. Reporting the
+			// same findings with two different exit codes depending on which
+			// command surfaced them made the code meaningless in CI.
+			if report.Errors() == 0 {
 				return nil
 			}
 			return findingsErrorf("Run `vat harness render` to bring them back in line.")
@@ -194,7 +207,7 @@ func harnessRoleCommand() *Command {
 	return &Command{
 		Name:    "role",
 		Summary: "Create a new runtime-neutral agent role",
-		Usage:   "vat harness role new <name> [--writes <repos>] [--model <m>]",
+		Usage:   "vat harness role new <name> [--writes <repos>] [--reads <repos>] [--model <m>] [--effort <e>] [--description <text>] [--runtimes <list>]",
 		Long: `Create a role definition under .agents/roles/.
 
 The role body is the canonical contract. Runtime adapters for each supported
@@ -219,7 +232,7 @@ func runHarnessRole(ctx context.Context, env *Env, args []string) error {
 		return err
 	}
 	if set.NArg() != 2 || set.Arg(0) != "new" {
-		return usageErrorf("usage: vat harness role new <name>")
+		return usageErrorf("expected: vat harness role new <name>")
 	}
 	name := set.Arg(1)
 

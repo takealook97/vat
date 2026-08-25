@@ -16,16 +16,27 @@ func execCommand() *Command {
 	return &Command{
 		Name:    "exec",
 		Summary: "Run a command in every selected repository",
-		Usage:   "vat exec [--group <g>] [--role <r>] [--checks] -- <command>",
+		Usage:   "vat exec [--only <names>] [--group <g>] [--role <r>] [--checks] [--jobs <n>] [--timeout <d>] [--keep-going=false] -- <command>",
 		Long: `Run one command across the workspace, in parallel, with per-repository results.
 
 Unlike a shell loop, a failure in one repository is never hidden by success in
 another: each result is reported separately and the exit code reflects the whole
 run.
 
+Your command is executed directly, not re-parsed by a shell, so your quoting
+survives. This commits with that message rather than also running a second
+command:
+
+    vat exec -- git commit -m "wip; cleanup"
+
+If you want shell behaviour, ask for it explicitly:
+
+    vat exec -- sh -c 'for f in *.go; do echo $f; done'
+
 --checks runs each repository's own canonical checks from the manifest instead
 of a command you supply, which is how you ask "is everything still green?"
-without knowing what each repository uses to answer that.`,
+without knowing what each repository uses to answer that. Those are shell
+fragments by contract, and do run through a shell.`,
 		Examples: []string{
 			"vat exec -- git status --short",
 			"vat exec --group backend -- make test",
@@ -48,9 +59,17 @@ func runExec(ctx context.Context, env *Env, args []string) error {
 		return err
 	}
 
-	command := strings.Join(set.Args(), " ")
-	if command == "" && !*useChecks {
+	// The argument vector is kept as a vector. Joining it back into a string
+	// would hand the caller's quoting to a second shell: `-- echo 'a; b'` would
+	// run two commands, and `-- git commit -m "wip; rm -rf build"` would run the
+	// rm. Only a check declared in vat.yaml is a shell fragment by contract.
+	argv := set.Args()
+	if len(argv) == 0 && !*useChecks {
 		return usageErrorf("expected a command after `--`, or --checks")
+	}
+
+	if *jobs < 0 {
+		return usageErrorf("--jobs cannot be negative")
 	}
 
 	ws, err := env.Workspace()
@@ -81,7 +100,7 @@ func runExec(ctx context.Context, env *Env, args []string) error {
 			}
 			continue
 		}
-		jobList = append(jobList, runner.Job{Repo: repo.Name, Dir: dir, Command: command})
+		jobList = append(jobList, runner.Job{Repo: repo.Name, Dir: dir, Argv: argv})
 	}
 	if len(jobList) == 0 {
 		env.Printer.Println("Nothing to run.")
@@ -118,6 +137,9 @@ func runExec(ctx context.Context, env *Env, args []string) error {
 		}
 	}
 	if failures > 0 {
+		if env.JSON {
+			return findingsErrorf("")
+		}
 		return findingsErrorf("%d of %d commands failed.", failures, len(results))
 	}
 	return nil
@@ -135,15 +157,11 @@ func renderExecResults(env *Env, results []runner.Result) {
 		}
 		if result.OK() {
 			env.Printer.Status(ui.LevelOK, label, result.Duration.Round(time.Millisecond).String())
-			for _, line := range firstLines(result.Stdout, 3) {
-				env.Printer.Hint("      | %s", truncate(line, 100))
-			}
+			printOutput(env, result.Stdout, 3)
 			continue
 		}
 		env.Printer.Status(ui.LevelFail, label, result.FirstLine())
-		for _, line := range firstLines(result.Output(), 6) {
-			env.Printer.Hint("      | %s", truncate(line, 100))
-		}
+		printOutput(env, result.Output(), 6)
 	}
 	passed, skipped := 0, 0
 	for _, result := range results {
@@ -160,6 +178,22 @@ func renderExecResults(env *Env, results []runner.Result) {
 		return
 	}
 	env.Printer.Hint("\n%d of %d succeeded.", passed, len(results))
+}
+
+// printOutput shows the first few lines and says plainly when it stopped, so a
+// truncated result is never mistaken for the whole of it.
+func printOutput(env *Env, text string, limit int) {
+	lines := firstLines(text, limit+1)
+	shown := lines
+	if len(shown) > limit {
+		shown = shown[:limit]
+	}
+	for _, line := range shown {
+		env.Printer.Hint("      | %s", truncate(line, 100))
+	}
+	if len(lines) > limit {
+		env.Printer.Hint("      | … output truncated")
+	}
 }
 
 func firstLines(text string, limit int) []string {

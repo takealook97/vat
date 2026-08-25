@@ -57,11 +57,26 @@ func (r Result) FirstLine() string {
 }
 
 // Job is one command to run in one directory.
+//
+// A job carries either Argv or Command, never both. Argv is executed directly,
+// so the caller's quoting survives; Command is handed to a shell, which is what
+// a canonical check declared in vat.yaml expects.
 type Job struct {
-	Repo    string
-	Dir     string
+	Repo string
+	Dir  string
+	// Command is a shell fragment, used for checks written in the manifest.
 	Command string
-	Env     []string
+	// Argv is an already-split argument vector, executed with no shell.
+	Argv []string
+	Env  []string
+}
+
+// Display returns the job's command as one readable line.
+func (j Job) Display() string {
+	if len(j.Argv) > 0 {
+		return strings.Join(j.Argv, " ")
+	}
+	return j.Command
 }
 
 // Options configure a run.
@@ -122,7 +137,7 @@ func runSequentially(ctx context.Context, jobs []Job, opts Options) []Result {
 	stopped := false
 	for i, job := range jobs {
 		if stopped {
-			results[i] = Result{Repo: job.Repo, Command: job.Command, Dir: job.Dir, Skipped: true}
+			results[i] = Result{Repo: job.Repo, Command: job.Display(), Dir: job.Dir, Skipped: true}
 			continue
 		}
 		results[i] = RunOne(ctx, job, opts.Timeout)
@@ -146,8 +161,16 @@ func RunOne(ctx context.Context, job Job, timeout time.Duration) Result {
 		defer cancel()
 	}
 
-	shell, flag := shellCommand()
-	cmd := exec.CommandContext(runCtx, shell, flag, job.Command)
+	var cmd *exec.Cmd
+	if len(job.Argv) > 0 {
+		// Executed directly: the caller already split these, and re-joining
+		// them into a string would let a shell re-interpret quotes, globs, and
+		// separators the caller's own shell had consumed.
+		cmd = exec.CommandContext(runCtx, job.Argv[0], job.Argv[1:]...)
+	} else {
+		shell, flag := shellCommand()
+		cmd = exec.CommandContext(runCtx, shell, flag, job.Command)
+	}
 	cmd.Dir = job.Dir
 	cmd.Env = append(os.Environ(), job.Env...)
 
@@ -157,7 +180,7 @@ func RunOne(ctx context.Context, job Job, timeout time.Duration) Result {
 
 	err := cmd.Run()
 	result := Result{
-		Repo: job.Repo, Command: job.Command, Dir: job.Dir,
+		Repo: job.Repo, Command: job.Display(), Dir: job.Dir,
 		Duration: time.Since(started),
 		Stdout:   stdout.String(), Stderr: stderr.String(),
 	}

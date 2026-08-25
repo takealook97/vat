@@ -14,7 +14,7 @@ func syncCommand() *Command {
 	return &Command{
 		Name:    "sync",
 		Summary: "Fetch every repository and fast-forward only what is safe",
-		Usage:   "vat sync [--dry-run] [--offline] [--group <g>] [--only <names>]",
+		Usage:   "vat sync [--dry-run] [--offline] [--only <names>] [--group <g>] [--role <r>] [--jobs <n>]",
 		Long: `Update the workspace without ever discarding local work.
 
 Missing repositories are cloned. Everything else is fetched, and only a clean
@@ -78,8 +78,13 @@ func runSync(ctx context.Context, env *Env, args []string) error {
 	}
 
 	if report.Failures > 0 {
-		return findingsErrorf("%d repository/repositories need attention before the workspace is consistent.",
-			report.Failures)
+		if env.JSON {
+			// The trailer goes to stdout, which would leave the JSON payload
+			// followed by prose and unparseable by the caller that asked for it.
+			return findingsErrorf("")
+		}
+		return findingsErrorf("%s need attention before the workspace is consistent.",
+			pluralise(report.Failures, "repository", "repositories"))
 	}
 	return nil
 }
