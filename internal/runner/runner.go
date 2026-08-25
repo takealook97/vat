@@ -26,10 +26,14 @@ type Result struct {
 	Stdout   string        `json:"stdout,omitempty"`
 	Stderr   string        `json:"stderr,omitempty"`
 	Err      error         `json:"-"`
+	// Skipped marks a job abandoned because an earlier one failed. It is
+	// neither a pass nor a failure.
+	Skipped bool `json:"skipped,omitempty"`
 }
 
-// OK reports whether the command succeeded.
-func (r Result) OK() bool { return r.Err == nil && r.ExitCode == 0 }
+// OK reports whether the command ran and succeeded. A skipped job is not OK
+// and is not a failure either; check Skipped to tell them apart.
+func (r Result) OK() bool { return !r.Skipped && r.Err == nil && r.ExitCode == 0 }
 
 // Output returns stderr when present, otherwise stdout, trimmed for display.
 func (r Result) Output() string {
@@ -69,10 +73,22 @@ type Options struct {
 	Timeout time.Duration
 	// Stream sends live output for a job to the caller as it completes.
 	Stream func(Result)
+	// StopOnFailure abandons the remaining jobs once one fails. Lowering
+	// concurrency alone does not achieve this: every job is still queued and
+	// still runs, just one at a time.
+	StopOnFailure bool
 }
 
 // Run executes every job, returning results in the order the jobs were given.
+//
+// With StopOnFailure the jobs run sequentially and the run abandons the rest as
+// soon as one fails; those jobs come back with Skipped set so the caller can
+// tell "did not run" from "ran and passed".
 func Run(ctx context.Context, jobs []Job, opts Options) []Result {
+	if opts.StopOnFailure {
+		return runSequentially(ctx, jobs, opts)
+	}
+
 	parallelism := opts.Parallelism
 	if parallelism <= 0 {
 		parallelism = 1
@@ -98,6 +114,25 @@ func Run(ctx context.Context, jobs []Job, opts Options) []Result {
 		}(i, job)
 	}
 	wg.Wait()
+	return results
+}
+
+func runSequentially(ctx context.Context, jobs []Job, opts Options) []Result {
+	results := make([]Result, len(jobs))
+	stopped := false
+	for i, job := range jobs {
+		if stopped {
+			results[i] = Result{Repo: job.Repo, Command: job.Command, Dir: job.Dir, Skipped: true}
+			continue
+		}
+		results[i] = RunOne(ctx, job, opts.Timeout)
+		if opts.Stream != nil {
+			opts.Stream(results[i])
+		}
+		if !results[i].OK() {
+			stopped = true
+		}
+	}
 	return results
 }
 

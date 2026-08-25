@@ -128,8 +128,9 @@ func Validate(m Manifest) error {
 			problems = append(problems, fmt.Sprintf("%s: two repositories resolve to the same directory %q", where, dir))
 		}
 		seenPaths[dir] = true
-		if filepath.IsAbs(dir) || strings.HasPrefix(dir, "..") {
-			problems = append(problems, where+": path must stay inside the workspace")
+		if !containedPath(dir) {
+			problems = append(problems, fmt.Sprintf(
+				"%s: path %q must stay inside the workspace", where, dir))
 		}
 		if repo.Access != "" && repo.Access != "public" && repo.Access != "private" {
 			problems = append(problems, where+`: access must be "public" or "private"`)
@@ -157,6 +158,26 @@ func Validate(m Manifest) error {
 		return nil
 	}
 	return fmt.Errorf("%s is invalid:\n  - %s", FileName, strings.Join(problems, "\n  - "))
+}
+
+// containedPath reports whether a repository directory stays inside the
+// workspace once the path is normalised.
+//
+// Checking for a leading ".." is not enough: "sub/../../outside" has no such
+// prefix but resolves above the root, and everything downstream then operates
+// there — cloning, writing a harness, and, with `repo remove --delete`,
+// deleting it.
+func containedPath(dir string) bool {
+	cleaned := filepath.Clean(dir)
+	if filepath.IsAbs(cleaned) || cleaned == "" {
+		return false
+	}
+	if cleaned == ".." || strings.HasPrefix(cleaned, ".."+string(filepath.Separator)) {
+		return false
+	}
+	// A Windows volume-relative path such as "C:foo" is neither absolute nor
+	// parent-relative, yet it escapes the root just as effectively.
+	return filepath.VolumeName(cleaned) == ""
 }
 
 func countRole(m Manifest, role Role) int {

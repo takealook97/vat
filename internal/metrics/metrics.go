@@ -12,7 +12,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"os"
 	"path/filepath"
 	"strings"
 	"time"
@@ -153,6 +152,10 @@ func medianClaimAge(store *brain.Store, now time.Time) int {
 
 // Append records a snapshot in the local ledger so trends become visible. A
 // single reading says little; the direction of travel says everything.
+//
+// The whole ledger is rewritten atomically rather than appended to. It is small
+// — one line per run — and vat's contract is that no write can leave a
+// half-finished file behind, including this one.
 func Append(ws *workspace.Workspace, snapshot Snapshot) error {
 	if err := fsx.EnsureDir(ws.StateDir()); err != nil {
 		return err
@@ -162,15 +165,17 @@ func Append(ws *workspace.Workspace, snapshot Snapshot) error {
 		return fmt.Errorf("encode snapshot: %w", err)
 	}
 	path := filepath.Join(ws.StateDir(), Ledger)
-	file, err := os.OpenFile(path, os.O_APPEND|os.O_CREATE|os.O_WRONLY, fsx.DefaultFileMode)
+	existing, _, err := fsx.ReadFileIfExists(path)
 	if err != nil {
-		return fmt.Errorf("open %s: %w", path, err)
+		return err
 	}
-	defer func() { _ = file.Close() }()
-	if _, err := file.Write(append(encoded, '\n')); err != nil {
-		return fmt.Errorf("write %s: %w", path, err)
+	next := existing
+	if len(next) > 0 && !strings.HasSuffix(string(next), "\n") {
+		next = append(next, '\n')
 	}
-	return nil
+	next = append(next, encoded...)
+	next = append(next, '\n')
+	return fsx.WriteFileAtomic(path, next, fsx.DefaultFileMode)
 }
 
 // History reads previous snapshots, oldest first.

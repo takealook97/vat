@@ -265,19 +265,81 @@ func ToplevelOf(ctx context.Context, dir string) (string, error) {
 // remote so a comparison does not report a mismatch for a trailing ".git" or a
 // scp-style SSH address. It is only used for comparison, never for rewriting a
 // configured remote: an actual mismatch is treated as a supply-chain signal.
+//
+// Two things are deliberately preserved. The path keeps its case, because on a
+// case-sensitive host "acme/Payments" and "acme/payments" are different
+// repositories. And "http" is not folded into "https", because silently
+// accepting a downgrade to an unauthenticated transport is exactly the
+// substitution this comparison exists to catch.
 func NormaliseURL(url string) string {
 	trimmed := strings.TrimSpace(url)
 	trimmed = strings.TrimSuffix(trimmed, "/")
 	trimmed = strings.TrimSuffix(trimmed, ".git")
-	if strings.HasPrefix(trimmed, "git@") {
+	trimmed = stripUserinfo(trimmed)
+
+	scheme := "ssh"
+	switch {
+	case strings.HasPrefix(trimmed, "git@"):
 		if host, path, ok := strings.Cut(strings.TrimPrefix(trimmed, "git@"), ":"); ok {
-			trimmed = "https://" + host + "/" + path
+			trimmed = host + "/" + path
 		}
+	case strings.HasPrefix(trimmed, "ssh://"):
+		trimmed = strings.TrimPrefix(trimmed, "ssh://")
+	case strings.HasPrefix(trimmed, "https://"):
+		scheme, trimmed = "https", strings.TrimPrefix(trimmed, "https://")
+	case strings.HasPrefix(trimmed, "http://"):
+		scheme, trimmed = "http", strings.TrimPrefix(trimmed, "http://")
+	default:
+		scheme = "file"
 	}
-	trimmed = strings.TrimPrefix(trimmed, "ssh://git@")
-	trimmed = strings.TrimPrefix(trimmed, "https://")
-	trimmed = strings.TrimPrefix(trimmed, "http://")
-	return strings.ToLower(trimmed)
+	// SSH and HTTPS are two authenticated routes to the same repository, so
+	// they compare equal; plain HTTP does not.
+	if scheme == "ssh" {
+		scheme = "https"
+	}
+
+	host, path, _ := strings.Cut(trimmed, "/")
+	return scheme + "://" + strings.ToLower(host) + "/" + path
+}
+
+// stripUserinfo removes any "user:token@" prefix from the authority.
+func stripUserinfo(url string) string {
+	scheme, rest, ok := strings.Cut(url, "://")
+	if !ok {
+		return url
+	}
+	authority, remainder, hasPath := strings.Cut(rest, "/")
+	if at := strings.LastIndex(authority, "@"); at >= 0 {
+		authority = authority[at+1:]
+	}
+	if hasPath {
+		return scheme + "://" + authority + "/" + remainder
+	}
+	return scheme + "://" + authority
+}
+
+// Redact removes credentials from a URL so it can be printed.
+//
+// A remote can carry a token in its authority ("https://x-token:ghp_...@host").
+// vat reports a remote mismatch by showing both URLs, and that report must not
+// become the one place a credential is disclosed.
+func Redact(url string) string {
+	scheme, rest, ok := strings.Cut(strings.TrimSpace(url), "://")
+	if !ok {
+		// An scp-style address ("git@host:path") carries a user name but never
+		// a secret, so it is safe as written.
+		return url
+	}
+	authority, remainder, hasPath := strings.Cut(rest, "/")
+	at := strings.LastIndex(authority, "@")
+	if at < 0 {
+		return url
+	}
+	redacted := scheme + "://" + "***@" + authority[at+1:]
+	if hasPath {
+		return redacted + "/" + remainder
+	}
+	return redacted
 }
 
 // SameRemote reports whether two URLs designate the same repository.

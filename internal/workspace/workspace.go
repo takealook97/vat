@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/takealook97/vat/internal/manifest"
 )
@@ -83,14 +84,23 @@ func (w *Workspace) ManifestPath() string {
 	return filepath.Join(w.Root, manifest.FileName)
 }
 
-// Path joins a workspace-relative path onto the root.
-func (w *Workspace) Path(parts ...string) string {
-	return filepath.Join(append([]string{w.Root}, parts...)...)
+// RepoPath returns the absolute directory a repository should occupy, and can
+// never point outside the workspace.
+//
+// The manifest already rejects an escaping path, but this is the function every
+// destructive operation resolves through — cloning, writing a harness, deleting
+// a directory. Rooting the join here means a path that somehow bypassed
+// validation still cannot reach outside.
+func (w *Workspace) RepoPath(repo manifest.Repo) string {
+	return w.Path(repo.Dir())
 }
 
-// RepoPath returns the absolute directory a repository should occupy.
-func (w *Workspace) RepoPath(repo manifest.Repo) string {
-	return filepath.Join(w.Root, repo.Dir())
+// Path joins workspace-relative parts onto the root, containing the result.
+// "../../etc" resolves to <root>/etc rather than escaping.
+func (w *Workspace) Path(parts ...string) string {
+	joined := filepath.Join(parts...)
+	contained := filepath.Clean(string(filepath.Separator) + joined)
+	return filepath.Join(w.Root, strings.TrimPrefix(contained, string(filepath.Separator)))
 }
 
 // Rel makes an absolute path readable in output by expressing it relative to

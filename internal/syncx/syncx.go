@@ -160,7 +160,7 @@ func syncOne(ctx context.Context, ws *workspace.Workspace, repo manifest.Repo, r
 		}
 		if opts.DryRun {
 			return Result{Repo: name, State: StatePlanned,
-				Detail: fmt.Sprintf("clone %s", repo.Origin)}
+				Detail: fmt.Sprintf("clone %s", gitx.Redact(repo.Origin))}
 		}
 		if err := gitx.Clone(ctx, repo.Origin, dir); err != nil {
 			return Result{Repo: name, State: StateMissing, Detail: gitErrorDetail(err)}
@@ -178,7 +178,8 @@ func syncOne(ctx context.Context, ws *workspace.Workspace, repo manifest.Repo, r
 		// Rewriting the remote here would turn a possible supply-chain problem
 		// into a silent redirection of every future fetch.
 		return Result{Repo: name, State: StateRemoteMismatch,
-			Detail: fmt.Sprintf("origin is %s, manifest says %s", actual, repo.Origin)}
+			Detail: fmt.Sprintf("origin is %s, manifest says %s",
+				gitx.Redact(actual), gitx.Redact(repo.Origin))}
 	}
 
 	if !opts.Offline {

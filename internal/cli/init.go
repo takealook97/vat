@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/takealook97/vat/internal/fsx"
+	"github.com/takealook97/vat/internal/gitx"
 	"github.com/takealook97/vat/internal/lint"
 	"github.com/takealook97/vat/internal/manifest"
 	"github.com/takealook97/vat/internal/ui"
@@ -107,7 +108,7 @@ func runInit(ctx context.Context, env *Env, args []string) error {
 		printer.Status(ui.LevelOK, file, "generated")
 	}
 	for _, repo := range built.Repos {
-		printer.Status(ui.LevelInfo, repo.Name, fmt.Sprintf("%s · %s", repo.Role, repo.Origin))
+		printer.Status(ui.LevelInfo, repo.Name, fmt.Sprintf("%s · %s", repo.Role, gitx.Redact(repo.Origin)))
 	}
 
 	printer.Heading("Next")

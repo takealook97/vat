@@ -102,19 +102,46 @@ func TestValidateRejectsMoreThanOneBrainRepository(t *testing.T) {
 	}
 }
 
-func TestValidateRejectsAPathThatEscapesTheWorkspace(t *testing.T) {
-	// Arrange
-	built := manifest.Default("acme")
-	built = manifest.WithRepo(built, manifest.Repo{
-		Name: "escape", Origin: "u", Role: manifest.RoleProduct, Path: "../outside",
-	})
+func TestValidateRejectsEveryPathThatEscapesTheWorkspace(t *testing.T) {
+	// Arrange: a leading ".." is the obvious case. The others are the ones a
+	// naive prefix check waves through, and everything downstream then operates
+	// outside the root — cloning, writing a harness, and deleting a directory.
+	escapes := []string{
+		"../outside",
+		"sub/../../outside",
+		"a/b/../../../outside",
+		"/etc",
+		"..",
+	}
 
-	// Act
-	err := manifest.Validate(built)
+	for _, path := range escapes {
+		built := manifest.Default("acme")
+		built = manifest.WithRepo(built, manifest.Repo{
+			Name: "escape", Origin: "u", Role: manifest.RoleProduct, Path: path,
+		})
 
-	// Assert
-	if err == nil || !strings.Contains(err.Error(), "inside the workspace") {
-		t.Fatalf("want a path-escape error, got %v", err)
+		// Act
+		err := manifest.Validate(built)
+
+		// Assert
+		if err == nil || !strings.Contains(err.Error(), "inside the workspace") {
+			t.Errorf("path %q was accepted; want a containment error, got %v", path, err)
+		}
+	}
+}
+
+func TestValidateAcceptsAPathThatStaysInside(t *testing.T) {
+	// Arrange: normalising must not reject a legitimate nested path.
+	for _, path := range []string{"payments", "services/payments", "./payments", "a/b/../c"} {
+		built := manifest.Default("acme")
+		built = manifest.WithRepo(built, manifest.Repo{
+			Name: "ok", Origin: "u", Role: manifest.RoleProduct, Path: path,
+		})
+
+		// Act & Assert
+		if err := manifest.Validate(built); err != nil {
+			t.Errorf("path %q was rejected: %v", path, err)
+		}
 	}
 }
 

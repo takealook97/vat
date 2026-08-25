@@ -205,12 +205,28 @@ func checkRepos(ctx context.Context, ws *workspace.Workspace) []Finding {
 		if err != nil || !gitx.SameRemote(actual, repo.Origin) {
 			findings = append(findings, Finding{
 				Section: sectionRepositories, Subject: repo.Name, Status: StatusFail,
-				Detail: fmt.Sprintf("origin is %q, manifest says %q", actual, repo.Origin),
+				Detail: fmt.Sprintf("origin is %q, manifest says %q",
+					gitx.Redact(actual), gitx.Redact(repo.Origin)),
 			})
 			continue
 		}
-		branch, _ := gitx.CurrentBranch(ctx, dir)
-		dirty, _ := gitx.IsDirty(ctx, dir)
+		branch, err := gitx.CurrentBranch(ctx, dir)
+		if err != nil {
+			// A repository git cannot answer for is a finding, not a clean one.
+			findings = append(findings, Finding{
+				Section: sectionRepositories, Subject: repo.Name, Status: StatusFail,
+				Detail: "git cannot read this repository",
+			})
+			continue
+		}
+		dirty, err := gitx.IsDirty(ctx, dir)
+		if err != nil {
+			findings = append(findings, Finding{
+				Section: sectionRepositories, Subject: repo.Name, Status: StatusFail,
+				Detail: "git cannot read the working tree state",
+			})
+			continue
+		}
 		expected := repo.Branch(ws.Manifest.Workspace.DefaultBranch)
 		detail := branch
 		if branch == "" {

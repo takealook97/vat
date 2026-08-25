@@ -43,7 +43,10 @@ type repoStatus struct {
 	Ahead    int    `json:"ahead"`
 	Behind   int    `json:"behind"`
 	Stashes  int    `json:"stashes,omitempty"`
-	Note     string `json:"note,omitempty"`
+	// Unreadable marks a repository git could not be questioned about. It is
+	// reported as its own state rather than folded into "clean".
+	Unreadable bool   `json:"unreadable,omitempty"`
+	Note       string `json:"note,omitempty"`
 }
 
 func runStatus(ctx context.Context, env *Env, args []string) error {
@@ -130,14 +133,32 @@ func describeStatus(ctx context.Context, ws *workspace.Workspace, repo manifest.
 			status.Note = "fetch failed"
 		}
 	}
-	branch, _ := gitx.CurrentBranch(ctx, dir)
+	// A git failure here is not the same as a clean repository. Discarding it
+	// would report an unreadable or permission-denied repository as clean and
+	// detached, which is the one answer a status command must never give.
+	branch, err := gitx.CurrentBranch(ctx, dir)
+	if err != nil {
+		status.Unreadable = true
+		status.Note = "unreadable: " + firstLine(err.Error())
+		return status
+	}
 	status.Branch = branch
 	if branch == "" {
 		status.Branch = "(detached)"
 	}
-	status.Revision, _ = gitx.ShortRevision(ctx, dir, "HEAD")
-	status.Dirty, _ = gitx.IsDirty(ctx, dir)
-	status.Stashes, _ = gitx.StashCount(ctx, dir)
+	if status.Revision, err = gitx.ShortRevision(ctx, dir, "HEAD"); err != nil {
+		status.Unreadable = true
+		status.Note = "unreadable: " + firstLine(err.Error())
+		return status
+	}
+	if status.Dirty, err = gitx.IsDirty(ctx, dir); err != nil {
+		status.Unreadable = true
+		status.Note = "unreadable: " + firstLine(err.Error())
+		return status
+	}
+	if status.Stashes, err = gitx.StashCount(ctx, dir); err != nil {
+		status.Note = "stash list unavailable"
+	}
 
 	if branch != "" {
 		upstream := "origin/" + branch
@@ -162,13 +183,16 @@ func renderStatusTable(env *Env, ws *workspace.Workspace, statuses []repoStatus)
 		return
 	}
 	rows := make([][]string, 0, len(statuses))
-	dirty, ahead, behind, missing := 0, 0, 0, 0
+	dirty, ahead, behind, missing, unreadable := 0, 0, 0, 0, 0
 	for _, status := range statuses {
 		state := "clean"
 		switch {
 		case !status.Present:
 			state = "missing"
 			missing++
+		case status.Unreadable:
+			state = "unreadable"
+			unreadable++
 		case status.Dirty:
 			state = "dirty"
 			dirty++
@@ -195,6 +219,9 @@ func renderStatusTable(env *Env, ws *workspace.Workspace, statuses []repoStatus)
 	if missing > 0 {
 		summary = append(summary, fmt.Sprintf("%d not cloned", missing))
 	}
+	if unreadable > 0 {
+		summary = append(summary, fmt.Sprintf("%d unreadable", unreadable))
+	}
 	if dirty > 0 {
 		summary = append(summary, fmt.Sprintf("%d dirty", dirty))
 	}
@@ -208,6 +235,17 @@ func renderStatusTable(env *Env, ws *workspace.Workspace, statuses []repoStatus)
 	if behind > 0 || missing > 0 {
 		env.Printer.Hint("Run `vat sync` to fast-forward what can be advanced safely.")
 	}
+}
+
+// firstLine returns the first non-empty line of a message, so a multi-line git
+// error stays inside one table cell.
+func firstLine(text string) string {
+	for _, line := range strings.Split(text, "\n") {
+		if trimmed := strings.TrimSpace(line); trimmed != "" {
+			return trimmed
+		}
+	}
+	return text
 }
 
 func formatDivergence(status repoStatus) string {

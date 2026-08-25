@@ -2,6 +2,8 @@ package runner_test
 
 import (
 	"context"
+	"os"
+	"path/filepath"
 	"runtime"
 	"strings"
 	"testing"
@@ -90,5 +92,74 @@ func TestATimeoutIsReportedAsSuch(t *testing.T) {
 	}
 	if !strings.Contains(result.Err.Error(), "timed out") {
 		t.Errorf("error = %v, want a timeout message", result.Err)
+	}
+}
+
+func TestStopOnFailureAbandonsTheRemainingJobs(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("the fixture command is POSIX shell")
+	}
+	// Arrange: lowering concurrency alone would still run every job, just one
+	// at a time. Stopping has to mean the rest do not run.
+	dir := t.TempDir()
+	marker := filepath.Join(dir, "ran-third")
+	jobs := []runner.Job{
+		{Repo: "first", Dir: dir, Command: "true"},
+		{Repo: "second", Dir: dir, Command: "exit 1"},
+		{Repo: "third", Dir: dir, Command: "touch " + marker},
+	}
+
+	// Act
+	results := runner.Run(context.Background(), jobs, runner.Options{
+		StopOnFailure: true, Timeout: 10 * time.Second,
+	})
+
+	// Assert
+	if !results[0].OK() {
+		t.Error("the first job should have run and passed")
+	}
+	if results[1].OK() || results[1].Skipped {
+		t.Error("the second job should have run and failed")
+	}
+	if !results[2].Skipped {
+		t.Error("the third job was not marked skipped")
+	}
+	if _, err := os.Stat(marker); err == nil {
+		t.Error("the third job ran despite the earlier failure")
+	}
+}
+
+func TestASkippedJobIsNeitherAPassNorAFailure(t *testing.T) {
+	// Arrange
+	skipped := runner.Result{Skipped: true}
+
+	// Act & Assert
+	if skipped.OK() {
+		t.Error("a skipped job reported success")
+	}
+}
+
+func TestKeepGoingRunsEveryJobDespiteAFailure(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("the fixture command is POSIX shell")
+	}
+	// Arrange
+	dir := t.TempDir()
+	jobs := []runner.Job{
+		{Repo: "first", Dir: dir, Command: "exit 1"},
+		{Repo: "second", Dir: dir, Command: "true"},
+	}
+
+	// Act
+	results := runner.Run(context.Background(), jobs, runner.Options{
+		Parallelism: 2, Timeout: 10 * time.Second,
+	})
+
+	// Assert
+	if results[0].OK() {
+		t.Error("the failing job reported success")
+	}
+	if !results[1].OK() {
+		t.Error("a later job was not run after an earlier failure")
 	}
 }

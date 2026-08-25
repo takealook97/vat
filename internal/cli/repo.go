@@ -84,7 +84,7 @@ func repoListCommand() *Command {
 				}
 				rows = append(rows, []string{
 					repo.Name, string(repo.Role), repo.Group,
-					repo.Branch(ws.Manifest.Workspace.DefaultBranch), state, repo.Origin,
+					repo.Branch(ws.Manifest.Workspace.DefaultBranch), state, gitx.Redact(repo.Origin),
 				})
 			}
 			env.Printer.Table([]string{"NAME", "ROLE", "GROUP", "BRANCH", "STATE", "ORIGIN"}, rows)
@@ -423,7 +423,7 @@ func runRepoAdopt(ctx context.Context, env *Env, args []string) error {
 	if err := commitManifest(env, ws, next); err != nil {
 		return err
 	}
-	env.Printer.Status(ui.LevelOK, name, fmt.Sprintf("adopted as %s · %s", repo.Role, repo.Origin))
+	env.Printer.Status(ui.LevelOK, name, fmt.Sprintf("adopted as %s · %s", repo.Role, gitx.Redact(repo.Origin)))
 	return renderAfterChange(env, ws.Root)
 }
 

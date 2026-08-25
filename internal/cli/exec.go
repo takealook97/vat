@@ -92,14 +92,13 @@ func runExec(ctx context.Context, env *Env, args []string) error {
 	if parallelism <= 0 {
 		parallelism = ws.Manifest.Policy.Sync.Parallelism
 	}
-	if !*keepGoing {
-		// Sequential execution is the only way to stop at the first failure
-		// without leaving other repositories half-run.
-		parallelism = 1
-	}
 
 	results := runner.Run(ctx, jobList, runner.Options{
 		Parallelism: parallelism, Timeout: *timeout,
+		// Stopping means abandoning the rest, not merely running them one at a
+		// time: the runner executes sequentially and skips what follows a
+		// failure.
+		StopOnFailure: !*keepGoing,
 	})
 
 	if env.JSON {
@@ -114,7 +113,7 @@ func runExec(ctx context.Context, env *Env, args []string) error {
 
 	failures := 0
 	for _, result := range results {
-		if !result.OK() {
+		if !result.OK() && !result.Skipped {
 			failures++
 		}
 	}
@@ -130,6 +129,10 @@ func renderExecResults(env *Env, results []runner.Result) {
 		if result.Command != "" {
 			label = result.Repo + " · " + truncate(result.Command, 32)
 		}
+		if result.Skipped {
+			env.Printer.Status(ui.LevelSkip, label, "not run; an earlier command failed")
+			continue
+		}
 		if result.OK() {
 			env.Printer.Status(ui.LevelOK, label, result.Duration.Round(time.Millisecond).String())
 			for _, line := range firstLines(result.Stdout, 3) {
@@ -142,11 +145,19 @@ func renderExecResults(env *Env, results []runner.Result) {
 			env.Printer.Hint("      | %s", truncate(line, 100))
 		}
 	}
-	passed := 0
+	passed, skipped := 0, 0
 	for _, result := range results {
-		if result.OK() {
+		switch {
+		case result.Skipped:
+			skipped++
+		case result.OK():
 			passed++
 		}
+	}
+	if skipped > 0 {
+		env.Printer.Hint("\n%d of %d succeeded, %d not run after the first failure.",
+			passed, len(results), skipped)
+		return
 	}
 	env.Printer.Hint("\n%d of %d succeeded.", passed, len(results))
 }

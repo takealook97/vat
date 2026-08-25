@@ -127,3 +127,45 @@ func TestFindReportsWhenThereIsNoWorkspaceAbove(t *testing.T) {
 		t.Fatal("Find succeeded outside any workspace")
 	}
 }
+
+func TestPathCannotResolveOutsideTheWorkspace(t *testing.T) {
+	// Arrange: the manifest already rejects an escaping path, but this is the
+	// function every destructive operation resolves through, so it contains the
+	// result even for input that bypassed validation.
+	ws := newWorkspace(t)
+
+	escapes := []string{"../outside", "sub/../../outside", "/etc/passwd", "../../.."}
+
+	for _, path := range escapes {
+		// Act
+		resolved := ws.Path(path)
+
+		// Assert
+		relative, err := filepath.Rel(ws.Root, resolved)
+		if err != nil {
+			t.Errorf("Path(%q) = %q, which is not under the root: %v", path, resolved, err)
+			continue
+		}
+		if relative == ".." || strings.HasPrefix(relative, ".."+string(filepath.Separator)) {
+			t.Errorf("Path(%q) escaped the workspace: %q", path, resolved)
+		}
+	}
+}
+
+func TestRepoPathContainsAnEscapingRepositoryDirectory(t *testing.T) {
+	// Arrange: the manifest refuses to save such a path, so it is constructed
+	// directly. That is the point of this test — the second line of defence has
+	// to hold for a value that never went through validation.
+	ws := newWorkspace(t)
+	repo := manifest.Repo{
+		Name: "payments", Origin: "u", Role: manifest.RoleProduct, Path: "../../escaped",
+	}
+
+	// Act
+	resolved := ws.RepoPath(repo)
+
+	// Assert
+	if !strings.HasPrefix(resolved, ws.Root+string(filepath.Separator)) {
+		t.Errorf("RepoPath escaped the workspace: %q is not under %q", resolved, ws.Root)
+	}
+}

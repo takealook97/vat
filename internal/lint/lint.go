@@ -246,7 +246,8 @@ func checkRepositories(ctx context.Context, ws *workspace.Workspace) []Finding {
 		} else if !gitx.SameRemote(actual, repo.Origin) {
 			findings = append(findings, Finding{
 				Rule: "repo/remote-mismatch", Severity: SeverityError, Subject: repo.Name,
-				Message: fmt.Sprintf("origin is %s but the manifest says %s", actual, repo.Origin),
+				Message: fmt.Sprintf("origin is %s but the manifest says %s",
+					gitx.Redact(actual), gitx.Redact(repo.Origin)),
 			})
 		}
 		if repo.DefaultBranch == "" && ws.Manifest.Workspace.DefaultBranch != "" {
