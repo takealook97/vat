@@ -325,6 +325,8 @@ never declared one.
 | `vat evidence` | `new` `show` `list` `check` |
 | `vat metrics` | measure whether the discipline is holding |
 | `vat fit` | decide which layers are worth adopting yet |
+| `vat completion` | shell completion for bash, zsh, and fish |
+| `vat version` | the build identity, including the commit it came from |
 
 Everything that prints a table also prints `--json`. Exit codes are part of the
 interface: `0` clean, `1` found problems, `2` called wrong.
