@@ -89,3 +89,92 @@ func TestReadFileIfExistsDistinguishesAbsentFromEmpty(t *testing.T) {
 		t.Errorf("an empty file reported as exists=%v content=%q", emptyExists, content)
 	}
 }
+
+func TestExistsAndIsDirDistinguishFileFromDirectory(t *testing.T) {
+	// Arrange
+	dir := t.TempDir()
+	file := filepath.Join(dir, "file")
+	if err := os.WriteFile(file, []byte("x"), 0o644); err != nil {
+		t.Fatalf("write: %v", err)
+	}
+
+	// Act & Assert
+	if !fsx.Exists(file) || !fsx.Exists(dir) {
+		t.Error("Exists reported a present path as absent")
+	}
+	if fsx.Exists(filepath.Join(dir, "absent")) {
+		t.Error("Exists reported a missing path as present")
+	}
+	if !fsx.IsDir(dir) {
+		t.Error("IsDir reported a directory as not one")
+	}
+	if fsx.IsDir(file) {
+		t.Error("IsDir reported a file as a directory")
+	}
+}
+
+func TestIsEmptyDirReportsBothStates(t *testing.T) {
+	// Arrange
+	empty := t.TempDir()
+	occupied := t.TempDir()
+	if err := os.WriteFile(filepath.Join(occupied, "file"), nil, 0o644); err != nil {
+		t.Fatalf("write: %v", err)
+	}
+
+	// Act
+	isEmpty, err := fsx.IsEmptyDir(empty)
+	if err != nil {
+		t.Fatalf("IsEmptyDir returned an error: %v", err)
+	}
+	isOccupied, err := fsx.IsEmptyDir(occupied)
+	if err != nil {
+		t.Fatalf("IsEmptyDir returned an error: %v", err)
+	}
+
+	// Assert
+	if !isEmpty {
+		t.Error("an empty directory was reported as occupied")
+	}
+	if isOccupied {
+		t.Error("an occupied directory was reported as empty")
+	}
+}
+
+func TestEnsureDirIsIdempotent(t *testing.T) {
+	// Arrange
+	path := filepath.Join(t.TempDir(), "a", "b")
+
+	// Act
+	if err := fsx.EnsureDir(path); err != nil {
+		t.Fatalf("first EnsureDir returned an error: %v", err)
+	}
+	err := fsx.EnsureDir(path)
+
+	// Assert
+	if err != nil {
+		t.Fatalf("second EnsureDir returned an error: %v", err)
+	}
+	if !fsx.IsDir(path) {
+		t.Error("the directory was not created")
+	}
+}
+
+func TestWriteFileAtomicAppliesTheRequestedMode(t *testing.T) {
+	// Arrange: a credential-adjacent file must not land world-readable because
+	// the umask happened to allow it.
+	path := filepath.Join(t.TempDir(), "restricted")
+
+	// Act
+	if err := fsx.WriteFileAtomic(path, []byte("x"), 0o600); err != nil {
+		t.Fatalf("WriteFileAtomic returned an error: %v", err)
+	}
+
+	// Assert
+	info, err := os.Stat(path)
+	if err != nil {
+		t.Fatalf("stat: %v", err)
+	}
+	if perm := info.Mode().Perm(); perm != 0o600 {
+		t.Errorf("mode = %o, want 600", perm)
+	}
+}

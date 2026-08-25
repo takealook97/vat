@@ -79,3 +79,121 @@ func TestMarkdownStatesTheWriteBoundaryAndWithholdsRelease(t *testing.T) {
 		}
 	}
 }
+
+func TestListReturnsPacketsNewestFirst(t *testing.T) {
+	// Arrange
+	root := t.TempDir()
+	for _, id := range []string{"EP-001", "EP-003", "EP-002"} {
+		packet := evidence.New(id, "objective "+id, []string{"payments"}, reference)
+		if err := evidence.Save(root, packet); err != nil {
+			t.Fatalf("Save returned an error: %v", err)
+		}
+	}
+
+	// Act
+	packets, err := evidence.List(root)
+
+	// Assert
+	if err != nil {
+		t.Fatalf("List returned an error: %v", err)
+	}
+	want := []string{"EP-003", "EP-002", "EP-001"}
+	if len(packets) != len(want) {
+		t.Fatalf("packet count = %d, want %d", len(packets), len(want))
+	}
+	for i, id := range want {
+		if packets[i].ID != id {
+			t.Errorf("packets[%d] = %s, want %s", i, packets[i].ID, id)
+		}
+	}
+}
+
+func TestListOnAWorkspaceWithNoPacketsIsEmpty(t *testing.T) {
+	// Act
+	packets, err := evidence.List(t.TempDir())
+
+	// Assert
+	if err != nil {
+		t.Fatalf("List returned an error: %v", err)
+	}
+	if len(packets) != 0 {
+		t.Errorf("packets = %+v, want none", packets)
+	}
+}
+
+func TestLoadReportsAMissingPacketRatherThanReturningAnEmptyOne(t *testing.T) {
+	// Act
+	_, err := evidence.Load(t.TempDir(), "EP-404")
+
+	// Assert
+	if err == nil {
+		t.Fatal("Load invented a packet that does not exist")
+	}
+	if !strings.Contains(err.Error(), "EP-404") {
+		t.Errorf("the error does not name the packet: %v", err)
+	}
+}
+
+func TestValidateReportsARepositoryWithNoReturnPoint(t *testing.T) {
+	// Arrange
+	packet := evidence.New("EP-001", "Do a thing", []string{"payments", "console"}, reference)
+	packet.Acceptance = []string{"the thing happens"}
+	packet.CanonicalChecks = []string{"make check"}
+	packet.RollbackPoints = map[string]string{"payments": "abcdef123456"}
+
+	// Act
+	problems := strings.Join(evidence.Validate(packet), "\n")
+
+	// Assert
+	if !strings.Contains(problems, "console") {
+		t.Errorf("the repository with no return point was not named: %q", problems)
+	}
+	if strings.Contains(problems, "payments") {
+		t.Errorf("a repository that has a return point was reported: %q", problems)
+	}
+}
+
+func TestMarkdownAnnouncesReleaseAuthorityWhenItIsGranted(t *testing.T) {
+	// Arrange
+	packet := evidence.New("EP-001", "Ship it", []string{"payments"}, reference)
+	packet.Acceptance = []string{"it is live"}
+	packet.ReleaseAuthority = true
+
+	// Act
+	briefing := evidence.Markdown(packet)
+
+	// Assert
+	if !strings.Contains(briefing, "Release is authorised") {
+		t.Errorf("the briefing does not state that release is authorised:\n%s", briefing)
+	}
+	if strings.Contains(briefing, "No release authority") {
+		t.Errorf("the briefing contradicts itself:\n%s", briefing)
+	}
+}
+
+func TestMarkdownListsNonGoalsAndContracts(t *testing.T) {
+	// Arrange: stating what is out of scope is what stops scope expanding
+	// silently.
+	packet := evidence.New("EP-001", "Do a thing", []string{"payments"}, reference)
+	packet.Acceptance = []string{"the thing happens"}
+	packet.NonGoals = []string{"changing refund timing"}
+	packet.Contracts = []string{"POST /orders/{id}/cancel"}
+	packet.RollbackPoints = map[string]string{"payments": "abcdef123456"}
+
+	// Act
+	briefing := evidence.Markdown(packet)
+
+	// Assert
+	for _, want := range []string{"Not in scope", "changing refund timing", "Contracts to honour", "abcdef123456"} {
+		if !strings.Contains(briefing, want) {
+			t.Errorf("the briefing omits %q", want)
+		}
+	}
+}
+
+func TestPathIsStableForAnIdentifier(t *testing.T) {
+	// Act & Assert
+	if got := evidence.Path("EP-001"); !strings.HasSuffix(got, "EP-001.yaml") {
+		t.Errorf("Path = %q, want it to end with EP-001.yaml", got)
+	}
+}
