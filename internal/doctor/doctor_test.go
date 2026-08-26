@@ -278,3 +278,40 @@ func TestCiphertextWithOpenPermissionsIsNotAFinding(t *testing.T) {
 		t.Errorf("encrypted material was reported as exposed: %+v", finding)
 	}
 }
+
+// A backup exists to answer one question: if this machine stopped working now,
+// what would be gone. vat takes no backups — where an archive goes and who
+// holds the key are facts it owns none of — but refusing to take one is not a
+// reason to leave the question unasked.
+func TestDoctorReportsCommitsThatExistOnlyOnThisMachine(t *testing.T) {
+	// Arrange: a repository with a commit no remote has.
+	ws := fixture(t, manifest.Repo{
+		Name: "payments", Origin: "https://example.invalid/acme/payments.git", Role: manifest.RoleProduct,
+	})
+	dir := filepath.Join(ws.Root, "payments")
+	if err := os.WriteFile(filepath.Join(dir, "local.txt"), []byte("only here\n"), 0o644); err != nil {
+		t.Fatalf("write: %v", err)
+	}
+	git(t, dir, "add", "-A")
+	git(t, dir, "commit", "--quiet", "-m", "work that exists nowhere else")
+
+	// Act
+	report := doctor.Run(context.Background(), ws, doctor.Options{Now: reference})
+
+	// Assert
+	found := false
+	for _, finding := range report.Findings {
+		if finding.Section == "recovery" && finding.Subject == "payments" {
+			found = true
+			if finding.Status != doctor.StatusWarn {
+				t.Errorf("status = %s, want warn", finding.Status)
+			}
+			if !strings.Contains(finding.Detail, "only on this machine") {
+				t.Errorf("detail does not name the exposure: %q", finding.Detail)
+			}
+		}
+	}
+	if !found {
+		t.Errorf("work that exists only here went unreported: %+v", report.Findings)
+	}
+}

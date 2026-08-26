@@ -36,6 +36,7 @@ const (
 	sectionBrain        = "brain"
 	subjectRecords      = "records"
 	sectionChangesets   = "changesets"
+	sectionRecovery     = "recovery"
 	sectionNetwork      = "network"
 )
 
@@ -94,6 +95,7 @@ func Run(ctx context.Context, ws *workspace.Workspace, opts Options) Report {
 	add(checkSecrets(ws, now, opts.SecretMaxAgeDays)...)
 	add(checkBrain(ws, now)...)
 	add(checkChangesets(ws, now)...)
+	add(checkRecoverability(ctx, ws)...)
 	if opts.Network {
 		add(checkNetwork(ctx)...)
 	}
@@ -561,4 +563,71 @@ func checkNetwork(ctx context.Context) []Finding {
 		Detail: fmt.Sprintf("%s/%s", runtime.GOOS, runtime.GOARCH),
 	})
 	return findings
+}
+
+// checkRecoverability answers the one question a backup exists to answer: if
+// this machine stopped working now, what would be gone.
+//
+// vat deliberately does not take backups. Where an archive should go, how it is
+// encrypted, and who holds the key are organisational facts this tool owns none
+// of, and writing outside the workspace root is the boundary the whole thing
+// rests on — it is also, exactly, the defect that retracted three releases. So
+// this reports and stops, the way the rest of doctor does.
+//
+// For a git repository the question has a precise form: does its history exist
+// anywhere other than here. A commit no remote has, and a stash, are the two
+// states where the answer is no.
+func checkRecoverability(ctx context.Context, ws *workspace.Workspace) []Finding {
+	var findings []Finding
+	exposed := 0
+	for _, repo := range ws.Manifest.Active() {
+		dir := ws.RepoPath(repo)
+		if !gitx.IsRepository(dir) {
+			continue
+		}
+		unpushed, err := gitx.UnpushedCommits(ctx, dir)
+		if err != nil {
+			// Saying nothing here would report a repository as recoverable
+			// because vat could not tell, which is the one answer this check
+			// must never give by accident.
+			findings = append(findings, Finding{
+				Section: sectionRecovery, Subject: repo.Name, Status: StatusWarn,
+				Detail: "git could not say whether any commit exists only here",
+			})
+			exposed++
+			continue
+		}
+		stashes, err := gitx.StashCount(ctx, dir)
+		if err != nil {
+			stashes = 0
+		}
+		if unpushed == 0 && stashes == 0 {
+			continue
+		}
+		exposed++
+		findings = append(findings, Finding{
+			Section: sectionRecovery, Subject: repo.Name, Status: StatusWarn,
+			Detail: describeExposure(unpushed, stashes),
+			Fix:    "push the branch, or accept that this machine is the only copy",
+		})
+	}
+	if exposed == 0 {
+		findings = append(findings, Finding{
+			Section: sectionRecovery, Subject: "git history", Status: StatusOK,
+			Detail: "every governed repository has its commits on a remote",
+		})
+	}
+	return findings
+}
+
+func describeExposure(unpushed, stashes int) string {
+	switch {
+	case unpushed > 0 && stashes > 0:
+		return fmt.Sprintf("%d commits and %d stashes exist only on this machine",
+			unpushed, stashes)
+	case unpushed > 0:
+		return fmt.Sprintf("%d commits exist only on this machine", unpushed)
+	default:
+		return fmt.Sprintf("%d stashes exist only on this machine", stashes)
+	}
 }

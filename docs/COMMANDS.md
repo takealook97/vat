@@ -117,9 +117,20 @@ secret value.
 | credentials | files that look like plaintext secrets, encrypted count, age since last change, key material readable by other users |
 | brain | record counts, review queue, generated-file freshness |
 | changesets | open and overdue work |
+| recovery | commits and stashes that exist only on this machine |
 | network | `--network` only: whether the GitHub CLI is authenticated, and the platform vat is running on |
 
 `--secret-max-age` defaults to 180 days; `0` disables the check.
+
+**recovery** answers the one question a backup exists to answer: if this machine
+stopped working now, what would be gone. For a git repository that has a precise
+form — does its history exist anywhere but here — and unpushed commits and
+stashes are the two states where the answer is no.
+
+`vat` takes no backups and will not. Where an archive goes, how it is encrypted,
+and who holds the key are organisational facts this tool owns none of, and
+writing outside the workspace root is the boundary everything else rests on. So
+this reports, like the rest of `doctor`, and stops.
 
 ---
 
