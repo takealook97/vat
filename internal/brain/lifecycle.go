@@ -151,7 +151,7 @@ func SetStatus(root string, record Record, status Status, reason string) error {
 			metadata.Reason = metadata.Reason + "; " + reason
 		}
 	}
-	rendered, err := frontmatter.Render(metadata, doc.Body)
+	rendered, err := doc.Merge(metadata)
 	if err != nil {
 		return fmt.Errorf("%s: %w", record.Path, err)
 	}
@@ -214,7 +214,7 @@ func Supersede(root string, previous, replacement Record) error {
 			return fmt.Errorf("read %s: %w", update.record.Path, err)
 		}
 		doc := frontmatter.Split(string(data))
-		rendered, err := frontmatter.Render(update.metadata, doc.Body)
+		rendered, err := doc.Merge(update.metadata)
 		if err != nil {
 			return fmt.Errorf("%s: %w", update.record.Path, err)
 		}

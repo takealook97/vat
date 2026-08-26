@@ -512,3 +512,46 @@ func TestCreateRefusesAnIdentifierThatCouldBecomeAPath(t *testing.T) {
 		t.Error("Create wrote a record to a caller-chosen path")
 	}
 }
+
+// The sweep is the first lifecycle command most records ever meet, and it runs
+// unattended. If it rewrites a record through the typed schema, a workspace
+// that extended the header loses that extension on the day its claim ages out —
+// a data loss with no error, no prompt, and nothing in the diff anyone reads.
+func TestSweepPreservesHeaderFieldsTheSchemaDoesNotModel(t *testing.T) {
+	// Arrange
+	root := newStore(t)
+	relative := mustCreate(t, root, NewRecordInput{
+		Kind: KindGap, ID: "G-0014", Title: "Retries double-submit",
+		Status: StatusActive, ClaimKind: ClaimCurrentState,
+		OwnedBy: "payments", SourceRef: "payments@3f9a1c2e8b74",
+	})
+	path := filepath.Join(root, filepath.FromSlash(relative))
+	original, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("read: %v", err)
+	}
+	extended := strings.Replace(string(original), "status: active",
+		"status: active\n# graded by the payments team, not by vat\nconfidence: high", 1)
+	if err := os.WriteFile(path, []byte(extended), 0o644); err != nil {
+		t.Fatalf("write: %v", err)
+	}
+
+	// Act
+	if _, err := Sweep(mustLoad(t, root), CheckPolicy{StaleAfterDays: 90}, longAfter, true); err != nil {
+		t.Fatalf("sweep: %v", err)
+	}
+
+	// Assert
+	swept, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("read: %v", err)
+	}
+	if !strings.Contains(string(swept), "status: stale") {
+		t.Fatalf("the claim was not demoted:\n%s", swept)
+	}
+	for _, kept := range []string{"confidence: high", "# graded by the payments team, not by vat"} {
+		if !strings.Contains(string(swept), kept) {
+			t.Errorf("sweep silently dropped %q:\n%s", kept, swept)
+		}
+	}
+}

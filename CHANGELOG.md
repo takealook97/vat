@@ -35,6 +35,13 @@ Notable changes to `vat`. The format follows
 
 ### Fixed
 
+- A lifecycle transition no longer deletes the parts of a record's header that
+  vat's own schema does not model. `sweep --apply` re-rendered the typed struct,
+  so a workspace's own field and any comment explaining a value disappeared the
+  day a claim aged out — an unattended command, no error, nothing in a diff
+  anyone reads. Rewrites now merge into the header that was there, keeping
+  unknown keys in place with their comments, while a field the schema does model
+  and clears is still removed.
 - Ten doc comments were separated from the functions they document by a blank
   line, which hides them from `go doc` and from an editor's hover entirely. The
   reasoning a comment records is the only thing that earns it a place, and this

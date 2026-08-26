@@ -259,3 +259,88 @@ func TestTitleFallsBackToASecondLevelHeadingAndThenToNothing(t *testing.T) {
 		}
 	}
 }
+
+// A record vat rewrote must not come back smaller than the one it read. The
+// typed struct is a partial view of the header — a workspace extends the schema
+// and a comment explains a value — and re-marshalling that view drops
+// everything outside it on the first lifecycle transition, with no error and no
+// diff anyone reads.
+func TestMergeKeepsHeaderKeysTheCallerDoesNotModel(t *testing.T) {
+	// Arrange
+	source := "---\n" +
+		"id: G-0014\n" +
+		"# graded by the payments team, not by vat\n" +
+		"confidence: high\n" +
+		"status: active\n" +
+		"tags: [payments, retries]\n" +
+		"---\n\n# G-0014 — Retries double-submit\n"
+	doc := frontmatter.Split(source)
+	type modelled struct {
+		ID     string `yaml:"id"`
+		Status string `yaml:"status"`
+	}
+
+	// Act
+	rendered, err := doc.Merge(modelled{ID: "G-0014", Status: "stale"})
+	if err != nil {
+		t.Fatalf("merge: %v", err)
+	}
+	result := string(rendered)
+
+	// Assert
+	if !strings.Contains(result, "status: stale") {
+		t.Errorf("the modelled field was not updated:\n%s", result)
+	}
+	for _, kept := range []string{"confidence: high", "tags: [payments, retries]",
+		"# graded by the payments team, not by vat"} {
+		if !strings.Contains(result, kept) {
+			t.Errorf("merge dropped %q:\n%s", kept, result)
+		}
+	}
+	if !strings.Contains(result, "# G-0014 — Retries double-submit") {
+		t.Errorf("the body did not survive:\n%s", result)
+	}
+}
+
+// The other half of the same guarantee: a field the caller does model and
+// deliberately cleared has to leave, or a superseded_by that was unset would
+// stay on disk and the check rules would keep reporting a link that no longer
+// exists.
+func TestMergeRemovesAModelledFieldTheCallerCleared(t *testing.T) {
+	// Arrange
+	doc := frontmatter.Split("---\nid: D-0001\nstatus: active\nsuperseded_by: D-0002\n---\n\n# D-0001\n")
+	type modelled struct {
+		ID           string `yaml:"id"`
+		Status       string `yaml:"status"`
+		SupersededBy string `yaml:"superseded_by,omitempty"`
+	}
+
+	// Act
+	rendered, err := doc.Merge(modelled{ID: "D-0001", Status: "active"})
+	if err != nil {
+		t.Fatalf("merge: %v", err)
+	}
+
+	// Assert
+	if strings.Contains(string(rendered), "superseded_by") {
+		t.Errorf("a cleared field stayed on disk:\n%s", rendered)
+	}
+}
+
+func TestMergeWritesAHeaderWhenTheDocumentHadNone(t *testing.T) {
+	// Arrange
+	doc := frontmatter.Split("# Only a body\n")
+
+	// Act
+	rendered, err := doc.Merge(struct {
+		ID string `yaml:"id"`
+	}{ID: "M-0001"})
+	if err != nil {
+		t.Fatalf("merge: %v", err)
+	}
+
+	// Assert
+	if !strings.HasPrefix(string(rendered), "---\nid: M-0001\n---\n") {
+		t.Errorf("no header was written:\n%s", rendered)
+	}
+}
