@@ -103,6 +103,16 @@ func RenderHarness(ws *workspace.Workspace) ([]string, error) {
 		return nil, err
 	}
 	changed = append(changed, adapters...)
+
+	skills, err := harness.LoadSkills(ws.Root)
+	if err != nil {
+		return nil, err
+	}
+	skillAdapters, err := harness.WriteSkillAdapters(ws.Root, skills)
+	if err != nil {
+		return nil, err
+	}
+	changed = append(changed, skillAdapters...)
 	return changed, nil
 }
 

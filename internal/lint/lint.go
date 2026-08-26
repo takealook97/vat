@@ -182,6 +182,7 @@ func RuleNames() []string {
 		"harness/adapter-drift",
 		"harness/role-metadata",
 		"harness/model-ambiguous",
+		"harness/skill-metadata",
 		"policy/trust-undeclared",
 		"brain/not-initialised",
 		"brain/unreferenced",
@@ -441,11 +442,38 @@ func checkHarness(ws *workspace.Workspace) ([]Finding, error) {
 	for _, path := range drifted {
 		findings = append(findings, Finding{
 			Rule: "harness/adapter-drift", Severity: SeverityWarn, Subject: path,
-			Message: "runtime adapter no longer matches its role definition in .agents/roles",
+			Message: "runtime adapter no longer matches its role definition in " + harness.RolesDir,
 			Fix:     fixHarness, Fixable: true,
 		})
 	}
 
+	skills, err := harness.LoadSkills(ws.Root)
+	if err != nil {
+		return nil, err
+	}
+	for _, skill := range skills {
+		// A skill with no description is a skill no runtime can offer. It is
+		// on disk, it is generated into every adapter, and it is invisible to
+		// the agent that needed it.
+		if strings.TrimSpace(skill.Description) == "" {
+			findings = append(findings, Finding{
+				Rule: "harness/skill-metadata", Severity: SeverityWarn, Subject: skill.Name,
+				Message: "skill has no description, so no runtime can advertise it",
+				Fix:     fmt.Sprintf("add description: to %s/%s/%s", harness.SkillsDir, skill.Dir, harness.SkillFile),
+			})
+		}
+	}
+	skillDrift, err := harness.SkillAdapterDrift(ws.Root, skills)
+	if err != nil {
+		return nil, err
+	}
+	for _, path := range skillDrift {
+		findings = append(findings, Finding{
+			Rule: "harness/adapter-drift", Severity: SeverityWarn, Subject: path,
+			Message: "runtime adapter no longer matches its skill definition in " + harness.SkillsDir,
+			Fix:     fixHarness, Fixable: true,
+		})
+	}
 	return findings, nil
 }
 

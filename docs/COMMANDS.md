@@ -148,9 +148,10 @@ The rules, and what each one prevents:
 | `harness/workspace-oversized` | warn | a root file that truncates the contracts below it |
 | `harness/repo-missing` | warn | a session opened in a repository with no contract |
 | `harness/repo-drift` | warn | the same, out of date |
-| `harness/adapter-drift` | warn | one role behaving differently per runtime |
+| `harness/adapter-drift` | warn | one role or skill behaving differently per runtime |
 | `harness/role-metadata` | warn | a role no runtime can advertise |
 | `harness/model-ambiguous` | warn | one model name written into two vendors' adapters, where it resolves in at most one |
+| `harness/skill-metadata` | warn | a skill on disk that no runtime can offer, because it has no description |
 | `policy/trust-undeclared` | warn | a harness that cannot say which content is data |
 | `brain/not-initialised` | warn | a declared knowledge repository with no records |
 | `brain/unreferenced` | warn | a scaffolded brain the manifest never adopted, which no `vat brain` command can reach |
