@@ -16,8 +16,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/takealook97/vat/internal/frontmatter"
-	"github.com/takealook97/vat/internal/gitx"
 	"github.com/takealook97/vat/internal/manifest"
 	"github.com/takealook97/vat/internal/ui"
 	"github.com/takealook97/vat/internal/version"
@@ -441,59 +439,4 @@ func takesValue(set *flag.FlagSet, name string) bool {
 	}
 	boolFlag, ok := found.Value.(interface{ IsBoolFlag() bool })
 	return !ok || !boolFlag.IsBoolFlag()
-}
-
-// splitList turns a repeated or comma-separated flag value into a list.
-func splitList(value string) []string {
-	if strings.TrimSpace(value) == "" {
-		return nil
-	}
-	parts := strings.Split(value, ",")
-	out := make([]string, 0, len(parts))
-	for _, part := range parts {
-		if trimmed := strings.TrimSpace(part); trimmed != "" {
-			out = append(out, trimmed)
-		}
-	}
-	return out
-}
-
-// isFlagSet reports whether a flag was given on the command line, as opposed to
-// holding its default. Commands that merge user input with discovered values
-// need the difference: an unset flag must not overwrite what was found on disk.
-func isFlagSet(set *flag.FlagSet, name string) bool {
-	found := false
-	set.Visit(func(f *flag.Flag) {
-		if f.Name == name {
-			found = true
-		}
-	})
-	return found
-}
-
-// renderFrontmatter is a thin wrapper so command files do not each import the
-// frontmatter package for one call.
-func renderFrontmatter(metadata any, body string) ([]byte, error) {
-	return frontmatter.Render(metadata, body)
-}
-
-// headRevision returns a repository's current commit, used when pinning a claim
-// to the evidence it was read from.
-func headRevision(ctx context.Context, dir string) (string, error) {
-	return gitx.HeadRevision(ctx, dir)
-}
-
-// pluralise renders a count with the right noun form, so output never reads
-// "1 repository/repositories".
-func pluralise(count int, singular, plural string) string {
-	if count == 1 {
-		return fmt.Sprintf("%d %s", count, singular)
-	}
-	return fmt.Sprintf("%d %s", count, plural)
-}
-
-// pluraliseCount is pluralise under the name the non-repo commands use; both
-// exist so a count never renders as "1 repositories".
-func pluraliseCount(count int, singular, plural string) string {
-	return pluralise(count, singular, plural)
 }
