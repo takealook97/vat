@@ -2,7 +2,9 @@
 name: docs-writer
 title: Documentation writer
 description: Keeps the documentation true to the code and free of restated obviousness.
-model: opus
+models:
+  claude: opus
+  codex: gpt-5.6-sol
 reads: ["*"]
 runtimes: [claude, codex]
 ---

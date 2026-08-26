@@ -2,7 +2,9 @@
 name: go-reviewer
 title: Go reviewer
 description: Reviews Go changes against this repository's safety and design rules.
-model: opus
+models:
+  claude: opus
+  codex: gpt-5.6-sol
 reasoning_effort: high
 reads: ["*"]
 runtimes: [claude, codex]

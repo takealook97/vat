@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/takealook97/vat/internal/brain"
 	"github.com/takealook97/vat/internal/lint"
 	"github.com/takealook97/vat/internal/manifest"
 	"github.com/takealook97/vat/internal/workspace"
@@ -290,5 +291,86 @@ func TestFixableCountsOnlyWhatFixCanActuallyRepair(t *testing.T) {
 		if finding.Fixable && finding.Fix == "" {
 			t.Errorf("finding %q is fixable but names no command", finding.Rule)
 		}
+	}
+}
+
+// `vat brain init <directory>` writes wherever it is pointed, so a workspace can
+// hold a complete brain layout that no `vat brain` command can reach — they all
+// resolve the brain through the manifest. Nothing reported that state before
+// this rule: brain/not-initialised fires only for a repository the manifest
+// already declares as the brain, which this directory is not.
+func TestAScaffoldedBrainTheManifestNeverAdoptedIsReported(t *testing.T) {
+	// Arrange: a brain layout on disk, and a manifest that names no brain.
+	ws := fixture(t)
+	dir := filepath.Join(ws.Root, "cortex")
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatalf("create: %v", err)
+	}
+	if _, err := brain.Init(dir, reference); err != nil {
+		t.Fatalf("brain.Init: %v", err)
+	}
+
+	// Act
+	report := run(t, ws)
+
+	// Assert
+	finding, found := rules(report)["brain/unreferenced"]
+	if !found {
+		t.Fatalf("a brain no command can reach went unreported: %+v", report.Findings)
+	}
+	if finding.Subject != "cortex" {
+		t.Errorf("subject = %q, want cortex", finding.Subject)
+	}
+	if !strings.Contains(finding.Fix, "vat repo adopt cortex") {
+		t.Errorf("an ungoverned directory must be enrolled first; fix = %q", finding.Fix)
+	}
+}
+
+// A governed repository needs only the second half of that advice, and telling
+// someone to re-adopt what is already in the manifest teaches them to distrust
+// the fix line.
+func TestAGovernedButUnadoptedBrainIsToldOnlyToAdopt(t *testing.T) {
+	// Arrange
+	ws := fixture(t, manifest.Repo{
+		Name: "cortex", Origin: "https://example.invalid/acme/cortex.git", Role: manifest.RoleProduct,
+	})
+	if _, err := brain.Init(filepath.Join(ws.Root, "cortex"), reference); err != nil {
+		t.Fatalf("brain.Init: %v", err)
+	}
+
+	// Act
+	report := run(t, ws)
+
+	// Assert
+	finding, found := rules(report)["brain/unreferenced"]
+	if !found {
+		t.Fatalf("a brain no command can reach went unreported: %+v", report.Findings)
+	}
+	if strings.Contains(finding.Fix, "repo adopt") {
+		t.Errorf("cortex is already governed; fix = %q", finding.Fix)
+	}
+	if !strings.Contains(finding.Fix, "vat brain adopt cortex") {
+		t.Errorf("fix = %q, want the adopt command", finding.Fix)
+	}
+}
+
+// The rule must stay silent for the repository that IS the brain, or every
+// correctly configured workspace carries a permanent warning and the whole
+// report stops being read.
+func TestTheAdoptedBrainIsNotReportedAsUnreferenced(t *testing.T) {
+	// Arrange
+	ws := fixture(t, manifest.Repo{
+		Name: "brain", Origin: "https://example.invalid/acme/brain.git", Role: manifest.RoleBrain,
+	})
+	if _, err := brain.Init(filepath.Join(ws.Root, "brain"), reference); err != nil {
+		t.Fatalf("brain.Init: %v", err)
+	}
+
+	// Act
+	report := run(t, ws)
+
+	// Assert
+	if finding, found := rules(report)["brain/unreferenced"]; found {
+		t.Errorf("the adopted brain was reported as unreachable: %+v", finding)
 	}
 }

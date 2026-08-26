@@ -60,10 +60,48 @@ that already holds records.`,
 			if len(created) == 0 {
 				env.Printer.Status(ui.LevelOK, "brain", "already initialised")
 			}
-			env.Printer.Hint("\nNext: vat brain new decision --title \"...\"")
+			env.Printer.Hint("%s", brainNextStep(ws, root))
 			return nil
 		},
 	}
+}
+
+// brainNextStep returns the hint to print once a brain layout exists at root.
+//
+// `brain init <directory>` scaffolds wherever it is pointed, but every other
+// `vat brain` command resolves the brain through the manifest. Printing "Next:
+// vat brain new" unconditionally sent the reader straight into "this workspace
+// has no brain repository": the tool created a state its own commands could not
+// reach, and named a command that could only fail.
+func brainNextStep(ws *workspace.Workspace, root string) string {
+	if brainRoot, ok := ws.BrainPath(); ok && sameDir(brainRoot, root) {
+		return "\nNext: vat brain new decision --title \"...\""
+	}
+	rel := ws.Rel(root)
+	if repo, ok := ws.Manifest.Find(rel); ok {
+		return fmt.Sprintf(
+			"\n%s is governed but is not the workspace's brain, so no vat brain\ncommand reaches it yet. Register it:\n  vat brain adopt %s",
+			rel, repo.Name)
+	}
+	return fmt.Sprintf(
+		"\n%s is not in %s, so no vat brain command reaches it yet. Enrol it:\n  vat repo adopt %s\n  vat brain adopt %s",
+		rel, manifest.FileName, rel, rel)
+}
+
+// sameDir compares two paths that are already absolute and inside the
+// workspace. Symlinks are resolved before the comparison because the workspace
+// root itself may be reached through one, and a false mismatch here would send
+// the reader to adopt a repository that is already the brain.
+func sameDir(a, b string) bool {
+	if filepath.Clean(a) == filepath.Clean(b) {
+		return true
+	}
+	resolvedA, errA := filepath.EvalSymlinks(a)
+	resolvedB, errB := filepath.EvalSymlinks(b)
+	if errA != nil || errB != nil {
+		return false
+	}
+	return resolvedA == resolvedB
 }
 
 func brainBuildCommand() *Command {

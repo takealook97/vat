@@ -2,7 +2,9 @@
 name: rule-designer
 title: Rule designer
 description: Turns a described failure into a checkable lint or doctor rule, or rejects it.
-model: opus
+models:
+  claude: opus
+  codex: gpt-5.6-sol
 reasoning_effort: high
 reads: ["*"]
 runtimes: [claude, codex]

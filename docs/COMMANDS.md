@@ -150,8 +150,10 @@ The rules, and what each one prevents:
 | `harness/repo-drift` | warn | the same, out of date |
 | `harness/adapter-drift` | warn | one role behaving differently per runtime |
 | `harness/role-metadata` | warn | a role no runtime can advertise |
+| `harness/model-ambiguous` | warn | one model name written into two vendors' adapters, where it resolves in at most one |
 | `policy/trust-undeclared` | warn | a harness that cannot say which content is data |
 | `brain/not-initialised` | warn | a declared knowledge repository with no records |
+| `brain/unreferenced` | warn | a scaffolded brain the manifest never adopted, which no `vat brain` command can reach |
 | `brain/generated-drift` | error | a hand-edited projection contradicting the records |
 | `brain/source-revision-drift` | warn | a claim whose evidence moved on months ago |
 | `brain/source-repo-unknown` | warn | a claim pointing at a repository that is not governed |

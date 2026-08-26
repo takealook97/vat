@@ -104,7 +104,9 @@ notices, because nobody diffs a prompt.
 name: planner
 title: Implementation planner
 description: Turns a goal into an ordered plan with explicit non-goals.
-model: opus
+models:
+  claude: opus
+  codex: gpt-5.6-sol
 reasoning_effort: high
 writes: [brain]
 reads: ["*"]
@@ -128,10 +130,30 @@ runtimes: [claude, codex]
 | --- | --- |
 | `name` | identifier; also the adapter filename |
 | `description` | how the runtime advertises the role |
-| `model`, `reasoning_effort` | passed through where a runtime accepts them |
+| `models` | the model each runtime should use, one entry per runtime |
+| `model` | shorthand for `models`, honoured only when the role targets **one** runtime |
+| `reasoning_effort` | passed through where a runtime accepts it |
 | `writes` | repositories this role may modify. **empty means read-only** |
 | `reads` | repositories it needs; `*` means the workspace |
 | `runtimes` | which adapters to generate; omitted means all |
+
+### A model name belongs to one vendor
+
+`opus` means nothing to Codex. `gpt-5.6-sol` means nothing to Claude Code. One
+role body can still span both, but the model is the one field that cannot be
+shared, so it is declared per runtime.
+
+A bare `model` is honoured only when the role targets a single runtime. Give it
+to a role that targets two and no adapter uses it, because writing a name a
+runtime cannot resolve is worse than writing nothing — the runtime falls back to
+its own default instead of failing on a name from another vendor's namespace.
+
+```console
+$ vat lint
+WARN  harness/model-ambiguous · planner   one model for claude and codex; a model name belongs
+                                          to a single vendor, so no adapter can honour it
+      -> replace model: with a models: map, one entry per runtime, in .agents/roles/planner.md
+```
 
 ### Read-only is the default
 

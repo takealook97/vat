@@ -503,3 +503,48 @@ func TestAMalformedIdentifierIsReportedAsCallingTheCommandWrong(t *testing.T) {
 		})
 	}
 }
+
+// `vat brain init <directory>` scaffolds wherever it is pointed, but every other
+// vat brain command resolves the brain through the manifest. The hint printed
+// after a successful scaffold named `vat brain new`, which then answered "this
+// workspace has no brain repository": the tool created a state its own commands
+// could not reach and advertised a command that could only fail.
+func TestBrainInitDoesNotPromiseACommandThatCannotReachTheDirectory(t *testing.T) {
+	// Arrange
+	h := newFixture(t)
+	h.mustRun("init", "--name", "acme")
+
+	// Act
+	output := h.mustRun("brain", "init", "cortex")
+
+	// Assert: the hint must not name a command that cannot see this directory.
+	if strings.Contains(output, "vat brain new") {
+		t.Errorf("init advertised `vat brain new`, which cannot reach an unenrolled directory:\n%s", output)
+	}
+	if !strings.Contains(output, "vat repo adopt cortex") {
+		t.Errorf("init did not say how to make the directory reachable:\n%s", output)
+	}
+	// And the failure the old hint walked into must still be a failure, so this
+	// test is pinning the advice rather than a change in what brain new accepts.
+	if code, newOutput := h.run("brain", "new", "decision", "--title", "x"); code == ExitOK {
+		t.Fatalf("brain new reached an unadopted directory after all:\n%s", newOutput)
+	}
+}
+
+// The accurate hint must not cost the correct case its next step: a workspace
+// whose brain is adopted should still be told what to do next.
+func TestBrainInitOnTheAdoptedBrainStillPointsAtTheNextCommand(t *testing.T) {
+	// Arrange
+	h := newFixture(t, "cortex")
+	h.mustRun("init", "--name", "acme")
+	h.mustRun("repo", "adopt", "cortex")
+	h.mustRun("brain", "adopt", "cortex")
+
+	// Act
+	output := h.mustRun("brain", "init")
+
+	// Assert
+	if !strings.Contains(output, "vat brain new") {
+		t.Errorf("the adopted brain lost its next step:\n%s", output)
+	}
+}

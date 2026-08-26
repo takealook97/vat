@@ -29,12 +29,20 @@ const (
 // role definitions drift apart. vat keeps the prose in exactly one place and
 // generates thin pointers, then checks that the pointers still match.
 type Role struct {
-	Name            string `yaml:"name"`
-	Title           string `yaml:"title,omitempty"`
-	Description     string `yaml:"description"`
-	Model           string `yaml:"model,omitempty"`
-	ReasoningEffort string `yaml:"reasoning_effort,omitempty"`
-	Sandbox         string `yaml:"sandbox,omitempty"`
+	Name        string `yaml:"name"`
+	Title       string `yaml:"title,omitempty"`
+	Description string `yaml:"description"`
+	// Model names one model for the whole role. A model name lives in a
+	// vendor's namespace — "opus" means nothing to Codex, "gpt-5.6-sol" means
+	// nothing to Claude Code — so this is honoured only when the role targets a
+	// single runtime. A role spanning runtimes declares Models instead.
+	Model string `yaml:"model,omitempty"`
+	// Models maps a runtime to the model that runtime should use. It is what
+	// lets one role body run on two vendors without either adapter naming a
+	// model the other invented.
+	Models          map[string]string `yaml:"models,omitempty"`
+	ReasoningEffort string            `yaml:"reasoning_effort,omitempty"`
+	Sandbox         string            `yaml:"sandbox,omitempty"`
 	// Writes lists the repositories this role may modify. An empty list means
 	// the role is read-only, which is the safe default for analysis roles.
 	Writes []string `yaml:"writes,omitempty"`
@@ -56,6 +64,55 @@ func (r Role) DisplayTitle() string {
 		return r.Title
 	}
 	return r.Name
+}
+
+// RuntimeNames lists every runtime vat generates an adapter for, in the order
+// the adapters are rendered.
+func RuntimeNames() []string { return []string{"claude", "codex"} }
+
+// TargetedRuntimes returns the runtimes this role generates an adapter for.
+func (r Role) TargetedRuntimes() []string {
+	var targeted []string
+	for _, runtime := range RuntimeNames() {
+		if r.TargetsRuntime(runtime) {
+			targeted = append(targeted, runtime)
+		}
+	}
+	return targeted
+}
+
+// ModelFor returns the model one runtime's adapter should request, or an empty
+// string when the role names none and the runtime's own default should stand.
+//
+// Writing a model a runtime has never heard of is worse than writing nothing.
+// Codex handed `model = "opus"` does not quietly fall back to something
+// sensible — it fails to resolve a name that is not in its namespace. So a bare
+// Model is honoured only when there is exactly one runtime for it to belong to,
+// and `harness/model-ambiguous` reports the case where it is not.
+func (r Role) ModelFor(runtime string) string {
+	if model, ok := r.Models[runtime]; ok && model != "" {
+		return model
+	}
+	if r.Model != "" && len(r.TargetedRuntimes()) == 1 {
+		return r.Model
+	}
+	return ""
+}
+
+// ModelIsAmbiguous reports a role that names one model but targets several
+// runtimes, so no adapter can honour it.
+func (r Role) ModelIsAmbiguous() bool {
+	if r.Model == "" || len(r.TargetedRuntimes()) < 2 {
+		return false
+	}
+	// An explicit entry for every targeted runtime resolves the ambiguity; the
+	// bare Model is then just unused.
+	for _, runtime := range r.TargetedRuntimes() {
+		if r.Models[runtime] == "" {
+			return true
+		}
+	}
+	return false
 }
 
 // TargetsRuntime reports whether an adapter should be generated for a runtime.
@@ -187,8 +244,8 @@ func renderClaudeAgent(role Role) string {
 	b.WriteString("---\n")
 	b.WriteString("name: " + role.Name + "\n")
 	b.WriteString("description: " + yamlScalar(role.Description) + "\n")
-	if role.Model != "" {
-		b.WriteString("model: " + role.Model + "\n")
+	if model := role.ModelFor("claude"); model != "" {
+		b.WriteString("model: " + model + "\n")
 	}
 	b.WriteString("---\n\n")
 	b.WriteString(adapterPreamble(role))
@@ -200,8 +257,8 @@ func renderCodexAgent(role Role) string {
 	b.WriteString("# " + adapterWarning + "\n")
 	b.WriteString("name = " + tomlString(role.DisplayTitle()) + "\n")
 	b.WriteString("description = " + tomlString(role.Description) + "\n")
-	if role.Model != "" {
-		b.WriteString("model = " + tomlString(role.Model) + "\n")
+	if model := role.ModelFor("codex"); model != "" {
+		b.WriteString("model = " + tomlString(model) + "\n")
 	}
 	if role.ReasoningEffort != "" {
 		b.WriteString("model_reasoning_effort = " + tomlString(role.ReasoningEffort) + "\n")
