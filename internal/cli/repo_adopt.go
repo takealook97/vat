@@ -48,6 +48,13 @@ func runRepoAdopt(ctx context.Context, env *Env, args []string) error {
 		return err
 	}
 	name := filepath.Base(target)
+	// strictlyBelow resolves symlinks, which textual containment does not: a
+	// link inside the workspace pointing at a repository outside it passed
+	// every check and then had contracts written into it, outside the one
+	// directory vat is allowed to write to.
+	if !strictlyBelow(ws.Root, filepath.Join(ws.Root, name)) {
+		return usageErrorf("%s resolves outside the workspace; adopt the directory where it actually is", name)
+	}
 	discovered, ok := describeRepo(ctx, ws.Root, name)
 	if !ok {
 		return usageErrorf("%s is not a git repository inside the workspace", name)

@@ -143,8 +143,11 @@ the files rather than in the commands, so no caller can write a record to a path
 of its own choosing. These were previously validated late enough that
 `vat repo new ../escaped` scaffolded a repository outside the workspace before
 failing, and `vat harness role new ../../../pwned` wrote a file outside it and
-reported success. Commands that delete or move a directory additionally require
-the resolved path to sit strictly below the workspace root.
+reported success. Commands that create, delete, move, or adopt a
+directory additionally require the *resolved* path to sit strictly below the
+workspace root — resolved, because a symlink inside the workspace pointing
+outside it satisfies every textual check, and `vat repo adopt` on one used to
+write a generated contract into a repository outside the root.
 
 `vat` opens no network connection of its own. Network activity is `git` and, for
 `vat repo new`, the GitHub CLI — both invoked as subprocesses using your

@@ -493,3 +493,36 @@ func TestAChangesetRefusesToRecordAnEmptyObjective(t *testing.T) {
 		t.Errorf("the refused changeset was written anyway: %+v", sets)
 	}
 }
+
+func TestRepoAdoptRefusesADirectoryThatOnlyLooksLikeItIsInside(t *testing.T) {
+	// Arrange: a symlink inside the workspace pointing at a repository outside
+	// it passed every textual containment check, was adopted, and then had a
+	// generated contract written into it — outside the one directory vat is
+	// allowed to write to.
+	h := adoptedFixture(t, "payments")
+	outside := filepath.Join(t.TempDir(), "elsewhere")
+	if err := os.MkdirAll(outside, 0o755); err != nil {
+		t.Fatalf("create: %v", err)
+	}
+	git(t, outside, "init", "--quiet", "--initial-branch", "main", ".")
+	if err := os.WriteFile(filepath.Join(outside, "README.md"), []byte("x\n"), 0o644); err != nil {
+		t.Fatalf("write: %v", err)
+	}
+	git(t, outside, "add", "-A")
+	git(t, outside, "commit", "--quiet", "-m", "init")
+	git(t, outside, "remote", "add", "origin", "https://example.invalid/acme/elsewhere.git")
+	if err := os.Symlink(outside, h.path("elsewhere")); err != nil {
+		t.Skipf("this platform does not allow symlinks here: %v", err)
+	}
+
+	// Act
+	code, output := h.run("repo", "adopt", "elsewhere")
+
+	// Assert
+	if code == ExitOK {
+		t.Errorf("a symlink resolving outside the workspace was adopted:\n%s", output)
+	}
+	if _, err := os.Stat(filepath.Join(outside, "AGENTS.md")); err == nil {
+		t.Error("a contract was written into a repository outside the workspace root")
+	}
+}

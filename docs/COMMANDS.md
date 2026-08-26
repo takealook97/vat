@@ -215,7 +215,9 @@ Every mutation moves the manifest, the `.gitignore` exclusion, and the generated
 harness together, because changing one without the others is the failure mode.
 
 A repository name may hold only letters, digits, `.`, `_`, and `-`, and `new`
-checks it before it creates anything. The name becomes both a directory and,
+checks it before it creates anything. `adopt` refuses a directory that resolves
+outside the workspace, which a symlink can do while looking as though it does
+not. The name becomes both a directory and,
 through `remote_template`, part of a URL.
 
 Every flag is validated before anything is created, so a typo cannot leave a
