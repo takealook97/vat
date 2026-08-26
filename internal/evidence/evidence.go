@@ -9,6 +9,7 @@
 package evidence
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -58,6 +59,32 @@ type Packet struct {
 // Path returns a packet's file path relative to the workspace root.
 func Path(id string) string { return filepath.Join(Dir, id+".yaml") }
 
+// ValidateID reports whether an identifier is safe to build a filename from.
+//
+// The id is chosen by the caller and pasted into a path, so an unchecked
+// "../escape" wrote the packet outside the evidence directory -- where nothing
+// lists it -- and a longer traversal left the workspace entirely.
+func ValidateID(id string) error {
+	if strings.TrimSpace(id) == "" {
+		return errors.New("an identifier is required")
+	}
+	if len(id) > 64 {
+		return errors.New("an identifier may not be longer than 64 characters")
+	}
+	for _, r := range id {
+		switch {
+		case r >= 'a' && r <= 'z', r >= 'A' && r <= 'Z', r >= '0' && r <= '9':
+		case r == '-', r == '_', r == '.':
+		default:
+			return fmt.Errorf("identifier %q may contain only letters, digits, '.', '_', and '-'", id)
+		}
+	}
+	if strings.HasPrefix(id, ".") {
+		return fmt.Errorf("identifier %q may not begin with '.'", id)
+	}
+	return nil
+}
+
 // New builds an empty packet.
 func New(id, objective string, repositories []string, now time.Time) Packet {
 	return Packet{
@@ -71,6 +98,11 @@ func New(id, objective string, repositories []string, now time.Time) Packet {
 
 // Save writes a packet atomically.
 func Save(root string, packet Packet) error {
+	// Checked here rather than at the command, so no caller can write a packet
+	// to a path of its own choosing.
+	if err := ValidateID(packet.ID); err != nil {
+		return err
+	}
 	encoded, err := yaml.Marshal(packet)
 	if err != nil {
 		return fmt.Errorf("encode packet %s: %w", packet.ID, err)
@@ -83,6 +115,9 @@ func Save(root string, packet Packet) error {
 
 // Load reads one packet.
 func Load(root, id string) (Packet, error) {
+	if err := ValidateID(id); err != nil {
+		return Packet{}, err
+	}
 	data, err := os.ReadFile(filepath.Join(root, Path(id)))
 	if err != nil {
 		return Packet{}, fmt.Errorf("read packet %s: %w", id, err)

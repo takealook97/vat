@@ -238,6 +238,11 @@ func Create(root string, input NewRecordInput) (string, error) {
 	if input.Title == "" {
 		return "", fmt.Errorf("a record needs a title")
 	}
+	// Checked here rather than at the command, so no caller can write a record
+	// to a path of its own choosing.
+	if err := ValidateID(input.ID); err != nil {
+		return "", err
+	}
 	status := input.Status
 	if status == "" {
 		// New knowledge enters unreviewed. Anything else would make the

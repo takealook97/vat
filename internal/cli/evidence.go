@@ -253,6 +253,13 @@ func evidenceCheckCommand() *Command {
 					ID: packet.ID, Complete: len(found) == 0, Problems: found,
 				})
 			}
+			// Naming a packet that does not exist used to print nothing and exit
+			// 0, so a CI job gating a merge on `vat evidence check EV-0007`
+			// passed when the packet had never been written. An empty run is
+			// the most expensive way for a typo to be wrong.
+			if set.NArg() == 1 && len(reports) == 0 {
+				return usageErrorf("no evidence packet with id %q", set.Arg(0))
+			}
 			if env.JSON {
 				if err := emitJSON(env, reports); err != nil {
 					return err

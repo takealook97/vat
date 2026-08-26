@@ -2,6 +2,7 @@ package cli
 
 import (
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -413,5 +414,66 @@ func TestRepoRemoveDeleteChangesNothingWhenNobodyConfirms(t *testing.T) {
 	}
 	if !strings.Contains(string(written), "payments") {
 		t.Error("the deletion was declined but the manifest entry was dropped anyway")
+	}
+}
+
+func TestARecordIdentifierCannotBecomeAPath(t *testing.T) {
+	// Arrange: ids are normally generated, but `brain new --id` and
+	// `evidence new <id>` let a caller supply one, and both were pasted
+	// straight into a filename. A traversing id wrote the record outside the
+	// workspace and reported success.
+	h := brainFixture(t, "payments")
+	outsideWorkspace := filepath.Dir(h.root)
+
+	cases := []struct {
+		name string
+		args []string
+	}{
+		{"brain", []string{"brain", "new", "decision", "--title", "x", "--id", "../../../pwned"}},
+		{"evidence", []string{"evidence", "new", "../../../pwned", "objective",
+			"--repos", "payments", "--acceptance", "something end to end"}},
+	}
+
+	for _, testCase := range cases {
+		t.Run(testCase.name, func(t *testing.T) {
+			// Act
+			code, output := h.run(testCase.args...)
+
+			// Assert
+			if code == ExitOK {
+				t.Errorf("`vat %s` was accepted:\n%s", strings.Join(testCase.args, " "), output)
+			}
+			entries, err := os.ReadDir(outsideWorkspace)
+			if err != nil {
+				t.Fatalf("read: %v", err)
+			}
+			for _, entry := range entries {
+				if strings.Contains(entry.Name(), "pwned") {
+					t.Errorf("`vat %s` wrote %s outside the workspace",
+						strings.Join(testCase.args, " "), entry.Name())
+				}
+			}
+		})
+	}
+}
+
+func TestEvidenceCheckFailsOnAnIdentifierThatDoesNotExist(t *testing.T) {
+	// Arrange: printing nothing and exiting 0 means a CI job gating a merge on
+	// `vat evidence check EV-0007` passes when the packet was never written.
+	h := adoptedFixture(t, "payments")
+	h.mustRun("evidence", "new", "EV-0001", "Tidy the ordering docs",
+		"--repos", "payments", "--acceptance", "the doc names the current revision")
+
+	// Act
+	code, output := h.run("evidence", "check", "EV-9999")
+
+	// Assert
+	if code == ExitOK {
+		t.Errorf("checking a packet that does not exist reported success:\n%s", output)
+	}
+	// The one that does exist must still pass, or the guard has broken the
+	// command it was added to protect.
+	if code, output := h.run("evidence", "check", "EV-0001"); code != ExitOK {
+		t.Errorf("checking a packet that does exist exited %d:\n%s", code, output)
 	}
 }

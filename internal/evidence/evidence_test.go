@@ -197,3 +197,36 @@ func TestPathIsStableForAnIdentifier(t *testing.T) {
 		t.Errorf("Path = %q, want it to end with EP-001.yaml", got)
 	}
 }
+
+func TestAnIdentifierThatCouldBecomeAPathIsRefused(t *testing.T) {
+	// Arrange: the id is chosen by the caller and pasted into a filename. An
+	// unchecked "../escape" wrote the packet where nothing lists it, and a
+	// longer traversal left the workspace entirely.
+	refused := []string{"", "   ", "../../../pwned", "nested/id", ".hidden"}
+	accepted := []string{"EV-0001", "release_gate", "ev.1", "a"}
+
+	// Act & Assert
+	for _, id := range refused {
+		if err := evidence.ValidateID(id); err == nil {
+			t.Errorf("ValidateID(%q) accepted an id that becomes a path", id)
+		}
+	}
+	for _, id := range accepted {
+		if err := evidence.ValidateID(id); err != nil {
+			t.Errorf("ValidateID(%q) refused an ordinary identifier: %v", id, err)
+		}
+	}
+}
+
+func TestSaveAndLoadRefuseAnIdentifierThatCouldBecomeAPath(t *testing.T) {
+	// Arrange: the package, not the command, is where this has to be enforced.
+	root := t.TempDir()
+
+	// Act & Assert
+	if err := evidence.Save(root, evidence.Packet{ID: "../../../pwned", Objective: "x"}); err == nil {
+		t.Error("Save wrote a packet to a caller-chosen path")
+	}
+	if _, err := evidence.Load(root, "../../../pwned"); err == nil {
+		t.Error("Load read from a caller-chosen path")
+	}
+}

@@ -357,6 +357,12 @@ vat evidence check [<id>]
 The contract a worker is given before it starts. `--markdown` renders the
 briefing to paste into a session.
 
+`check` with an identifier fails if no packet has it, rather than reporting
+nothing: a merge gated on a packet that was never written must not pass.
+
+An evidence or brain identifier may hold only letters, digits, `.`, `_`, and
+`-`. Both become filenames.
+
 `new` refuses to overwrite an existing packet: silently replacing the acceptance
 criterion defeats the point of writing one down.
 

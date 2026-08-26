@@ -9,6 +9,7 @@
 package brain
 
 import (
+	"errors"
 	"fmt"
 	"path"
 	"regexp"
@@ -265,6 +266,34 @@ func ParseSourceRef(ref string) (repo, revision, filePath string, ok bool) {
 
 // numericID extracts the leading number of an identifier for sorting, so G-2
 // sorts before G-10.
+// ValidateID reports whether an identifier is safe to build a filename from.
+//
+// Ids are normally generated, but `vat brain new --id` lets a caller supply
+// one, and it is pasted straight into a path: an unchecked "../../../x" wrote
+// the record outside the workspace and reported success. The rule is
+// deliberately looser than any particular numbering scheme -- a workspace may
+// name records however it likes -- and only forbids what makes an id a path.
+func ValidateID(id string) error {
+	if strings.TrimSpace(id) == "" {
+		return errors.New("an identifier is required")
+	}
+	if len(id) > 64 {
+		return errors.New("an identifier may not be longer than 64 characters")
+	}
+	for _, r := range id {
+		switch {
+		case r >= 'a' && r <= 'z', r >= 'A' && r <= 'Z', r >= '0' && r <= '9':
+		case r == '-', r == '_', r == '.':
+		default:
+			return fmt.Errorf("identifier %q may contain only letters, digits, '.', '_', and '-'", id)
+		}
+	}
+	if strings.HasPrefix(id, ".") {
+		return fmt.Errorf("identifier %q may not begin with '.'", id)
+	}
+	return nil
+}
+
 func numericID(id string) int {
 	digits := regexp.MustCompile(`\d+`).FindString(id)
 	if digits == "" {

@@ -476,3 +476,39 @@ func TestIsBrainRecognisesAnInitialisedDirectoryOnly(t *testing.T) {
 		t.Error("an empty directory is treated as a brain repository")
 	}
 }
+
+func TestAnIdentifierThatCouldBecomeAPathIsRefused(t *testing.T) {
+	// Arrange: ids are normally generated, but `--id` lets a caller supply one
+	// and it is pasted straight into a filename. The check lives here rather
+	// than at the command so no caller can write a record to a path of its own
+	// choosing.
+	refused := []string{"", "   ", "../../../pwned", "nested/id", ".hidden", strings.Repeat("x", 65)}
+	accepted := []string{"D-0001", "GO-0014", "some_id", "some.id", "a"}
+
+	// Act & Assert
+	for _, id := range refused {
+		if err := ValidateID(id); err == nil {
+			t.Errorf("ValidateID(%q) accepted an id that becomes a path", id)
+		}
+	}
+	for _, id := range accepted {
+		if err := ValidateID(id); err != nil {
+			t.Errorf("ValidateID(%q) refused an ordinary identifier: %v", id, err)
+		}
+	}
+}
+
+func TestCreateRefusesAnIdentifierThatCouldBecomeAPath(t *testing.T) {
+	// Arrange: the package, not the command, is where this has to be enforced.
+	root := newStore(t)
+
+	// Act
+	_, err := Create(root, NewRecordInput{
+		Kind: KindDecision, ID: "../../../pwned", Title: "x", Now: observedOn,
+	})
+
+	// Assert
+	if err == nil {
+		t.Error("Create wrote a record to a caller-chosen path")
+	}
+}
