@@ -174,6 +174,11 @@ func renderStatusTable(env *Env, ws *workspace.Workspace, statuses []repoStatus)
 	}
 	rows := make([][]string, 0, len(statuses))
 	dirty, ahead, behind, missing, unreadable := 0, 0, 0, 0, 0
+	// advanceable counts the repositories `vat sync` could actually move: on a
+	// branch, behind its remote, and not carrying anything of their own. A
+	// repository that is behind *and* ahead has diverged, and sync will not
+	// touch it.
+	advanceable := 0
 	for _, status := range statuses {
 		state := "clean"
 		switch {
@@ -193,6 +198,10 @@ func renderStatusTable(env *Env, ws *workspace.Workspace, statuses []repoStatus)
 		if status.Behind > 0 {
 			behind++
 		}
+		if status.Present && !status.Unreadable && !status.Dirty &&
+			status.Behind > 0 && status.Ahead == 0 {
+			advanceable++
+		}
 		rows = append(rows, []string{
 			status.Name,
 			status.Branch,
@@ -205,7 +214,7 @@ func renderStatusTable(env *Env, ws *workspace.Workspace, statuses []repoStatus)
 	env.Printer.Table([]string{"REPOSITORY", "BRANCH", "REV", "TREE", "VS ORIGIN", "NOTE"}, rows)
 
 	var summary []string
-	summary = append(summary, fmt.Sprintf("%d repositories", len(statuses)))
+	summary = append(summary, pluralise(len(statuses), "repository", "repositories"))
 	if missing > 0 {
 		summary = append(summary, fmt.Sprintf("%d not cloned", missing))
 	}
@@ -222,9 +231,10 @@ func renderStatusTable(env *Env, ws *workspace.Workspace, statuses []repoStatus)
 		summary = append(summary, fmt.Sprintf("%d behind", behind))
 	}
 	env.Printer.Hint("\n%s · workspace %s", strings.Join(summary, " · "), ws.Manifest.Workspace.Name)
-	// Suggested only when there is something for it to advance; recommending it
-	// while everything is ahead or diverged proposes a no-op.
-	if behind > 0 || missing > 0 {
+	// Suggested only when there is something for it to advance. "Behind" was the
+	// wrong test: a diverged repository is behind too, and sync will refuse it,
+	// so the hint sent people to a command that could only tell them no.
+	if advanceable > 0 || missing > 0 {
 		env.Printer.Hint("Run `vat sync` to fast-forward what can be advanced safely.")
 	}
 }

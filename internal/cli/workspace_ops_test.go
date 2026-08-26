@@ -526,3 +526,75 @@ func TestRepoAdoptRefusesADirectoryThatOnlyLooksLikeItIsInside(t *testing.T) {
 		t.Error("a contract was written into a repository outside the workspace root")
 	}
 }
+
+func TestStatusReadsCorrectlyForASingleRepository(t *testing.T) {
+	// Arrange: the summary line said "1 repositories". The helper that renders
+	// a count with the right noun already existed and this one call site did
+	// not use it.
+	h := adoptedFixture(t, "payments")
+
+	// Act
+	_, output := h.run("status")
+
+	// Assert
+	if strings.Contains(output, "1 repositories") {
+		t.Errorf("the summary does not agree with itself about how many there are:\n%s", output)
+	}
+	if !strings.Contains(output, "1 repository") {
+		t.Errorf("the summary does not state the count at all:\n%s", output)
+	}
+}
+
+func TestStatusOnlySuggestsSyncWhenSyncCouldActuallyAdvanceSomething(t *testing.T) {
+	// Arrange: a diverged repository is behind its remote as well as ahead of
+	// it, and sync refuses to touch one. Testing "behind" sent the reader to a
+	// command that could only tell them no.
+	h := adoptedFixture(t, "payments")
+	diverge(t, h, "payments")
+
+	// Act
+	_, output := h.run("status", "--fetch")
+
+	// Assert
+	if !strings.Contains(output, "diverged") {
+		t.Fatalf("the fixture did not actually diverge, so this proves nothing:\n%s", output)
+	}
+	if strings.Contains(output, "vat sync") {
+		t.Errorf("sync was suggested for a repository it refuses to touch:\n%s", output)
+	}
+}
+
+// diverge advances a repository and its upstream along different histories, so
+// the clone is both ahead and behind.
+func diverge(t *testing.T, h *workspaceFixture, name string) {
+	t.Helper()
+	upstream := filepath.Join(filepath.Dir(h.root), "upstream", name)
+	if err := os.WriteFile(filepath.Join(upstream, "theirs.md"), []byte("theirs\n"), 0o644); err != nil {
+		t.Fatalf("write: %v", err)
+	}
+	git(t, upstream, "add", "-A")
+	git(t, upstream, "commit", "--quiet", "-m", "remote side")
+
+	if err := os.WriteFile(h.path(name, "mine.md"), []byte("mine\n"), 0o644); err != nil {
+		t.Fatalf("write: %v", err)
+	}
+	git(t, h.path(name), "add", "-A")
+	git(t, h.path(name), "commit", "--quiet", "-m", "local side")
+}
+
+func TestStatusSuggestsSyncWhenARepositoryIsNotClonedYet(t *testing.T) {
+	// Arrange: cloning what is missing is the one thing sync can always do, so
+	// the hint has to survive the narrowing above.
+	h := adoptedFixture(t, "payments")
+	if err := os.RemoveAll(h.path("payments")); err != nil {
+		t.Fatalf("remove: %v", err)
+	}
+
+	// Act
+	_, output := h.run("status")
+
+	// Assert
+	if !strings.Contains(output, "vat sync") {
+		t.Errorf("sync was not suggested for a repository that is not on disk:\n%s", output)
+	}
+}
