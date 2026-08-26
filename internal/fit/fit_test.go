@@ -103,3 +103,34 @@ func TestEveryLayerCarriesAThresholdAndAStartingCommand(t *testing.T) {
 		}
 	}
 }
+
+func TestSummaryReadsCorrectlyForASingleLayer(t *testing.T) {
+	// Arrange: "Adopt workspace now, in that order" is not a sentence.
+	verdicts := fit.Assess(fit.Signals{Repositories: 4, People: 1})
+
+	// Act
+	summary := fit.Summary(verdicts)
+
+	// Assert
+	if strings.Contains(summary, "in that order") {
+		t.Errorf("a single-layer summary claims an ordering: %q", summary)
+	}
+	if !strings.Contains(summary, "Adopt workspace now.") {
+		t.Errorf("summary = %q", summary)
+	}
+}
+
+func TestSummaryKeepsTheOrderingWhenSeveralLayersApply(t *testing.T) {
+	// Arrange
+	verdicts := fit.Assess(fit.Signals{
+		Repositories: 6, Contracts: 3, People: 3, AgentSessions: 5, SecretRepos: 3,
+	})
+
+	// Act
+	summary := fit.Summary(verdicts)
+
+	// Assert
+	if !strings.Contains(summary, "Every layer is justified") && !strings.Contains(summary, "in that order") {
+		t.Errorf("a multi-layer summary lost its ordering: %q", summary)
+	}
+}

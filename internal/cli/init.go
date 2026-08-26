@@ -111,6 +111,13 @@ func runInit(ctx context.Context, env *Env, args []string) error {
 		printer.Status(ui.LevelInfo, repo.Name, fmt.Sprintf("%s · %s", repo.Role, gitx.Redact(repo.Origin)))
 	}
 
+	if len(rendered) > 0 {
+		// Without this, the very first `vat status` a new user runs shows every
+		// repository dirty and nothing explains why.
+		printer.Hint("\nThe generated contracts above are uncommitted, so `vat status` will")
+		printer.Hint("show those repositories as dirty until you commit them.")
+	}
+
 	printer.Heading("Next")
 	printer.Println("  vat status        see where every repository stands")
 	printer.Println("  vat doctor        judge the environment")

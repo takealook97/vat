@@ -224,7 +224,8 @@ func Compare(current Snapshot, history []Snapshot) []Trend {
 	}{
 		{"lint errors", current.LintErrors, true,
 			"rules the workspace declares but does not meet"},
-		{"lint warnings", current.LintWarnings, true, ""},
+		{"lint warnings", current.LintWarnings, true,
+			"things to look at that are not yet failures"},
 		{"review queue", current.ReviewQueue, true,
 			"claims awaiting verification; sustained growth means knowledge is decaying"},
 		{"review overdue", current.ReviewOverdue, true,
@@ -235,7 +236,8 @@ func Compare(current Snapshot, history []Snapshot) []Trend {
 			"records usable as evidence right now"},
 		{"open changesets", current.ChangesetsOpen, true,
 			"cross-repository work with no closing evidence"},
-		{"stale changesets", current.ChangesetsStale, true, ""},
+		{"stale changesets", current.ChangesetsStale, true,
+			"open past the limit, so the revision bundle is drifting from what shipped"},
 	}
 
 	trends := make([]Trend, 0, len(measures)+1)

@@ -182,3 +182,18 @@ func TestCompareWithNoHistoryReportsNoDirection(t *testing.T) {
 		}
 	}
 }
+
+func TestEveryMeasureExplainsWhatItMeans(t *testing.T) {
+	// Arrange: a row with an empty explanation is a number nobody can act on.
+	trends := metrics.Compare(metrics.Snapshot{}, nil)
+
+	// Act & Assert
+	for _, trend := range trends {
+		if strings.TrimSpace(trend.Reading) == "" {
+			t.Errorf("measure %q has no explanation", trend.Name)
+		}
+		if strings.TrimSpace(trend.Name) == "" {
+			t.Error("a measure has no name")
+		}
+	}
+}

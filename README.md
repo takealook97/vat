@@ -83,28 +83,48 @@ hooks, and host config apply unchanged.
 
 ```console
 $ cd ~/work                    # a folder with several repos already cloned
-$ vat init --adopt
-OK    vat.yaml                  6 repositories enrolled
+$ vat init --adopt --name acme
+OK    vat.yaml                  4 repositories enrolled
 OK    .gitignore                governed repositories excluded from the root history
 OK    AGENTS.md                 generated
+OK    CLAUDE.md                 generated
+OK    brain/AGENTS.md           generated
+OK    console/AGENTS.md         generated
+OK    docs/AGENTS.md            generated
 OK    payments/AGENTS.md        generated
-...
+INFO  brain                     brain · https://github.com/acme/brain.git
+INFO  console                   product · https://github.com/acme/console.git
+INFO  docs                      docs · https://github.com/acme/docs.git
+INFO  payments                  product · https://github.com/acme/payments.git
+
+The generated contracts above are uncommitted, so `vat status` will
+show those repositories as dirty until you commit them.
+
+Next
+  vat status        see where every repository stands
+  vat doctor        judge the environment
+  vat fit           decide which layers are worth adopting yet
 
 $ vat status
-REPOSITORY  BRANCH   REV      TREE   VS ORIGIN     NOTE
-payments    main     3f9a1c2  clean  -4
-console     feature  8b2e0d1  dirty  +2            not on main
-brain       main     c07af31  clean  =
-docs        master   1e5b9a0  clean  =             not on main
+REPOSITORY  BRANCH   REV      TREE   VS ORIGIN  NOTE
+brain       main     9af189c  clean  =
+console     feature  772418c  dirty  +2         not on main
+docs        master   3bf4bf2  clean  -4
+payments    main     3bebc3c  clean  =
+
+4 repositories · 1 dirty · 1 ahead · 1 behind · workspace acme
+Run `vat sync` to fast-forward what can be advanced safely.
 
 $ vat sync
-payments    UPDATED   main  a71c93d
-console     DIRTY     feature 8b2e0d1  uncommitted changes; nothing advanced
-brain       CURRENT   main  c07af31
-docs        BRANCH    master  1e5b9a0  on master, not main; nothing advanced
+REPOSITORY  STATE    BRANCH   REV      DETAIL
+brain       CURRENT  main     9af189c
+console     DIRTY    feature  772418c  uncommitted changes; nothing advanced
+docs        UPDATED  master   1e5b9a0
+payments    CURRENT  main     3bebc3c
 
-2 advanced · 2 left alone on purpose · 0 need attention
+1 advanced · 1 left alone on purpose · 0 need attention
 ```
+
 
 Notice what `sync` did **not** do: it did not stash `console`'s work, did not
 check `docs` out to `main`, and did not report success on your behalf. Then run
@@ -120,11 +140,17 @@ what to skip.
 
 ```console
 $ vat fit --contracts 1 --people 1
-OK    workspace     adopt — 6 repositories: knowing what to clone, and what state each is in, has stopped being memorable
-SKIP  harness       not yet — without agents in the loop, a written contract per repository is enough
-SKIP  changesets    not yet — with no shared contracts, each repository's own history is a complete record
-SKIP  brain         not yet — one person across a few repositories still remembers why
-SKIP  credential    not yet — a single secret location is still auditable by looking at it
+OK    workspace                 adopt — 4 repositories: knowing what to clone, and what state each is in, has stopped being memorable
+      threshold: 3 or more repositories worked in together
+      start with: vat init
+SKIP  harness                   not yet — without agents in the loop, a written contract per repository is enough
+      threshold: agents work across more than one repository
+SKIP  changesets                not yet — with no shared contracts, each repository's own history is a complete record
+      threshold: 2 or more interfaces cross a repository boundary
+SKIP  brain                     not yet — one person across a few repositories still remembers why
+      threshold: a decision has already been lost, or 2+ people across 4+ repositories
+SKIP  credential                not yet — a single secret location is still auditable by looking at it
+      threshold: 2 or more repositories hold their own secrets
 
 Conclusion
 Adopt workspace now. Leave the rest until its threshold is met; adopting a layer
@@ -348,11 +374,13 @@ $ vat repo new payments --group backend --private
 OK    payments                  initialised with a starter harness
 OK    payments                  pushed to https://github.com/acme/payments.git
 OK    .gitignore                updated
+OK    payments                  registered as product
 OK    AGENTS.md                 regenerated
+OK    payments/AGENTS.md        regenerated
 
 $ vat repo remove legacy-api
 FAIL  legacy-api                uncommitted changes in the working tree
-FAIL  legacy-api                3 commit(s) not on any remote
+FAIL  legacy-api                3 commits not on any remote
 FAIL  legacy-api                1 stash entry
 
 Refusing to remove legacy-api. Push or discard the work above, or pass --force.
@@ -372,11 +400,13 @@ rituals produced the effect they were for.
 $ vat metrics
 MEASURE           NOW  CHANGE  WHAT IT MEANS
 lint errors       0    -2      rules the workspace declares but does not meet
+lint warnings     3    +1      things to look at that are not yet failures
 review queue      14   +6      claims awaiting verification; sustained growth means knowledge is decaying
 review overdue    3    +3      past the review window
 median claim age  62   +12     days since the typical current-state claim was verified
 citable records   41   -6      records usable as evidence right now
 open changesets   2    +1      cross-repository work with no closing evidence
+stale changesets  1    +1      open past the limit, so the revision bundle is drifting from what shipped
 rework rate       11%          share of recorded checks that failed
 ```
 

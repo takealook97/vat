@@ -142,9 +142,12 @@ func Summary(verdicts []Verdict) string {
 	case len(verdicts):
 		return "Every layer is justified. Adopt them in the order listed — each one assumes " +
 			"the one before it is already stable."
+	case 1:
+		return fmt.Sprintf("Adopt %s now. Leave the rest until its threshold is met; "+
+			"adopting a layer early costs ceremony and buys nothing.", adopt[0])
 	default:
-		return fmt.Sprintf("Adopt %s now, in that order. Leave the rest until its threshold "+
-			"is met; adopting a layer early costs ceremony and buys nothing.",
+		return fmt.Sprintf("Adopt %s now, in that order. Leave the rest until each "+
+			"threshold is met; adopting a layer early costs ceremony and buys nothing.",
 			strings.Join(adopt, ", then "))
 	}
 }
