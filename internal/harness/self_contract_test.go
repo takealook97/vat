@@ -42,7 +42,7 @@ func TestVatsOwnAdaptersMatchItsOwnRoleDefinitions(t *testing.T) {
 				t.Errorf("role %q has no %s adapter at %s: %v", role.Name, adapter.Runtime, adapter.Path, err)
 				continue
 			}
-			if string(committed) != adapter.Content {
+			if normaliseNewlines(string(committed)) != adapter.Content {
 				t.Errorf("%s is out of step with %s/%s.md; re-render it\n--- committed ---\n%s\n--- expected ---\n%s",
 					adapter.Path, harness.RolesDir, role.Name, committed, adapter.Content)
 			}
@@ -75,12 +75,21 @@ func TestNoCommittedAdapterNamesAnotherRuntimesModel(t *testing.T) {
 				if err != nil {
 					t.Fatalf("read %s: %v", adapterPath, err)
 				}
-				if strings.Contains(string(content), theirs) {
+				if strings.Contains(normaliseNewlines(string(content)), theirs) {
 					t.Errorf("%s names %q, which belongs to the %s runtime", adapterPath, theirs, other)
 				}
 			}
 		}
 	}
+}
+
+// normaliseNewlines makes the comparison about content rather than about the
+// reader's git configuration. .gitattributes pins the working tree to LF, but a
+// clone made before that existed still holds CRLF, and telling such a
+// contributor their adapters have drifted would send them to re-render files
+// that are already correct.
+func normaliseNewlines(text string) string {
+	return strings.ReplaceAll(text, "\r\n", "\n")
 }
 
 func adapterPathFor(t *testing.T, role harness.Role, runtime string) string {

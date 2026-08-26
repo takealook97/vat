@@ -1,0 +1,14 @@
+# vat writes every file it generates with LF, on every platform: the manifest,
+# the harness adapters, the brain records, the changesets. Left to its own
+# devices git converts them to CRLF on a Windows checkout, and the next
+# `vat harness render` rewrites all of them back — so the working tree is dirty
+# on arrival and drift detection reports files nobody touched.
+#
+# It is not only cosmetic. The suite reads the committed adapters and compares
+# them with what the generator produces, which is a byte comparison; CI caught
+# it on windows-latest the first time that test ran there.
+* text=auto eol=lf
+
+# Binaries git must not touch.
+*.png binary
+*.svg text eol=lf
