@@ -174,6 +174,10 @@ vat exec [--group <g>] [--role <r>] [--only <names>] [--checks]
 Runs a command in every selected repository, in parallel, with per-repository
 results. A failure in one is never hidden by success in another.
 
+A job stopped by `--timeout` or by Ctrl-C is reported as timed out or
+interrupted rather than as the signal that killed it, which renders as an exit
+status of `-1` and says nothing about what happened.
+
 **Your command is executed directly, not re-parsed by a shell.** Quoting
 survives, so `-- git commit -m "wip; cleanup"` commits with that message rather
 than also running a second command. Ask for a shell explicitly when you want

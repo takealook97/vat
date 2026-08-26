@@ -163,3 +163,36 @@ func TestKeepGoingRunsEveryJobDespiteAFailure(t *testing.T) {
 		t.Error("a later job was not run after an earlier failure")
 	}
 }
+
+func TestAnInterruptedJobIsNamedRatherThanNumbered(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("the fixture command is POSIX shell")
+	}
+	// Arrange: a job killed by Ctrl-C reports the signal that killed it, which
+	// renders as "exit status -1" — a number that tells the reader nothing.
+	// Pressing Ctrl-C is something the user did, and the report should say so.
+	ctx, cancel := context.WithCancel(t.Context())
+
+	// Act
+	go func() {
+		time.Sleep(150 * time.Millisecond)
+		cancel()
+	}()
+	result := runner.RunOne(ctx, runner.Job{
+		Repo: "payments", Dir: t.TempDir(), Command: "sleep 30",
+	}, 0)
+
+	// Assert
+	if result.OK() {
+		t.Fatal("an interrupted job reported success")
+	}
+	if !result.Interrupted {
+		t.Error("the result does not record that the run was cancelled")
+	}
+	if result.Err == nil || !strings.Contains(result.Err.Error(), "interrupted") {
+		t.Errorf("the failure reads as %v, which does not say the run was interrupted", result.Err)
+	}
+	if result.Err != nil && strings.Contains(result.Err.Error(), "exit status") {
+		t.Errorf("the failure still reports a raw exit status: %v", result.Err)
+	}
+}

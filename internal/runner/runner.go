@@ -29,6 +29,10 @@ type Result struct {
 	// Skipped marks a job abandoned because an earlier one failed. It is
 	// neither a pass nor a failure.
 	Skipped bool `json:"skipped,omitempty"`
+	// Interrupted marks a job stopped because the run was cancelled. Ctrl-C is
+	// something the user did, not something that went wrong, and reporting it
+	// as a plain failure reads as a defect in whatever was running.
+	Interrupted bool `json:"interrupted,omitempty"`
 }
 
 // OK reports whether the command ran and succeeded. A skipped job is not OK
@@ -198,8 +202,15 @@ func RunOne(ctx context.Context, job Job, timeout time.Duration) Result {
 			result.ExitCode = -1
 			result.Err = err
 		}
-		if errors.Is(runCtx.Err(), context.DeadlineExceeded) {
+		// A job killed by the deadline or by the user reports the signal that
+		// killed it, which renders as "exit status -1" -- a number that tells
+		// the reader nothing about what happened. Both are states worth naming.
+		switch {
+		case errors.Is(runCtx.Err(), context.DeadlineExceeded):
 			result.Err = fmt.Errorf("timed out after %s", timeout)
+		case errors.Is(runCtx.Err(), context.Canceled):
+			result.Interrupted = true
+			result.Err = errors.New("interrupted")
 		}
 	}
 	return result
