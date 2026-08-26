@@ -4,13 +4,17 @@
 
 # vat
 
-**A rule that is only written down is a hope.**
+**Git records each repository. `vat` records what happened across them.**
 
-`vat` makes the written parts of a codebase enforceable: the contracts your
-coding agents read, the facts your team relies on, and the layout of the
-repositories they live in. Rules become checks that run. Facts carry the
-revision they were read from and stop counting as true when nobody re-checks
-them.
+`vat` makes a folder of repositories into one workspace you can work from the
+top of: one manifest, one contract your coding agents read in every repository,
+and one history of the work that crossed a boundary — which revisions were
+verified *together*, what check proved it, and why the decision was made. The
+repositories stay independent; the account of what happened stops being
+scattered across four `git log`s and one person's memory.
+
+Every rule it states is a check that runs, because a rule only written down is
+a hope.
 
 [![CI](https://github.com/takealook97/vat/actions/workflows/ci.yml/badge.svg)](https://github.com/takealook97/vat/actions/workflows/ci.yml)
 [![Go Reference](https://pkg.go.dev/badge/github.com/takealook97/vat.svg)](https://pkg.go.dev/github.com/takealook97/vat)
@@ -26,24 +30,30 @@ them.
 
 ## The problem
 
-Three things in every project are written down and nothing checks them.
+You work in several repositories at once, and increasingly so does an agent
+sitting in the folder above them. Three things about that arrangement are
+written down, assumed, or remembered — and nothing checks them.
 
-**The contract your agents read.** The same role is defined in
-`.claude/agents/` and `.codex/agents/`, they have quietly diverged, and nobody
-diffs a prompt. `AGENTS.md` describes a layout that changed in March. Nothing
-tells the agent which of the text it just fetched is data and which is
+**What crossed the boundary.** An API change shipped across three repositories.
+Each `git log` is complete and none of them is the answer: nobody can say which
+three revisions were verified *together*, what check proved it, or how to get
+back. Meanwhile `for r in */; do git -C "$r" pull; done` reported success while
+two repositories failed and one silently stashed your work, and someone added a
+repository to the folder without excluding it, so the next root commit swallowed
+the whole clone.
+
+**The contract your agents read.** A session opened at the parent directory can
+see every repository, which is the point and also the hazard — reading them all
+is not permission to write to any of them. Meanwhile the same role is defined
+in `.claude/agents/` and `.codex/agents/`, they have quietly diverged, nobody
+diffs a prompt, `AGENTS.md` describes a layout that changed in March, and
+nothing tells the agent which of the text it just fetched is data and which is
 instruction.
 
-**The facts your team relies on.** A doc says the payments service "has
+**The facts both of them rely on.** A doc says the payments service "has
 retry-safe ordering." It was true when someone wrote it. Nobody has checked
 since, and it is quoted as current fact weekly — by people and by agents that
-read it as ground truth.
-
-**The shape of the repositories.** Someone added a repo to the manifest and
-forgot `.gitignore`, so the next root commit swallowed the whole clone. An API
-change shipped across three repos and nobody can say which three revisions were
-verified *together*. `for r in */; do git -C "$r" pull; done` reported success
-while two repos failed and one silently stashed your work.
+read it as ground truth, and neither can tell that nobody has.
 
 None of these are exotic. They are what a written rule does when nothing
 enforces it.
@@ -68,6 +78,11 @@ FAIL  lint                      2 errors, 2 warnings across 21 rules
 
 ## Who this is for
 
+**You work across several repositories, and so do your agents.** That is the
+case this was built for: one manifest, one place to run from, a written boundary
+per repository so a session at the parent directory cannot edit its way across
+one by accident, and a record of which revisions were verified together.
+
 **You use coding agents on a codebase you care about.** One repository is
 enough. `vat harness` keeps one role definition and generates the per-runtime
 adapters from it, so Claude Code and Codex cannot drift apart, and states the
@@ -77,10 +92,6 @@ contract it writes.
 **Your team keeps re-deriving what it already decided.** `vat brain` records a
 fact with the revision it was read from, and demotes it when nobody re-checks
 it. Not a wiki, not a vector store: a claim that expires.
-
-**You work across several repositories at once.** `vat` clones, updates without
-ever discarding local work, and records which revisions across which
-repositories were verified together.
 
 Run `vat fit` and it will tell you which of those you do *not* need yet.
 
@@ -94,11 +105,11 @@ Being clear about the neighbours is more useful than pretending there are none.
 | one build graph and task runner over many projects | [Nx](https://nx.dev), [Turborepo](https://turbo.build), [Bazel](https://bazel.build) |
 | a place to file architecture decision records | [`adr-tools`](https://github.com/npryce/adr-tools), [Log4brains](https://github.com/thomvaill/log4brains) |
 | semantic recall over your documents for an agent | a retrieval layer — and point it at `vat brain`, which decides what is canonical |
-| **written rules that fail loudly when reality moves away from them** | `vat` |
+| **a history of what crossed between repositories, and rules that fail loudly when reality moves away from them** | `vat` |
 
-`vat` is not a build system, and it will not make your agent smarter. It makes
-the text your agent and your team both depend on impossible to leave quietly
-wrong.
+`vat` is not a build system, and it will not make your agent smarter. It gives
+the agent a boundary it cannot cross by accident, and leaves behind an account
+of what actually happened across your repositories.
 
 ## Install
 
@@ -172,6 +183,98 @@ Notice what `sync` did **not** do: it did not stash `console`'s work, did not
 check `docs` out to `main`, and did not report success on your behalf. Then run
 `vat fit` and it will tell you which of the deeper layers you should not adopt
 yet.
+
+---
+
+## One change, three repositories
+
+The commands above are the floor. This is the arc they exist for: one contract
+change, from the session that starts it to the session that inherits it.
+
+**1 · Enrol what is already on disk.** `vat init --adopt` writes `vat.yaml`,
+excludes every governed repository from the root history, and generates a
+contract into each one. Nothing is cloned, moved, or rewritten.
+
+**2 · Open one agent session at the parent directory.** It reads the root
+`AGENTS.md` as the map and each repository's `AGENTS.md` as the working permit.
+Each permit says *write only inside this repository*; the others are readable so
+contracts can be compared, and reading them is stated not to be permission to
+edit them. That boundary is text the agent is handed, not a convention it is
+expected to infer.
+
+**3 · Say what "done" means while it is still cheap to scope.**
+
+```console
+$ vat evidence new EV-0007 "Order cancellation moves to v2" \
+    --repos payments,console \
+    --acceptance "cancel-then-refund passes end to end against a live payments"
+OK    EV-0007                   evidence/EV-0007.yaml
+
+Print the briefing:  vat evidence show EV-0007 --markdown
+```
+
+The briefing is what you hand the agent — objective, repositories it may write
+to, and the acceptance it will be judged against. Written first, it is a
+contract; written afterwards, it is whatever happened to pass.
+
+**4 · Open the changeset, which captures the way back before anything moves.**
+
+```console
+$ vat changeset new "Move order cancellation to v2" --repos payments,console
+OK    CS-0001                   changesets/CS-0001.yaml
+INFO  payments                  return point 3f9a1c2e
+INFO  console                   return point 8b2e0d19
+```
+
+**5 · Do the work.** In the repositories, with git, as normal — `vat` is not in
+that loop and does not want to be. `vat status` is how you see all of it at once.
+
+**6 · Verify each repository, then verify the whole.**
+
+```console
+$ vat changeset verify CS-0001
+OK    payments · make check     14.2s at a71c93d0
+OK    console · pnpm test       31.8s at 5c1f80ab
+OK    CS-0001                   every repository verified
+
+$ vat changeset close CS-0001 --acceptance "cancel-then-refund passes end to end"
+```
+
+Every repository's own suite passing is not the same as the pieces working
+together, and that gap is where multi-repo changes actually break. Closing
+refuses without the second claim.
+
+**7 · Record why, not just what.**
+
+```console
+$ vat brain new decision --title "Cancellation is a v2-only operation" --owner payments
+OK    D-0042                    decisions/D-0042-cancellation-is-a-v2-only-operation.md
+
+Write the record, then: vat brain build && vat brain check
+It stays provisional until: vat brain promote D-0042
+```
+
+Provisional means not citable. A record nobody reviewed does not get to count as
+a fact simply because it exists.
+
+**8 · The next session starts where this one stopped.**
+
+```console
+$ vat brain query cancellation
+INFO  D-0042  Cancellation is a v2-only operation  active
+      decisions/D-0042-cancellation-is-a-v2-only-operation.md
+
+1 result. Open the records themselves; this is an index, not an answer.
+```
+
+Six months on, `vat changeset show CS-0001` still names the revisions that were
+verified together and the checks that proved it, and `vat changeset undo-plan`
+still prints the way back in the right order.
+
+That is the loop: a boundary an agent cannot cross by accident, a record of what
+was verified together, and a fact that expires when nobody re-checks it. The
+layers are independently useful, and `vat fit` will tell you which of them you
+have not earned yet.
 
 ---
 
