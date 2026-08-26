@@ -466,3 +466,43 @@ func TestARepositoryNameHasALengthTheFilesystemCanHold(t *testing.T) {
 		t.Errorf("an ordinary name was rejected: %v", err)
 	}
 }
+
+func TestARemoteTemplateCarryingACredentialIsRejectedWithoutQuotingIt(t *testing.T) {
+	// Arrange: the template is the field most likely to hold a token, and the
+	// {name} message used to quote the whole template back — so the check for
+	// one problem would have printed the other.
+	m := sampleManifest()
+	m.Workspace.RemoteTemplate = "https://user:ghp_EXAMPLETOKEN@example.invalid/acme/{name}.git"
+
+	// Act
+	err := Validate(m)
+
+	// Assert
+	if err == nil {
+		t.Fatal("a remote template carrying a credential was accepted")
+	}
+	if strings.Contains(err.Error(), "ghp_EXAMPLETOKEN") {
+		t.Errorf("the refusal quoted the credential back: %v", err)
+	}
+}
+
+func TestTheMissingPlaceholderMessageDoesNotQuoteTheTemplate(t *testing.T) {
+	// Arrange: same reasoning from the other direction — a template can be
+	// wrong in this way and still hold a secret.
+	m := sampleManifest()
+	m.Workspace.RemoteTemplate = "https://example.invalid/acme/FIXED.git"
+
+	// Act
+	err := Validate(m)
+
+	// Assert
+	if err == nil {
+		t.Fatal("a template with no placeholder was accepted")
+	}
+	if strings.Contains(err.Error(), "FIXED") {
+		t.Errorf("the message quotes the template back, which may hold a token: %v", err)
+	}
+	if !strings.Contains(err.Error(), "{name}") {
+		t.Errorf("the message does not say what is missing: %v", err)
+	}
+}

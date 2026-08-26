@@ -176,7 +176,10 @@ as `0600` is created with whatever the directory's ACL grants.
 
 An origin that carries a credential never reaches `vat.yaml`: the manifest
 rejects one that was typed and strips one that was discovered on an existing
-remote. Everything that prints a URL — a remote mismatch, a failed clone, git's
+remote, and `remote_template` is held to the same rule. `vat repo new` checks
+the remote before it creates anything, because the next things it would do are
+write that URL into `.git/config` and push to it. No refusal quotes the value
+back. Everything that prints a URL — a remote mismatch, a failed clone, git's
 own stderr, and the arguments of a failed git command — goes through `Redact`
 first, which masks the userinfo of every URL in the string rather than the first
 one it finds.

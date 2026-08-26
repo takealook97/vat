@@ -89,6 +89,13 @@ func runRepoNew(ctx context.Context, env *Env, args []string) error {
 	if originURL == "" && !*noRemote {
 		originURL = expandRemoteTemplate(ws.Manifest.Workspace.RemoteTemplate, name)
 	}
+	// Checked here, before anything is created. The URL is about to be written
+	// into .git/config and pushed to, and the refusal must never quote it back.
+	if manifest.HasEmbeddedCredential(originURL) {
+		return usageErrorf(
+			"the remote embeds a credential; %s is committed, so it records identity and never access.\n"+
+				"  Keep the token in your git credential helper and pass the plain URL.", manifest.FileName)
+	}
 
 	branch := *fields.branch
 	if branch == "" {
@@ -121,7 +128,7 @@ func runRepoNew(ctx context.Context, env *Env, args []string) error {
 			env.Printer.Hint("      → create it yourself, then: git -C %s remote add origin <url>", name)
 		} else if created != "" {
 			repo.Origin = created
-			env.Printer.Status(ui.LevelOK, name, "pushed to "+created)
+			env.Printer.Status(ui.LevelOK, name, "pushed to "+gitx.Redact(created))
 		}
 	}
 	if repo.Origin == "" {

@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"strings"
 
 	"github.com/takealook97/vat/internal/fsx"
 	"github.com/takealook97/vat/internal/lint"
@@ -148,21 +149,31 @@ func runRepoRename(ctx context.Context, env *Env, args []string) error {
 
 	// The directory has to move before the manifest is written, or a crash
 	// between the two leaves a manifest naming a directory that is not there.
-	// Moving first has the opposite risk, so a failed write is put back: the
-	// alternative is a workspace whose manifest and disk disagree, which every
-	// later command then reports as a different problem than the one that
-	// happened.
+	// Moving first has the opposite risk, so a failure puts everything back.
+	//
+	// commitManifest writes two files, and the second can fail after the first
+	// succeeded -- so the manifest is restored as well as the directory. Two
+	// files cannot be written atomically without a journal, and a journal is
+	// more machinery than this earns; what it can do is leave nothing
+	// half-applied, and say exactly what to repair when even that fails.
+	previous := ws.Manifest
 	if err := commitManifest(env, ws, next); err != nil {
+		var unrepaired []string
+		if restore := commitManifest(env, ws, previous); restore != nil {
+			unrepaired = append(unrepaired,
+				fmt.Sprintf("%s still names %s: %v", manifest.FileName, newName, restore))
+		}
 		if moved {
 			if back := os.Rename(newDir, oldDir); back != nil {
-				// Both failures matter: the first is why nothing was
-				// recorded, the second is what the reader has to repair.
-				return fmt.Errorf(
-					"%w\n  the directory was renamed to %s and could not be put back: %w\n  rename it to %s by hand before running vat again",
-					err, ws.Rel(newDir), back, ws.Rel(oldDir))
+				unrepaired = append(unrepaired,
+					fmt.Sprintf("the directory is still %s: %v", ws.Rel(newDir), back))
 			}
-			env.Printer.Status(ui.LevelInfo, oldName, "directory put back; nothing was changed")
 		}
+		if len(unrepaired) > 0 {
+			return fmt.Errorf("%w\n  the workspace could not be put back:\n    %s\n  repair this by hand before running vat again",
+				err, strings.Join(unrepaired, "\n    "))
+		}
+		env.Printer.Status(ui.LevelInfo, oldName, "put back; nothing was changed")
 		return err
 	}
 	env.Printer.Status(ui.LevelOK, newName, "renamed from "+oldName)

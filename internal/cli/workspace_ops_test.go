@@ -679,3 +679,92 @@ func TestAdoptRecordsARemoteWithoutItsCredential(t *testing.T) {
 		t.Errorf("the credential was printed:\n%s", output)
 	}
 }
+
+func TestRepoNewRefusesACredentialBeforeItCreatesOrPushesAnything(t *testing.T) {
+	// Arrange: --remote was never checked. The command created the directory,
+	// scaffolded it, committed, wrote the credential-bearing URL into
+	// .git/config, pushed to it over the network, printed it, and only then had
+	// the manifest refuse. Every one of those happened before the refusal.
+	h := adoptedFixture(t, "payments")
+	const withToken = "https://user:ghp_EXAMPLETOKEN@example.invalid/acme/console.git"
+
+	// Act
+	code, output := h.run("repo", "new", "console", "--remote", withToken)
+
+	// Assert
+	if code != ExitUsage {
+		t.Errorf("`repo new --remote <credential>` exited %d, want %d:\n%s", code, ExitUsage, output)
+	}
+	if strings.Contains(output, "ghp_EXAMPLETOKEN") {
+		t.Errorf("the refusal quoted the credential back:\n%s", output)
+	}
+	if _, err := os.Stat(h.path("console")); err == nil {
+		t.Error("the repository was created before the remote was checked")
+	}
+	written, err := os.ReadFile(h.path("vat.yaml"))
+	if err != nil {
+		t.Fatalf("read: %v", err)
+	}
+	if strings.Contains(string(written), "ghp_EXAMPLETOKEN") {
+		t.Error("the credential reached the manifest")
+	}
+}
+
+func TestRepoNewStillAcceptsAnOrdinaryRemote(t *testing.T) {
+	// Arrange: the guard must not have closed the door on the normal case. The
+	// push fails because the host does not resolve, which `repo new` reports as
+	// a warning rather than a failure.
+	h := adoptedFixture(t, "payments")
+
+	// Act
+	code, output := h.run("repo", "new", "console",
+		"--remote", "https://example.invalid/acme/console.git")
+
+	// Assert
+	if code != ExitOK {
+		t.Errorf("an ordinary remote was refused:\n%s", output)
+	}
+	if _, err := os.Stat(h.path("console", ".git")); err != nil {
+		t.Errorf("the repository was not created: %v", err)
+	}
+}
+
+func TestAFailedRenamePutsTheManifestBackAsWellAsTheDirectory(t *testing.T) {
+	// Arrange: writing the manifest and the .gitignore are two writes, and the
+	// second can fail after the first succeeded. Rolling back only the
+	// directory left the manifest naming the new name and the disk holding the
+	// old one — the exact disagreement the rollback exists to prevent.
+	h := adoptedFixture(t, "payments")
+	// A directory where the .gitignore should be: readable as a path, writable
+	// as a file by nothing.
+	if err := os.Remove(h.path(".gitignore")); err != nil {
+		t.Fatalf("remove: %v", err)
+	}
+	if err := os.MkdirAll(h.path(".gitignore"), 0o755); err != nil {
+		t.Fatalf("create: %v", err)
+	}
+
+	// Act
+	code, output := h.run("repo", "rename", "payments", "billing")
+
+	// Assert
+	if code == ExitOK {
+		t.Fatalf("the rename reported success while .gitignore could not be written:\n%s", output)
+	}
+	written, err := os.ReadFile(h.path("vat.yaml"))
+	if err != nil {
+		t.Fatalf("read: %v", err)
+	}
+	if strings.Contains(string(written), "billing") {
+		t.Errorf("the manifest kept the new name after the rename failed:\n%s", written)
+	}
+	if !strings.Contains(string(written), "payments") {
+		t.Errorf("the manifest lost the original name:\n%s", written)
+	}
+	if _, err := os.Stat(h.path("payments")); err != nil {
+		t.Error("the directory was not put back under its original name")
+	}
+	if _, err := os.Stat(h.path("billing")); err == nil {
+		t.Error("the renamed directory survived a failed rename")
+	}
+}

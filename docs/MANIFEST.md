@@ -203,7 +203,8 @@ built rather than when the manifest is saved.
 ### `origin` records identity, never access
 
 An origin carrying a credential — `https://user:token@host/repo.git` — is
-rejected. `vat.yaml` is committed, so a token pasted into it is published by the
+rejected, and so is a `remote_template` that carries one. Neither refusal quotes
+the value back: an error message is not where a token surfaces. `vat.yaml` is committed, so a token pasted into it is published by the
 next push of the workspace root. Keep it in your git credential helper; the
 remote still works. `vat repo adopt` and `vat init --adopt` read a remote that
 already has one and record it stripped rather than refusing, because they record

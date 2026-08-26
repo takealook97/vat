@@ -105,11 +105,16 @@ func Validate(m Manifest) error {
 	// A template without the placeholder is not a template: every repository
 	// created from it was handed the same origin, and two repositories sharing
 	// an upstream fetch and push over each other with nothing reporting it.
-	if template := strings.TrimSpace(m.Workspace.RemoteTemplate); template != "" &&
-		!strings.Contains(template, "{name}") {
-		problems = append(problems, fmt.Sprintf(
-			"workspace.remote_template %q has no {name}; every repository would be given the same origin",
-			template))
+	if template := strings.TrimSpace(m.Workspace.RemoteTemplate); template != "" {
+		// Neither branch quotes the template: it is the one field most likely
+		// to hold a token, and an error message is not where that surfaces.
+		if HasEmbeddedCredential(template) {
+			problems = append(problems,
+				"workspace.remote_template embeds a credential; store it in your git credential helper and record the plain URL")
+		} else if !strings.Contains(template, "{name}") {
+			problems = append(problems,
+				"workspace.remote_template has no {name}; every repository would be given the same origin")
+		}
 	}
 	seenNames := map[string]bool{}
 	seenPaths := map[string]bool{}
