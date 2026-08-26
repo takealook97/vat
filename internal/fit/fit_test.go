@@ -17,7 +17,8 @@ func verdictFor(verdicts []fit.Verdict, layer string) (fit.Verdict, bool) {
 }
 
 func TestASoloDeveloperWithTwoRepositoriesIsToldToAdoptNothing(t *testing.T) {
-	// Arrange
+	// Arrange: no agents, no shared contracts, one person. Nothing here has a
+	// problem worth paying ceremony for.
 	signals := fit.Signals{Repositories: 2, Contracts: 0, People: 1}
 
 	// Act
@@ -132,5 +133,54 @@ func TestSummaryKeepsTheOrderingWhenSeveralLayersApply(t *testing.T) {
 	// Assert
 	if !strings.Contains(summary, "Every layer is justified") && !strings.Contains(summary, "in that order") {
 		t.Errorf("a multi-layer summary lost its ordering: %q", summary)
+	}
+}
+
+func TestTheHarnessIsRecommendedAtASingleRepositoryWhenAgentsWorkInIt(t *testing.T) {
+	// Arrange: one role body drifting into two runtime adapters, a contract
+	// that must hold wherever a session was opened, and a written trust
+	// boundary are all problems at one repository. Gating this on repository
+	// count turned away the largest audience the tool has.
+	signals := fit.Signals{Repositories: 1, People: 1, AgentSessions: 8}
+
+	// Act
+	verdict, found := verdictFor(fit.Assess(signals), fit.LayerHarness)
+
+	// Assert
+	if !found || !verdict.Adopt {
+		t.Fatalf("the harness was not recommended to a single-repository agent user: %+v", verdict)
+	}
+	if strings.Contains(verdict.Threshold, "more than one repository") {
+		t.Errorf("the threshold still speaks of repository count: %q", verdict.Threshold)
+	}
+}
+
+func TestHeavyAgentUseReachesTheKnowledgeThresholdOnItsOwn(t *testing.T) {
+	// Arrange: an agent that re-derives a settled decision costs the same as a
+	// person who forgot it, and does so far more often.
+	signals := fit.Signals{Repositories: 1, People: 1, AgentSessions: 12}
+
+	// Act
+	verdict, found := verdictFor(fit.Assess(signals), fit.LayerBrain)
+
+	// Assert
+	if !found || !verdict.Adopt {
+		t.Fatalf("the knowledge layer was not recommended despite constant agent use: %+v", verdict)
+	}
+	if !strings.Contains(verdict.Because, "agent sessions") {
+		t.Errorf("the reason does not name what triggered it: %q", verdict.Because)
+	}
+}
+
+func TestNoAgentsMeansNoHarnessRecommendation(t *testing.T) {
+	// Arrange: the layer must still say no when its problem is absent.
+	signals := fit.Signals{Repositories: 6, People: 3, AgentSessions: 0}
+
+	// Act
+	verdict, _ := verdictFor(fit.Assess(signals), fit.LayerHarness)
+
+	// Assert
+	if verdict.Adopt {
+		t.Error("the harness was recommended with no agents in the loop")
 	}
 }

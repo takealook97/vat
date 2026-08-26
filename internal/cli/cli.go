@@ -482,3 +482,9 @@ func pluralise(count int, singular, plural string) string {
 	}
 	return fmt.Sprintf("%d %s", count, plural)
 }
+
+// pluraliseCount is pluralise under the name the non-repo commands use; both
+// exist so a count never renders as "1 repositories".
+func pluraliseCount(count int, singular, plural string) string {
+	return pluralise(count, singular, plural)
+}

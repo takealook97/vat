@@ -4,11 +4,13 @@
 
 # vat
 
-**A control plane for multi-repo workspaces — and the brain that remembers why.**
+**A rule that is only written down is a hope.**
 
-Your repositories are the body. `vat` is the vessel that keeps them coherent,
-and `vat brain` is the organisational memory suspended inside it: facts that
-carry where they came from, and stop counting as true when nobody re-checks them.
+`vat` makes the written parts of a codebase enforceable: the contracts your
+coding agents read, the facts your team relies on, and the layout of the
+repositories they live in. Rules become checks that run. Facts carry the
+revision they were read from and stop counting as true when nobody re-checks
+them.
 
 [![CI](https://github.com/takealook97/vat/actions/workflows/ci.yml/badge.svg)](https://github.com/takealook97/vat/actions/workflows/ci.yml)
 [![Go Reference](https://pkg.go.dev/badge/github.com/takealook97/vat.svg)](https://pkg.go.dev/github.com/takealook97/vat)
@@ -24,23 +26,27 @@ carry where they came from, and stop counting as true when nobody re-checks them
 
 ## The problem
 
-You have eight repositories in one folder. An agent works across all of them.
-Six months in:
+Three things in every project are written down and nothing checks them.
 
-- Someone added a repo to the manifest and forgot `.gitignore`. The root commit
-  swallowed the whole clone.
-- The same agent role is defined in `.claude/agents/` and `.codex/agents/`. They
-  disagree, and nobody noticed which one the session actually loaded.
-- A doc says the payments service "has retry-safe ordering." It was true in
-  March. Nobody has checked since, and it is quoted as current fact weekly.
-- An API change shipped across three repos. Which three revisions were verified
-  *together*? Nobody can say. Rolling back is archaeology.
-- `for r in */; do git -C "$r" pull; done` reported success while two repos
-  failed and one silently stashed your work.
+**The contract your agents read.** The same role is defined in
+`.claude/agents/` and `.codex/agents/`, they have quietly diverged, and nobody
+diffs a prompt. `AGENTS.md` describes a layout that changed in March. Nothing
+tells the agent which of the text it just fetched is data and which is
+instruction.
 
-None of these are exotic. They are what a multi-repo workspace does to you by
-default, and no amount of documentation prevents them — because **a rule that is
-only written down is a hope.**
+**The facts your team relies on.** A doc says the payments service "has
+retry-safe ordering." It was true when someone wrote it. Nobody has checked
+since, and it is quoted as current fact weekly — by people and by agents that
+read it as ground truth.
+
+**The shape of the repositories.** Someone added a repo to the manifest and
+forgot `.gitignore`, so the next root commit swallowed the whole clone. An API
+change shipped across three repos and nobody can say which three revisions were
+verified *together*. `for r in */; do git -C "$r" pull; done` reported success
+while two repos failed and one silently stashed your work.
+
+None of these are exotic. They are what a written rule does when nothing
+enforces it.
 
 `vat` turns each one into a check that runs.
 
@@ -59,6 +65,40 @@ FAIL  lint                      2 errors, 2 warnings across 21 rules
 ```
 
 ---
+
+## Who this is for
+
+**You use coding agents on a codebase you care about.** One repository is
+enough. `vat harness` keeps one role definition and generates the per-runtime
+adapters from it, so Claude Code and Codex cannot drift apart, and states the
+trust boundary — that fetched text is data, never instruction — in every
+contract it writes.
+
+**Your team keeps re-deriving what it already decided.** `vat brain` records a
+fact with the revision it was read from, and demotes it when nobody re-checks
+it. Not a wiki, not a vector store: a claim that expires.
+
+**You work across several repositories at once.** `vat` clones, updates without
+ever discarding local work, and records which revisions across which
+repositories were verified together.
+
+Run `vat fit` and it will tell you which of those you do *not* need yet.
+
+## What this is not
+
+Being clear about the neighbours is more useful than pretending there are none.
+
+| If what you want is | Reach for |
+| --- | --- |
+| parallel `git pull` across many repositories | a shell loop, [`mu-repo`](https://github.com/fabioz/mu-repo), [`meta`](https://github.com/mateodelnorte/meta), [`gita`](https://github.com/nosarthur/gita) |
+| one build graph and task runner over many projects | [Nx](https://nx.dev), [Turborepo](https://turbo.build), [Bazel](https://bazel.build) |
+| a place to file architecture decision records | [`adr-tools`](https://github.com/npryce/adr-tools), [Log4brains](https://github.com/thomvaill/log4brains) |
+| semantic recall over your documents for an agent | a retrieval layer — and point it at `vat brain`, which decides what is canonical |
+| **written rules that fail loudly when reality moves away from them** | `vat` |
+
+`vat` is not a build system, and it will not make your agent smarter. It makes
+the text your agent and your team both depend on impossible to leave quietly
+wrong.
 
 ## Install
 
@@ -162,9 +202,9 @@ early costs ceremony and buys nothing.
 | Layer | Adopt when | What it gives you |
 | --- | --- | --- |
 | **workspace** | 3+ repositories worked in together | `init` `status` `sync` `doctor` `exec` |
-| **harness** | agents work across more than one repo | generated `AGENTS.md`, one role body → N runtime adapters |
+| **harness** | coding agents work in this code at all | generated `AGENTS.md`, one role body → N runtime adapters, drift-checked |
 | **changesets** | 2+ interfaces cross a repo boundary | the revision bundle that was verified together, and the way back |
-| **brain** | a decision was already lost, or 2+ people across 4+ repos | reviewed facts with provenance and an expiry |
+| **brain** | a decision was already lost, agents work here weekly, or 2+ people across 4+ repos | reviewed facts with provenance and an expiry |
 | **credential** | secrets live in 2+ places | encrypted canon, rotation age tracking |
 
 ---

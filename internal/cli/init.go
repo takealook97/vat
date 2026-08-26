@@ -102,7 +102,7 @@ func runInit(ctx context.Context, env *Env, args []string) error {
 	}
 
 	printer := env.Printer
-	printer.Status(ui.LevelOK, manifest.FileName, fmt.Sprintf("%d repositories enrolled", len(built.Repos)))
+	printer.Status(ui.LevelOK, manifest.FileName, fmt.Sprintf("%s enrolled", pluraliseCount(len(built.Repos), "repository", "repositories")))
 	printer.Status(ui.LevelOK, ".gitignore", "governed repositories excluded from the root history")
 	for _, file := range rendered {
 		printer.Status(ui.LevelOK, file, "generated")

@@ -52,6 +52,24 @@ not have:
 
 If you only need parallel `git pull`, use a shell loop. It is fine.
 
+### I only have one repository. Is this for me?
+
+Yes, for two of the five layers.
+
+`vat harness` solves problems that exist at a single repository: one role body
+generated into every runtime you use rather than copied, a contract that holds
+wherever a session was opened, and a written trust boundary saying that fetched
+text is data. If you run Claude Code and Codex against the same code, their role
+definitions are already drifting.
+
+`vat brain` is worth it once agents work in the code weekly, because an agent
+that re-derives a settled decision costs the same as a person who forgot it and
+does so far more often.
+
+The other three — the workspace layer, changesets, credential separation — are
+genuinely about having several repositories, and `vat fit` will tell you to skip
+them.
+
 ### Do I have to use the brain?
 
 No. It is one layer of five, and `vat fit` will tell you to skip it until a

@@ -70,12 +70,17 @@ func Assess(signals Signals) []Verdict {
 			Command: "vat init",
 		},
 		{
-			Layer:     LayerHarness,
-			Adopt:     signals.Repositories >= 3 && signals.AgentSessions >= 1,
-			Threshold: "agents work across more than one repository",
-			Because: because(signals.Repositories >= 3 && signals.AgentSessions >= 1,
-				"an agent opening a session in any repository needs to find the same boundary rules there",
-				"without agents in the loop, a written contract per repository is enough"),
+			Layer: LayerHarness,
+			// Deliberately not gated on repository count. The problems this
+			// layer solves — one role body drifting into two runtime adapters,
+			// a contract that has to hold wherever a session was opened, a
+			// written trust boundary — all exist with a single repository. The
+			// trigger is whether agents touch the code at all.
+			Adopt:     signals.AgentSessions >= 1,
+			Threshold: "coding agents work in this code at all",
+			Because: because(signals.AgentSessions >= 1,
+				harnessReason(signals),
+				"with no agents in the loop, a contract you wrote by hand is enough"),
 			Command: "vat harness render",
 		},
 		{
@@ -89,10 +94,17 @@ func Assess(signals Signals) []Verdict {
 			Command: "vat changeset new",
 		},
 		{
-			Layer:     LayerBrain,
-			Adopt:     signals.DecisionsLost || signals.People >= 2 && signals.Repositories >= 4,
-			Threshold: "a decision has already been lost, or 2+ people across 4+ repositories",
-			Because: because(signals.DecisionsLost || (signals.People >= 2 && signals.Repositories >= 4),
+			Layer: LayerBrain,
+			// An agent that re-derives a settled decision costs the same as a
+			// person who forgot it, and does so far more often, so heavy agent
+			// use reaches the threshold on its own.
+			Adopt: signals.DecisionsLost ||
+				signals.AgentSessions >= 5 ||
+				(signals.People >= 2 && signals.Repositories >= 4),
+			Threshold: "a decision has already been lost, agents work here weekly, or 2+ people across 4+ repositories",
+			Because: because(signals.DecisionsLost ||
+				signals.AgentSessions >= 5 ||
+				(signals.People >= 2 && signals.Repositories >= 4),
 				brainReason(signals),
 				"one person across a few repositories still remembers why; the layer would store what you already know"),
 			Command: "vat brain init",
@@ -111,9 +123,24 @@ func Assess(signals Signals) []Verdict {
 	return verdicts
 }
 
+// harnessReason explains what the harness is buying at this scale.
+func harnessReason(signals Signals) string {
+	if signals.Repositories >= 3 {
+		return fmt.Sprintf(
+			"agents open sessions across %d repositories and need to find the same boundary rules in each one",
+			signals.Repositories)
+	}
+	return "one role body, generated into every runtime you use, and checked for drift — two hand-maintained copies diverge within weeks and nobody diffs a prompt"
+}
+
 func brainReason(signals Signals) string {
 	if signals.DecisionsLost {
 		return "a decision has already been re-argued because nobody could find the original reasoning; that cost recurs"
+	}
+	if signals.AgentSessions >= 5 {
+		return fmt.Sprintf(
+			"roughly %d agent sessions a week, each starting without what the last one settled; re-deriving a decision costs the same whoever forgets it",
+			signals.AgentSessions)
 	}
 	return fmt.Sprintf("%d people across %d repositories: what each of you believes is true has started to differ",
 		signals.People, signals.Repositories)
