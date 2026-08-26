@@ -42,6 +42,11 @@ func changesetShowCommand() *Command {
 			if current.Acceptance != "" {
 				env.Printer.Printf("acceptance: %s\n", current.Acceptance)
 			}
+			// Why work stopped is the whole value of an abandoned record, and
+			// it was being written to the file and never shown again.
+			if current.Notes != "" {
+				env.Printer.Printf("notes: %s\n", current.Notes)
+			}
 			env.Printer.Heading("Repositories")
 			rows := make([][]string, 0, len(current.Repositories))
 			for _, participant := range current.Repositories {
@@ -86,14 +91,24 @@ func changesetListCommand() *Command {
 			if err != nil {
 				return err
 			}
+			// Filtered before the JSON branch, not inside the table loop.
+			// Applying it in only one of the two renderings meant a CI job
+			// asking for open work in JSON was handed every changeset ever
+			// closed and had no way to tell.
+			if *openOnly {
+				open := make([]changeset.Changeset, 0, len(sets))
+				for _, current := range sets {
+					if current.Status.Open() {
+						open = append(open, current)
+					}
+				}
+				sets = open
+			}
 			if env.JSON {
 				return emitJSON(env, sets)
 			}
 			rows := make([][]string, 0, len(sets))
 			for _, current := range sets {
-				if *openOnly && !current.Status.Open() {
-					continue
-				}
 				age := fmt.Sprintf("%dd", current.AgeDays(env.Now))
 				limit := ws.Manifest.Policy.Changeset.MaxOpenDays
 				if current.Status.Open() && limit > 0 && current.AgeDays(env.Now) > limit {

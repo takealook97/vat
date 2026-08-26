@@ -151,6 +151,13 @@ func changesetAddCommand() *Command {
 			if err != nil {
 				return usageErrorf("%v", err)
 			}
+			// `abandon` already refused a finished changeset and this did not.
+			// Enrolling a repository after the fact rewrites the one claim the
+			// record exists to make: which revisions were verified together.
+			if !current.Status.Open() {
+				return usageErrorf("%s is already %s; a finished changeset records what was verified, so it does not take new repositories",
+					current.ID, current.Status)
+			}
 			for _, name := range set.Args()[1:] {
 				if _, exists := current.Participant(name); exists {
 					env.Printer.Status(ui.LevelSkip, name, "already enrolled")

@@ -307,7 +307,9 @@ vat changeset undo-plan <id>
 ```
 
 `new` and `add` record where each repository stands before the change begins,
-because after it lands that can no longer be observed.
+because after it lands that can no longer be observed. `add` refuses once the
+changeset is closed or abandoned: enrolling a repository afterwards rewrites the
+one claim the record exists to make.
 
 `verify` runs each repository's canonical checks and records the outcome against
 the exact revision it ran on. It refuses on a dirty working tree, because
@@ -315,6 +317,13 @@ results recorded against a revision that does not describe what was tested are
 worse than none, and refuses on a changeset that is already closed.
 
 `close` requires `--acceptance`, and it must describe something end to end.
+
+`show` prints the objective, the status, the acceptance, and the notes — which
+is where `abandon --reason` is kept, because why work stopped is the whole value
+of an abandoned record.
+
+`list --open` narrows to unfinished work in both renderings, so a CI job asking
+for it in `--json` gets the same answer the table shows.
 
 `undo-plan` prints the commands that would return every repository to its start
 point, in reverse enrolment order. `vat` prints and never runs it.
@@ -365,6 +374,9 @@ vat fit [--repos n] [--contracts n] [--people n] [--agent-sessions n]
 Per-layer break-even verdict. Numbers are read from the workspace where they can
 be. `--contracts` is the important one: how many interfaces cross a repository
 boundary is what makes a multi-repo layout expensive, not repository count.
+
+`--json` returns one object per layer with the fields `layer`, `adopt`,
+`threshold`, `because`, and `command`.
 
 ---
 

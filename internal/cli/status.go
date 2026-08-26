@@ -51,7 +51,7 @@ type repoStatus struct {
 func runStatus(ctx context.Context, env *Env, args []string) error {
 	set := newFlagSet("status")
 	selection := bindSelector(set, true)
-	dirtyOnly := set.Bool("dirty", false, "only repositories with uncommitted work")
+	dirtyOnly := set.Bool("dirty", false, "only repositories holding work that exists nowhere else (uncommitted, unpushed, or stashed)")
 	fetch := set.Bool("fetch", false, "update remote-tracking refs first")
 	if err := parseFlags(set, args); err != nil {
 		return err

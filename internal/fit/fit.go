@@ -35,11 +35,11 @@ type Signals struct {
 
 // Verdict is a recommendation about one layer.
 type Verdict struct {
-	Layer     string
-	Adopt     bool
-	Threshold string
-	Because   string
-	Command   string
+	Layer     string `json:"layer"`
+	Adopt     bool   `json:"adopt"`
+	Threshold string `json:"threshold"`
+	Because   string `json:"because"`
+	Command   string `json:"command"`
 }
 
 // Layer names, in adoption order. Each one assumes the ones before it.
