@@ -100,21 +100,36 @@ func brainCheckCommand() *Command {
 	return &Command{
 		Name:    "check",
 		Summary: "Validate identifiers, provenance, supersession, and links",
-		Usage:   "vat brain check",
+		Usage:   "vat brain check [--only <rule>] [--list]",
 		Long: `Fail closed on everything that would make the knowledge layer untrustworthy.
 
 Every finding is reported at once rather than one per run, because these rules
-are run in a loop while cleaning up a repository.`,
+are run in a loop while cleaning up a repository. --only narrows that to one
+class of problem while you work through it; --list names every rule.`,
+		Examples: []string{
+			"vat brain check",
+			"vat brain check --only claim    # provenance rules alone",
+		},
 		Run: func(ctx context.Context, env *Env, args []string) error {
 			set := newFlagSet("brain check")
+			only := set.String("only", "", "only rules whose name contains this")
+			list := set.Bool("list", false, "list every rule and exit")
 			if err := parseFlags(set, args); err != nil {
 				return err
+			}
+			if *list {
+				for _, rule := range brain.RuleNames() {
+					env.Printer.Println(rule)
+				}
+				return nil
 			}
 			ws, store, err := openBrain(env)
 			if err != nil {
 				return err
 			}
-			findings := brain.Check(store, brainPolicy(ws), env.Now)
+			policy := brainPolicy(ws)
+			policy.Only = splitList(*only)
+			findings := brain.Check(store, policy, env.Now)
 			switch {
 			case env.JSON:
 				if err := emitJSON(env, findings); err != nil {

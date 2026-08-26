@@ -84,9 +84,12 @@ A change to a command's output, exit code, or flags is a contract change. It
 needs, in the same commit: the code, its test, and the matching row in
 `docs/COMMANDS.md`.
 
-Adding a lint rule additionally requires its name in `lint.RuleNames()` — a test
-asserts that every reported rule is listed there, because an unlisted rule
-cannot be selected with `--only` or documented.
+Adding a rule additionally requires its name in the list its package keeps —
+`lint.RuleNames()` for `vat lint`, `brain.RuleNames()` for `vat brain check` —
+and the matching row in the reference table, `docs/COMMANDS.md` for the first
+and `docs/BRAIN.md` for the second. A test asserts each list against both the
+code and its table, because an unlisted rule cannot be selected with `--only`
+and is a rule nobody knows to look for.
 
 ## Completion
 

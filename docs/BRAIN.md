@@ -377,6 +377,45 @@ enough to be worth having.
 
 ---
 
+## What `vat brain check` reports
+
+Every rule, and the state each was written for. An unlisted rule is one nobody
+knows to look for, so this table and `brain.RuleNames()` are compared by a test.
+
+| Rule | Severity | Fires when |
+| --- | --- | --- |
+| `brain/claim-observed` | error | a current-state claim with no `observed_at` — it can never age out |
+| `brain/claim-owner` | error | a current-state claim naming no owning repository |
+| `brain/claim-source` | error | a current-state claim with no `source_ref`, or one that is not `<repo>@<revision>[:<path>]` |
+| `brain/claim-source-branch` | warn | evidence pinned to a branch, which keeps moving and takes the claim's meaning with it |
+| `brain/claim-stale` | warn | an active claim past the policy window; `vat brain sweep --apply` demotes it |
+| `brain/id-duplicate` | error | two records claiming the same identifier, so a reference resolves to either |
+| `brain/id-missing` | error | a record with no identifier; nothing can cite it and nothing can supersede it |
+| `brain/link-broken` | error | a relative link in a record that resolves to nothing |
+| `brain/quarantine-reason` | error | a quarantine with no stated cause, which cannot be reviewed or lifted later |
+| `brain/record-malformed` | error | a file that cannot be read as a record, and is therefore invisible to every rule above |
+| `brain/record-secret-suspected` | error / warn | a line that carries a credential; error for unmistakable shapes, warning for heuristics |
+| `brain/ref-missing` | error | a reference to a record that does not exist |
+| `brain/ref-withdrawn` | warn | a record citing a revoked or quarantined one as support |
+| `brain/review-overdue` | warn | a record past `review_sla_days` — a defect of the process, not of the record |
+| `brain/revoke-reason` | error | a tombstone with no stated cause |
+| `brain/status-unknown` | error | a status no rule here understands, so no rule here governs the record |
+| `brain/supersede-cycle` | error | a replacement chain that loops, so it has no current end |
+| `brain/superseded-asymmetric` | error | a chain readable from one end only |
+| `brain/superseded-missing` | error | `superseded_by` naming a record that does not exist |
+| `brain/superseded-orphan` | error | status `superseded` with nothing named as the replacement |
+| `brain/superseded-status` | error | `superseded_by` set while the status says otherwise |
+| `brain/supersedes-asymmetric` | error | the same break, seen from the replacement |
+| `brain/supersedes-missing` | error | `supersedes` naming a record that does not exist |
+| `brain/title-missing` | warn | a record with no heading; the index can show only its identifier |
+
+```console
+$ vat brain check --only claim     # the provenance rules alone
+$ vat brain check --list           # every rule name
+```
+
+---
+
 ## Two rules about the records themselves
 
 **A file that cannot be read is a finding, not a crash.** One record with a

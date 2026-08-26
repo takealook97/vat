@@ -8,6 +8,14 @@ Notable changes to `vat`. The format follows
 
 ### Added
 
+- `brain.RuleNames()`, `vat brain check --list`, and `--only`, with the rule
+  table in BRAIN.md. `vat brain check` reported twenty-four rules and two of
+  them were named in any document; the other twenty-two had gone undocumented
+  since the first release, because nothing held the list and nothing compared it
+  with what the code reports. Two tests now do: one reads the package's own
+  source and fails on a rule the list omits, the other fails when the table and
+  the list disagree. This is the guarantee `vat lint` already had, and the
+  reason AGENTS.md gives for it applied here the whole time.
 - `vat brain quarantine`, `revoke`, and `resolve`. These three states carried
   check rules and review-queue weights from the first release and had no
   command, so reaching one meant hand-editing the YAML of the record whose

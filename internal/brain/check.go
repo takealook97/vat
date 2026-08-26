@@ -37,6 +37,59 @@ type CheckPolicy struct {
 	// ReviewSLADays is how long a record may stay in a non-answerable state
 	// before the queue itself is reported as failing.
 	ReviewSLADays int
+	// Only narrows the report to rules whose name contains one of these. It is
+	// for working through one class of problem at a time; an empty list checks
+	// everything.
+	Only []string
+}
+
+// selected reports whether a rule survives the caller's --only filter.
+func selected(rule string, only []string) bool {
+	if len(only) == 0 {
+		return true
+	}
+	for _, want := range only {
+		if want != "" && strings.Contains(rule, want) {
+			return true
+		}
+	}
+	return false
+}
+
+// RuleNames lists every rule Check can report.
+//
+// The same reason lint keeps one: a rule that is not listed cannot be selected
+// with --only and cannot be documented, so it is a rule nobody knows to look
+// for. Half of this package's rules had gone undocumented since the first
+// release for exactly that reason — nothing held the list and nothing checked
+// it against what the code reports.
+func RuleNames() []string {
+	return []string{
+		"brain/claim-observed",
+		"brain/claim-owner",
+		"brain/claim-source",
+		"brain/claim-source-branch",
+		"brain/claim-stale",
+		"brain/id-duplicate",
+		"brain/id-missing",
+		"brain/link-broken",
+		"brain/quarantine-reason",
+		"brain/record-malformed",
+		"brain/record-secret-suspected",
+		"brain/ref-missing",
+		"brain/ref-withdrawn",
+		"brain/review-overdue",
+		"brain/revoke-reason",
+		"brain/status-unknown",
+		"brain/supersede-cycle",
+		"brain/superseded-asymmetric",
+		"brain/superseded-missing",
+		"brain/superseded-orphan",
+		"brain/superseded-status",
+		"brain/supersedes-asymmetric",
+		"brain/supersedes-missing",
+		"brain/title-missing",
+	}
 }
 
 // Check validates the whole knowledge surface and returns every finding at
@@ -56,6 +109,16 @@ func Check(store *Store, policy CheckPolicy, now time.Time) []Finding {
 	findings = append(findings, checkReferences(store, index)...)
 	findings = append(findings, checkLinks(store)...)
 	findings = append(findings, checkReviewQueue(store, policy, now)...)
+
+	if len(policy.Only) > 0 {
+		kept := findings[:0]
+		for _, finding := range findings {
+			if selected(finding.Rule, policy.Only) {
+				kept = append(kept, finding)
+			}
+		}
+		findings = kept
+	}
 
 	sort.SliceStable(findings, func(i, j int) bool {
 		if findings[i].Severity != findings[j].Severity {

@@ -12,6 +12,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/takealook97/vat/internal/brain"
 	"github.com/takealook97/vat/internal/lint"
 	"github.com/takealook97/vat/internal/manifest"
 	"github.com/takealook97/vat/internal/ui"
@@ -289,6 +290,43 @@ func TestTheReadmeQuotesTheRuleCountItActuallyHas(t *testing.T) {
 	for _, match := range quoted {
 		if match[1] != actual {
 			t.Errorf("the README says %q but lint reports %s rules", match[0], actual)
+		}
+	}
+}
+
+// The same guarantee the rule table above gives `vat lint`, for the rules the
+// knowledge layer reports. It had none, and twenty-two of its twenty-four rules
+// had gone unnamed in any document since the first release — the exact state
+// this class of test exists to make impossible.
+func TestTheBrainReferenceListsExactlyTheRulesThatExist(t *testing.T) {
+	// Arrange
+	content, err := os.ReadFile("../../docs/BRAIN.md")
+	if err != nil {
+		t.Fatalf("read brain reference: %v", err)
+	}
+	documented := map[string]bool{}
+	for _, match := range regexp.MustCompile(`(?m)^\| `+"`"+`(brain/[a-z-]+)`+"`").
+		FindAllStringSubmatch(string(content), -1) {
+		documented[match[1]] = true
+	}
+	if len(documented) == 0 {
+		t.Fatal("no brain rules found in docs/BRAIN.md; the table changed shape and this test stopped checking anything")
+	}
+
+	real := map[string]bool{}
+	for _, name := range brain.RuleNames() {
+		real[name] = true
+	}
+
+	// Act & Assert
+	for name := range real {
+		if !documented[name] {
+			t.Errorf("brain rule %q is not in the reference table in docs/BRAIN.md", name)
+		}
+	}
+	for name := range documented {
+		if !real[name] {
+			t.Errorf("docs/BRAIN.md documents brain rule %q, which brain check never reports", name)
 		}
 	}
 }

@@ -284,7 +284,7 @@ vat brain init      [directory]
 vat brain new       <goal|gap|decision|memory> --title "..." [--claim <kind>]
                     [--owner <repo>] [--axis <a>] [--refs <ids>] [--id <id>]
 vat brain build
-vat brain check
+vat brain check     [--only <rule>] [--list]
 vat brain query     <terms...> [--all] [--limit n]
 vat brain review    [--overdue] [--limit n]
 vat brain sweep     [--apply]
@@ -329,6 +329,10 @@ not `promote`, will reopen one.
 repointing the relative links inside them. Nothing is deleted and an archived
 record is still loaded, so its supersession chain is still checked from both
 ends; `--apply` writes the moves.
+
+`check --list` names every rule it can report, and `--only` narrows a run to
+one class while you work through it. The rules are tabulated in
+[BRAIN.md](BRAIN.md).
 
 `check` reports `brain/record-malformed` for a file it cannot read as a record
 and keeps loading the rest, and `brain/record-secret-suspected` for a record
