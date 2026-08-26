@@ -99,8 +99,22 @@ func Validate(m Manifest) error {
 	if strings.TrimSpace(m.Workspace.Name) == "" {
 		problems = append(problems, "workspace.name is required")
 	}
+	// A template without the placeholder is not a template: every repository
+	// created from it was handed the same origin, and two repositories sharing
+	// an upstream fetch and push over each other with nothing reporting it.
+	if template := strings.TrimSpace(m.Workspace.RemoteTemplate); template != "" &&
+		!strings.Contains(template, "{name}") {
+		problems = append(problems, fmt.Sprintf(
+			"workspace.remote_template %q has no {name}; every repository would be given the same origin",
+			template))
+	}
 	seenNames := map[string]bool{}
 	seenPaths := map[string]bool{}
+	// Two entries may share an upstream when they track different branches --
+	// that is a worktree-per-branch layout. Sharing an upstream *and* a branch
+	// is not a layout: they fetch and push over each other, and nothing else
+	// here would report it.
+	seenUpstreams := map[string]string{}
 	for i, repo := range m.Repos {
 		where := fmt.Sprintf("repos[%d]", i)
 		if repo.Name != "" {
@@ -128,6 +142,17 @@ func Validate(m Manifest) error {
 			problems = append(problems, fmt.Sprintf("%s: two repositories resolve to the same directory %q", where, dir))
 		}
 		seenPaths[dir] = true
+
+		if origin := strings.TrimSpace(repo.Origin); origin != "" {
+			upstream := origin + "#" + repo.Branch(m.Workspace.DefaultBranch)
+			if first, clash := seenUpstreams[upstream]; clash {
+				problems = append(problems, fmt.Sprintf(
+					"%s: shares an origin and a branch with %s; they would fetch and push over each other",
+					where, first))
+			} else {
+				seenUpstreams[upstream] = repo.Name
+			}
+		}
 		if !containedPath(dir) {
 			problems = append(problems, fmt.Sprintf(
 				"%s: path %q must stay inside the workspace", where, dir))

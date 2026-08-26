@@ -71,7 +71,7 @@ func rules(report lint.Report) map[string]lint.Finding {
 
 func TestAGovernedRepositoryMissingFromGitignoreIsAnError(t *testing.T) {
 	// Arrange: the next commit at the workspace root would absorb the clone.
-	ws := fixture(t, manifest.Repo{Name: "payments", Origin: "u", Role: manifest.RoleProduct})
+	ws := fixture(t, manifest.Repo{Name: "payments", Origin: "https://example.invalid/acme/payments.git", Role: manifest.RoleProduct})
 
 	// Act
 	report := run(t, ws)
@@ -92,7 +92,7 @@ func TestAGovernedRepositoryMissingFromGitignoreIsAnError(t *testing.T) {
 func TestFixRepairsWhatIsGeneratedAndTheRunThenPasses(t *testing.T) {
 	// Arrange
 	ws := fixture(t, manifest.Repo{
-		Name: "payments", Origin: "u", Role: manifest.RoleProduct, Checks: []string{"make check"},
+		Name: "payments", Origin: "https://example.invalid/acme/payments.git", Role: manifest.RoleProduct, Checks: []string{"make check"},
 	})
 
 	// Act
@@ -113,12 +113,12 @@ func TestFixRepairsWhatIsGeneratedAndTheRunThenPasses(t *testing.T) {
 
 func TestHarnessDriftIsReportedAfterTheManifestChanges(t *testing.T) {
 	// Arrange
-	ws := fixture(t, manifest.Repo{Name: "payments", Origin: "u", Role: manifest.RoleProduct})
+	ws := fixture(t, manifest.Repo{Name: "payments", Origin: "https://example.invalid/acme/payments.git", Role: manifest.RoleProduct})
 	if _, err := lint.Fix(ws, reference); err != nil {
 		t.Fatalf("Fix returned an error: %v", err)
 	}
 	extended := manifest.WithRepo(ws.Manifest,
-		manifest.Repo{Name: "console", Origin: "u", Role: manifest.RoleProduct})
+		manifest.Repo{Name: "console", Origin: "https://example.invalid/acme/console.git", Role: manifest.RoleProduct})
 	if err := ws.SaveManifest(extended); err != nil {
 		t.Fatalf("SaveManifest: %v", err)
 	}
@@ -140,7 +140,7 @@ func TestHarnessDriftIsReportedAfterTheManifestChanges(t *testing.T) {
 func TestAnOversizedWorkspaceContractIsReported(t *testing.T) {
 	// Arrange: past the budget, a runtime may stop loading the per-repository
 	// contracts below it.
-	ws := fixture(t, manifest.Repo{Name: "payments", Origin: "u", Role: manifest.RoleProduct})
+	ws := fixture(t, manifest.Repo{Name: "payments", Origin: "https://example.invalid/acme/payments.git", Role: manifest.RoleProduct})
 	if _, err := lint.Fix(ws, reference); err != nil {
 		t.Fatalf("Fix returned an error: %v", err)
 	}
@@ -183,7 +183,7 @@ func TestAWorkspaceWithNoDeclaredUntrustedSourcesIsReported(t *testing.T) {
 
 func TestAProductRepositoryWithNoCanonicalChecksIsReported(t *testing.T) {
 	// Arrange: without them a changeset has nothing to verify.
-	ws := fixture(t, manifest.Repo{Name: "payments", Origin: "u", Role: manifest.RoleProduct})
+	ws := fixture(t, manifest.Repo{Name: "payments", Origin: "https://example.invalid/acme/payments.git", Role: manifest.RoleProduct})
 
 	// Act
 	report := run(t, ws)
@@ -202,7 +202,7 @@ func TestARequiredRepositoryThatIsNotClonedIsAnError(t *testing.T) {
 	// Arrange
 	ws := fixture(t)
 	built := manifest.WithRepo(ws.Manifest, manifest.Repo{
-		Name: "ghost", Origin: "u", Role: manifest.RoleProduct, Required: true,
+		Name: "ghost", Origin: "https://example.invalid/acme/ghost.git", Role: manifest.RoleProduct, Required: true,
 	})
 	ws.Manifest = built
 
@@ -221,7 +221,7 @@ func TestARequiredRepositoryThatIsNotClonedIsAnError(t *testing.T) {
 
 func TestOnlyRestrictsTheRunToMatchingRules(t *testing.T) {
 	// Arrange
-	ws := fixture(t, manifest.Repo{Name: "payments", Origin: "u", Role: manifest.RoleProduct})
+	ws := fixture(t, manifest.Repo{Name: "payments", Origin: "https://example.invalid/acme/payments.git", Role: manifest.RoleProduct})
 
 	// Act
 	report, err := lint.Run(context.Background(), ws,
@@ -241,8 +241,8 @@ func TestOnlyRestrictsTheRunToMatchingRules(t *testing.T) {
 func TestEveryReportedRuleIsListedInRuleNames(t *testing.T) {
 	// Arrange: an unlisted rule cannot be selected with --only or documented.
 	ws := fixture(t,
-		manifest.Repo{Name: "payments", Origin: "u", Role: manifest.RoleProduct},
-		manifest.Repo{Name: "brain", Origin: "u", Role: manifest.RoleBrain},
+		manifest.Repo{Name: "payments", Origin: "https://example.invalid/acme/payments.git", Role: manifest.RoleProduct},
+		manifest.Repo{Name: "brain", Origin: "https://example.invalid/acme/brain.git", Role: manifest.RoleBrain},
 	)
 	declared := map[string]bool{}
 	for _, name := range lint.RuleNames() {

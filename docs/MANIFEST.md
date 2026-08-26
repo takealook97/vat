@@ -86,7 +86,7 @@ repos:
 | --- | --- |
 | `name` | required; identifies the workspace in generated contracts |
 | `default_branch` | the branch `sync` fast-forwards when a repository does not declare its own |
-| `remote_template` | expands `{name}` into an origin URL for `vat repo new` |
+| `remote_template` | expands `{name}` into an origin URL for `vat repo new`; the placeholder is required |
 | `description` | rendered into the workspace contract |
 
 ---
@@ -192,6 +192,14 @@ A repository on `master` in a workspace defaulting to `main` is skipped by every
 update forever, reported as "on another branch" — a note nobody reads. Declaring
 it turns a silent skip into a real update. `vat lint` reports the mismatch, and
 `vat init --adopt` records it for you.
+
+### Two repositories may share an upstream, but not a branch of one
+
+Tracking `main` in one directory and `release` in another is a worktree-per-
+branch layout and is accepted. Two entries with the same `origin` *and* the same
+branch are not: they would fetch and push over each other, and nothing else
+reports it. A `remote_template` without `{name}` produces exactly that, which is
+why the placeholder is required.
 
 ### `checks` are the contract with `changeset verify`
 

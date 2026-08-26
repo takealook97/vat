@@ -305,3 +305,79 @@ func TestRoleNamesOffersEveryRoleTheSchemaAccepts(t *testing.T) {
 		}
 	}
 }
+
+func TestARemoteTemplateWithoutThePlaceholderIsRejected(t *testing.T) {
+	// Arrange: a template is a pattern. One with no {name} handed every
+	// repository created from it the same origin, and two repositories sharing
+	// an upstream fetch and push over each other with nothing reporting it.
+	m := sampleManifest()
+	m.Workspace.RemoteTemplate = "https://example.invalid/acme/FIXED.git"
+
+	// Act
+	err := Validate(m)
+
+	// Assert
+	if err == nil {
+		t.Fatal("a remote template with no placeholder was accepted")
+	}
+	if !strings.Contains(err.Error(), "{name}") {
+		t.Errorf("the error does not say what is missing: %v", err)
+	}
+}
+
+func TestARemoteTemplateWithThePlaceholderIsAccepted(t *testing.T) {
+	// Arrange: the check must not have closed the door on the normal case.
+	m := sampleManifest()
+	m.Workspace.RemoteTemplate = "https://example.invalid/acme/{name}.git"
+
+	// Act & Assert
+	if err := Validate(m); err != nil {
+		t.Errorf("an ordinary remote template was rejected: %v", err)
+	}
+}
+
+func TestNoRemoteTemplateAtAllIsFine(t *testing.T) {
+	// Arrange: the field is optional; `repo new --remote` and `--no-remote`
+	// both work without it.
+	m := sampleManifest()
+
+	// Act & Assert
+	if err := Validate(m); err != nil {
+		t.Errorf("a manifest with no remote template was rejected: %v", err)
+	}
+}
+
+func TestTwoRepositoriesMayNotShareAnUpstreamAndABranch(t *testing.T) {
+	// Arrange: this is what a remote_template with no placeholder produced, and
+	// it can also be hand-written. Two clones of one branch in two directories
+	// fetch and push over each other, and no other check here notices.
+	m := WithRepo(sampleManifest(), Repo{
+		Name: "payments-copy", Origin: "https://example.invalid/acme/payments.git",
+		Role: RoleProduct,
+	})
+
+	// Act
+	err := Validate(m)
+
+	// Assert
+	if err == nil {
+		t.Fatal("two repositories tracking the same branch of the same upstream were accepted")
+	}
+	if !strings.Contains(err.Error(), "payments") {
+		t.Errorf("the error does not name the repository it collides with: %v", err)
+	}
+}
+
+func TestTwoRepositoriesMayShareAnUpstreamOnDifferentBranches(t *testing.T) {
+	// Arrange: a worktree-per-branch layout is legitimate, and refusing it would
+	// make the rule above a nuisance rather than a guard.
+	m := WithRepo(sampleManifest(), Repo{
+		Name: "payments-release", Origin: "https://example.invalid/acme/payments.git",
+		Role: RoleProduct, DefaultBranch: "release",
+	})
+
+	// Act & Assert
+	if err := Validate(m); err != nil {
+		t.Errorf("two repositories on different branches of one upstream were rejected: %v", err)
+	}
+}

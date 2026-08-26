@@ -72,7 +72,9 @@ type Workspace struct {
 	// declare its own. Declaring it per repository is what stops a `master` or
 	// `develop` repository from being silently skipped forever.
 	DefaultBranch string `yaml:"default_branch" json:"default_branch"`
-	// RemoteTemplate expands {name} into an origin URL for `vat repo new`.
+	// RemoteTemplate expands {name} into an origin URL for `vat repo new`. The
+	// placeholder is required: without it every repository is handed the same
+	// remote, which validation rejects.
 	RemoteTemplate string `yaml:"remote_template,omitempty" json:"remote_template,omitempty"`
 	// Description is free text shown in the generated workspace harness.
 	Description string `yaml:"description,omitempty" json:"description,omitempty"`
