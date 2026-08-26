@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strconv"
 	"strings"
 
 	"github.com/takealook97/vat/internal/frontmatter"
@@ -18,6 +19,16 @@ const (
 	CurrentFile = "CURRENT.md"
 	GraphFile   = "graph.json"
 	MarkerFile  = ".brain"
+
+	// SchemaVersion is the version of the on-disk contract: the record
+	// directories, the front-matter fields, and the meaning of each status.
+	//
+	// It is written into the marker so that a tool which is not vat — and a
+	// vat older than the brain it is handed — can tell whether it understands
+	// what it is reading. A knowledge layer whose whole claim is that it
+	// outlives the tool that made it has to say which contract it was written
+	// against; "plain markdown" is a file format, not an agreement.
+	SchemaVersion = 1
 
 	// archiveDir holds the records that have reached an end state. They are
 	// still loaded — a supersession chain is checked from both ends — but they
@@ -312,4 +323,29 @@ func (s *Store) RecentMemories(limit int) []Record {
 		return memories[:limit]
 	}
 	return memories
+}
+
+// DeclaredSchema returns the schema version the marker records, and false when
+// the marker names none.
+//
+// A brain scaffolded before versioning existed has no line to read, which is
+// not an error: it is the same contract, written before the contract had a
+// number.
+func DeclaredSchema(root string) (int, bool) {
+	data, found, err := fsx.ReadFileIfExists(filepath.Join(root, MarkerFile))
+	if err != nil || !found {
+		return 0, false
+	}
+	for _, line := range strings.Split(string(data), "\n") {
+		rest, ok := strings.CutPrefix(strings.TrimSpace(line), "schema:")
+		if !ok {
+			continue
+		}
+		version, err := strconv.Atoi(strings.TrimSpace(rest))
+		if err != nil {
+			return 0, false
+		}
+		return version, true
+	}
+	return 0, false
 }

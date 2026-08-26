@@ -581,3 +581,71 @@ func TestTheIndexStaysBoundedAsRecordsAccumulate(t *testing.T) {
 		t.Errorf("the index truncated without saying so:\n%s", index)
 	}
 }
+
+// A knowledge layer whose whole claim is that it outlives the tool that wrote
+// it will eventually be handed to an older tool. Reading it quietly and
+// reporting it clean is the worst available outcome: the records look sound
+// because half of what governs them was invisible.
+func TestABrainWrittenAgainstANewerSchemaIsRefusedRatherThanReadQuietly(t *testing.T) {
+	// Arrange
+	root := t.TempDir()
+	if _, err := brain.Init(root, reference); err != nil {
+		t.Fatalf("Init: %v", err)
+	}
+	marker := filepath.Join(root, brain.MarkerFile)
+	if err := os.WriteFile(marker,
+		[]byte(fmt.Sprintf("# brain\nschema: %d\n", brain.SchemaVersion+1)), 0o644); err != nil {
+		t.Fatalf("write marker: %v", err)
+	}
+	store, err := brain.Load(root)
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+
+	// Act
+	findings := brain.Check(store, brain.CheckPolicy{}, reference)
+
+	// Assert
+	found := false
+	for _, finding := range findings {
+		if finding.Rule == "brain/schema-newer" {
+			found = true
+			if finding.Severity != brain.SeverityError {
+				t.Errorf("severity = %s, want error", finding.Severity)
+			}
+		}
+	}
+	if !found {
+		t.Errorf("an unreadable schema went unreported: %+v", findings)
+	}
+}
+
+// The version vat writes must be the version vat accepts, or every freshly
+// scaffolded brain greets its owner with an error.
+func TestAFreshlyScaffoldedBrainDeclaresASchemaThisBuildAccepts(t *testing.T) {
+	// Arrange
+	root := t.TempDir()
+	if _, err := brain.Init(root, reference); err != nil {
+		t.Fatalf("Init: %v", err)
+	}
+
+	// Act
+	declared, ok := brain.DeclaredSchema(root)
+
+	// Assert
+	if !ok {
+		t.Fatal("a scaffolded brain records no schema version")
+	}
+	if declared != brain.SchemaVersion {
+		t.Errorf("declared schema %d, this build is %d", declared, brain.SchemaVersion)
+	}
+	store, err := brain.Load(root)
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	for _, finding := range brain.Check(store, brain.CheckPolicy{}, reference) {
+		if finding.Rule == "brain/schema-newer" {
+			t.Errorf("a fresh brain reports its own schema as unreadable: %+v", finding)
+		}
+	}
+}

@@ -369,6 +369,40 @@ governing what belongs there.
 
 ---
 
+## The on-disk contract
+
+The point of writing knowledge as files is that it outlives the tool that wrote
+it. That is only true if the files say which agreement they were written
+against, so the marker carries a version:
+
+```
+$ cat brain/.brain
+# This directory is a vat brain repository.
+# Generated projections: CURRENT.md, graph.json — rebuild with `vat brain build`.
+schema: 1
+```
+
+Schema 1 is:
+
+| | |
+| --- | --- |
+| record directories | `goals/` `gaps/` `decisions/` `memory/`, one Markdown file per record |
+| record identity | `id` in YAML front matter; the filename repeats it for humans and is not authoritative |
+| lifecycle | `status` is one of `provisional` `active` `stale` `quarantined` `superseded` `revoked` |
+| provenance | `source` names `<repo>@<revision>[:<path>]`; `observed` is the date it was read |
+| supersession | `superseded_by` and `supersedes` are written at both ends and must agree |
+| generated | `CURRENT.md` and `graph.json` are derived and never authoritative |
+| out of the working set | `archive/`, still loaded so a supersession chain reads from both ends |
+
+Anything in that table is what another tool may rely on. `brain/schema-newer`
+is what stops an older `vat` from reading a newer brain and reporting it clean
+because half of what governs it was invisible.
+
+A brain scaffolded before the version existed has no `schema:` line. That is not
+an error — it is the same contract, written before the contract had a number.
+
+---
+
 ## What the index refuses to become
 
 `CURRENT.md` is an entry point, which means it has a size. Each section lists at
@@ -412,6 +446,7 @@ knows to look for, so this table and `brain.RuleNames()` are compared by a test.
 | `brain/ref-withdrawn` | warn | a record citing a revoked or quarantined one as support |
 | `brain/review-overdue` | warn | a record past `review_sla_days` — a defect of the process, not of the record |
 | `brain/revoke-reason` | error | a tombstone with no stated cause |
+| `brain/schema-newer` | error | a brain written against a contract this build cannot read, whose newer fields would be silently invisible |
 | `brain/status-unknown` | error | a status no rule here understands, so no rule here governs the record |
 | `brain/supersede-cycle` | error | a replacement chain that loops, so it has no current end |
 | `brain/superseded-asymmetric` | error | a chain readable from one end only |

@@ -80,6 +80,7 @@ func RuleNames() []string {
 		"brain/ref-withdrawn",
 		"brain/review-overdue",
 		"brain/revoke-reason",
+		"brain/schema-newer",
 		"brain/status-unknown",
 		"brain/supersede-cycle",
 		"brain/superseded-asymmetric",
@@ -100,6 +101,7 @@ func Check(store *Store, policy CheckPolicy, now time.Time) []Finding {
 	findings := make([]Finding, 0, len(store.Records))
 	index := store.ByID()
 
+	findings = append(findings, checkSchema(store)...)
 	findings = append(findings, checkMalformed(store)...)
 	findings = append(findings, checkSecrets(store)...)
 	findings = append(findings, checkIdentity(store)...)
@@ -461,4 +463,24 @@ func contains(list []string, want string) bool {
 		}
 	}
 	return false
+}
+
+// checkSchema reports a brain written against a contract this build does not
+// know.
+//
+// The knowledge layer is meant to outlive the tool that wrote it, which means
+// an older vat will eventually be pointed at a newer brain. Reading it silently
+// and reporting on fields it cannot see would be the worst outcome: the records
+// would look clean because half of what governs them was invisible.
+func checkSchema(store *Store) []Finding {
+	declared, ok := DeclaredSchema(store.Root)
+	if !ok || declared <= SchemaVersion {
+		return nil
+	}
+	return []Finding{{
+		Rule: "brain/schema-newer", Severity: SeverityError, Path: MarkerFile,
+		Message: fmt.Sprintf(
+			"written against schema %d; this build understands %d, so anything newer is invisible to these checks",
+			declared, SchemaVersion),
+	}}
 }

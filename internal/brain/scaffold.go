@@ -61,7 +61,8 @@ func Init(root string, now time.Time) ([]string, error) {
 
 func markerContent() string {
 	return "# This directory is a vat brain repository.\n" +
-		"# Generated projections: CURRENT.md, graph.json — rebuild with `vat brain build`.\n"
+		"# Generated projections: CURRENT.md, graph.json — rebuild with `vat brain build`.\n" +
+		fmt.Sprintf("schema: %d\n", SchemaVersion)
 }
 
 func readmeContent() string {
