@@ -139,7 +139,7 @@ func TestARoleWithNoDeclaredWriteTargetGeneratesAReadOnlyAdapter(t *testing.T) {
 	// Arrange
 	root := t.TempDir()
 	writeRole(t, root, "auditor", "name: auditor\ndescription: Audits things.")
-	roles, err := harness.LoadRoles(root)
+	roles, _, err := harness.LoadRoles(root)
 	if err != nil {
 		t.Fatalf("LoadRoles returned an error: %v", err)
 	}
@@ -160,7 +160,7 @@ func TestAdapterDriftIsReportedWhenAnAdapterIsEditedDirectly(t *testing.T) {
 	// Arrange
 	root := t.TempDir()
 	writeRole(t, root, "planner", "name: planner\ndescription: Plans.\nwrites: [brain]")
-	roles, err := harness.LoadRoles(root)
+	roles, _, err := harness.LoadRoles(root)
 	if err != nil {
 		t.Fatalf("LoadRoles returned an error: %v", err)
 	}
@@ -188,7 +188,7 @@ func TestWriteAdaptersIsIdempotent(t *testing.T) {
 	// Arrange
 	root := t.TempDir()
 	writeRole(t, root, "planner", "name: planner\ndescription: Plans.")
-	roles, err := harness.LoadRoles(root)
+	roles, _, err := harness.LoadRoles(root)
 	if err != nil {
 		t.Fatalf("LoadRoles returned an error: %v", err)
 	}
@@ -212,7 +212,7 @@ func TestARoleCanRestrictWhichRuntimesGetAnAdapter(t *testing.T) {
 	// Arrange
 	root := t.TempDir()
 	writeRole(t, root, "claude-only", "name: claude-only\ndescription: x\nruntimes: [claude]")
-	roles, err := harness.LoadRoles(root)
+	roles, _, err := harness.LoadRoles(root)
 	if err != nil {
 		t.Fatalf("LoadRoles returned an error: %v", err)
 	}

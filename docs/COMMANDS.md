@@ -163,6 +163,7 @@ The rules, and what each one prevents:
 | `harness/role-metadata` | warn | a role no runtime can advertise |
 | `harness/model-ambiguous` | warn | one model name written into two vendors' adapters, where it resolves in at most one |
 | `harness/skill-metadata` | warn | a skill on disk that no runtime can offer, because it has no description |
+| `harness/definition-malformed` | error | a role or skill file that cannot be read, reported instead of withdrawing every other definition beside it |
 | `harness/runtime-unknown` | warn | a `runtimes:` value that generates no adapter, leaving the definition inert while every other rule passes |
 | `policy/trust-undeclared` | warn | a harness that cannot say which content is data |
 | `brain/not-initialised` | warn | a declared knowledge repository with no records |

@@ -130,16 +130,17 @@ func (r Role) TargetsRuntime(runtime string) bool {
 }
 
 // LoadRoles reads every role definition under root.
-func LoadRoles(root string) ([]Role, error) {
+func LoadRoles(root string) ([]Role, []Malformed, error) {
 	dir := filepath.Join(root, RolesDir)
 	entries, err := os.ReadDir(dir)
 	if os.IsNotExist(err) {
-		return nil, nil
+		return nil, nil, nil
 	}
 	if err != nil {
-		return nil, fmt.Errorf("read %s: %w", dir, err)
+		return nil, nil, fmt.Errorf("read %s: %w", dir, err)
 	}
 	roles := make([]Role, 0, len(entries))
+	var malformed []Malformed
 	for _, entry := range entries {
 		if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".md") {
 			continue
@@ -147,15 +148,27 @@ func LoadRoles(root string) ([]Role, error) {
 		path := filepath.Join(dir, entry.Name())
 		role, err := LoadRole(path)
 		if err != nil {
-			return nil, err
+			// A name that could escape the adapter directories is not a broken
+			// file to be skipped past: it is a file asking to be written
+			// somewhere vat must not write, and writing outside the workspace
+			// root is what retracted three releases. That stops the load.
+			if errors.Is(err, ErrInvalidRoleName) {
+				return nil, malformed, err
+			}
+			malformed = append(malformed, Malformed{
+				Path: filepath.Join(RolesDir, entry.Name()), Problem: err.Error(),
+			})
+			continue
 		}
 		roles = append(roles, role)
 	}
+	// A duplicate is not one bad file: it is an ambiguity between two good ones,
+	// and rendering either is wrong. That still stops the load.
 	if err := refuseDuplicateNames(roleNames(roles)); err != nil {
-		return nil, err
+		return nil, malformed, err
 	}
 	sort.Slice(roles, func(i, j int) bool { return roles[i].Name < roles[j].Name })
-	return roles, nil
+	return roles, malformed, nil
 }
 
 func roleNames(roles []Role) map[string][]string {
@@ -185,6 +198,24 @@ func refuseDuplicateNames(byName map[string][]string) error {
 // ErrInvalidRoleName is returned for a role whose name could escape the
 // directories adapters are written into.
 var ErrInvalidRoleName = errors.New("invalid role name")
+
+// Malformed is a definition file that could not be read as one.
+//
+// It is returned beside the sound definitions rather than raised as a load
+// error, for the reason the brain package keeps malformed records beside sound
+// ones: one unparseable file used to stop every other definition from being
+// rendered, so a typo in one skill silently withdrew the adapters of all the
+// others. A file vat cannot read is a finding, not a reason to do nothing.
+//
+// A name that could escape the adapter directories is the exception and still
+// stops the load. That is not a file vat failed to read; it is a file asking to
+// be written somewhere it must not be.
+type Malformed struct {
+	// Path is relative to the repository root.
+	Path string `json:"path"`
+	// Problem quotes the parser rather than the file.
+	Problem string `json:"problem"`
+}
 
 // ErrDuplicateName is returned when two definitions claim the same name.
 //

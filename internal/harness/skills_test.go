@@ -37,7 +37,7 @@ description: Take one service from a green build to a verified deployment.
 1. Confirm the build is green.
 2. Tag the revision and push the tag.
 `)
-	skills, err := harness.LoadSkills(root)
+	skills, _, err := harness.LoadSkills(root)
 	if err != nil {
 		t.Fatalf("LoadSkills: %v", err)
 	}
@@ -80,7 +80,7 @@ func TestADirectoryWithNoSkillFileIsNotASkill(t *testing.T) {
 	}
 
 	// Act
-	skills, err := harness.LoadSkills(root)
+	skills, _, err := harness.LoadSkills(root)
 
 	// Assert
 	if err != nil {
@@ -100,7 +100,7 @@ func TestASkillNameThatCouldEscapeIsRefused(t *testing.T) {
 	writeSkill(t, root, "escaping", "---\nname: ../../escape\ndescription: no.\n---\n")
 
 	// Act
-	_, err := harness.LoadSkills(root)
+	_, _, err := harness.LoadSkills(root)
 
 	// Assert
 	if err == nil {
@@ -114,7 +114,7 @@ func TestWritingSkillAdaptersTwiceReportsChangeOnlyOnce(t *testing.T) {
 	// Arrange
 	root := t.TempDir()
 	writeSkill(t, root, "release-a-service", "---\nname: release-a-service\ndescription: Ship it.\n---\n\nSteps.\n")
-	skills, err := harness.LoadSkills(root)
+	skills, _, err := harness.LoadSkills(root)
 	if err != nil {
 		t.Fatalf("LoadSkills: %v", err)
 	}
@@ -156,7 +156,7 @@ func TestTwoSkillsClaimingOneNameAreRefused(t *testing.T) {
 	writeSkill(t, root, "deploy-web", "---\nname: deploy\ndescription: Two.\n---\n\nSteps.\n")
 
 	// Act
-	_, err := harness.LoadSkills(root)
+	_, _, err := harness.LoadSkills(root)
 
 	// Assert
 	if err == nil {
@@ -169,5 +169,66 @@ func TestTwoSkillsClaimingOneNameAreRefused(t *testing.T) {
 		if !strings.Contains(err.Error(), want) {
 			t.Errorf("the error does not name %s, so it cannot be acted on: %v", want, err)
 		}
+	}
+}
+
+// One unparseable file used to withdraw the adapters of every definition beside
+// it, and reported only the first problem — so a second typo stayed invisible
+// until the first was fixed. A file vat cannot read is a finding, not a reason
+// to do nothing.
+func TestOneUnreadableSkillDoesNotWithdrawTheOthers(t *testing.T) {
+	// Arrange
+	root := t.TempDir()
+	writeSkill(t, root, "broken", "---\nname: [this is not\n  valid: yaml\n---\n")
+	writeSkill(t, root, "sound", "---\nname: sound\ndescription: Works.\n---\n\nSteps.\n")
+
+	// Act
+	skills, malformed, err := harness.LoadSkills(root)
+
+	// Assert
+	if err != nil {
+		t.Fatalf("one bad file stopped the load: %v", err)
+	}
+	if len(skills) != 1 || skills[0].Name != "sound" {
+		t.Errorf("loaded %+v, want only the sound skill", skills)
+	}
+	if len(malformed) != 1 {
+		t.Fatalf("the unreadable file was not reported: %+v", malformed)
+	}
+	if !strings.Contains(malformed[0].Path, "broken") {
+		t.Errorf("the finding does not name the file: %+v", malformed[0])
+	}
+	written, err := harness.WriteSkillAdapters(root, skills)
+	if err != nil {
+		t.Fatalf("WriteSkillAdapters: %v", err)
+	}
+	if len(written) != 1 {
+		t.Errorf("the sound skill's adapter was not written: %v", written)
+	}
+}
+
+// The exception: a name that could escape is a file asking to be written
+// somewhere vat must not write, and that stops the load rather than being
+// skipped past with a note.
+func TestAnEscapingNameStopsTheLoadRatherThanBeingSkipped(t *testing.T) {
+	// Arrange
+	root := t.TempDir()
+	writeSkill(t, root, "escaping", "---\nname: ../../escape\ndescription: no.\n---\n")
+	writeSkill(t, root, "sound", "---\nname: sound\ndescription: Works.\n---\n")
+
+	// Act
+	_, _, err := harness.LoadSkills(root)
+
+	// Assert
+	if err == nil {
+		t.Fatal("an escaping name was skipped rather than refused")
+	}
+	// And it must say skill, not role: the file is under .agents/skills, and
+	// naming the wrong directory sends the reader to the wrong place.
+	if !errors.Is(err, harness.ErrInvalidSkillName) {
+		t.Errorf("err = %v, want ErrInvalidSkillName", err)
+	}
+	if strings.Contains(err.Error(), "role name") {
+		t.Errorf("a skill problem was reported as a role problem: %v", err)
 	}
 }

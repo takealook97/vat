@@ -107,7 +107,7 @@ func runFit(ctx context.Context, env *Env, args []string) error {
 
 // definesRoles reports whether the workspace has any agent role defined.
 func definesRoles(ws *workspace.Workspace) bool {
-	roles, err := harness.LoadRoles(ws.Root)
+	roles, _, err := harness.LoadRoles(ws.Root)
 	return err == nil && len(roles) > 0
 }
 

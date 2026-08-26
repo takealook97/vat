@@ -1,6 +1,7 @@
 package harness
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -37,6 +38,13 @@ type Skill struct {
 // every runtime that supports skills already looks for.
 const SkillFile = "SKILL.md"
 
+// ErrInvalidSkillName is returned for a skill whose name could escape the
+// directories adapters are written into. It is separate from the role sentinel
+// so the message names what the reader actually has in front of them: reporting
+// "invalid role name" for a file under .agents/skills sends them to the wrong
+// directory.
+var ErrInvalidSkillName = errors.New("invalid skill name")
+
 // TargetsRuntime reports whether an adapter should be generated for a runtime.
 func (s Skill) TargetsRuntime(runtime string) bool {
 	if len(s.Runtimes) == 0 {
@@ -51,16 +59,17 @@ func (s Skill) TargetsRuntime(runtime string) bool {
 }
 
 // LoadSkills reads every skill definition under root.
-func LoadSkills(root string) ([]Skill, error) {
+func LoadSkills(root string) ([]Skill, []Malformed, error) {
 	dir := filepath.Join(root, SkillsDir)
 	entries, err := os.ReadDir(dir)
 	if os.IsNotExist(err) {
-		return nil, nil
+		return nil, nil, nil
 	}
 	if err != nil {
-		return nil, fmt.Errorf("read %s: %w", dir, err)
+		return nil, nil, fmt.Errorf("read %s: %w", dir, err)
 	}
 	skills := make([]Skill, 0, len(entries))
+	var malformed []Malformed
 	for _, entry := range entries {
 		if !entry.IsDir() {
 			continue
@@ -73,7 +82,14 @@ func LoadSkills(root string) ([]Skill, error) {
 		}
 		skill, err := LoadSkill(path)
 		if err != nil {
-			return nil, err
+			// See Malformed: an escaping name is a refusal, not a finding.
+			if errors.Is(err, ErrInvalidSkillName) {
+				return nil, malformed, err
+			}
+			malformed = append(malformed, Malformed{
+				Path: filepath.Join(SkillsDir, entry.Name(), SkillFile), Problem: err.Error(),
+			})
+			continue
 		}
 		skills = append(skills, skill)
 	}
@@ -83,10 +99,10 @@ func LoadSkills(root string) ([]Skill, error) {
 			filepath.Join(SkillsDir, skill.Dir, SkillFile))
 	}
 	if err := refuseDuplicateNames(byName); err != nil {
-		return nil, err
+		return nil, malformed, err
 	}
 	sort.Slice(skills, func(i, j int) bool { return skills[i].Name < skills[j].Name })
-	return skills, nil
+	return skills, malformed, nil
 }
 
 // LoadSkill reads one skill definition.
@@ -109,7 +125,7 @@ func LoadSkill(path string) (Skill, error) {
 	// same way a role name is: this is the value that decides where vat writes.
 	if !ValidRoleName(skill.Name) {
 		return Skill{}, fmt.Errorf("%w %q in %s: use letters, digits, '-', and '_' only",
-			ErrInvalidRoleName, skill.Name, path)
+			ErrInvalidSkillName, skill.Name, path)
 	}
 	return skill, nil
 }
@@ -152,7 +168,7 @@ func WriteSkillAdapters(root string, skills []Skill) ([]string, error) {
 			// written whole, with no markers to bound the damage.
 			if !withinRoot(adapter.Path) {
 				return nil, fmt.Errorf("%w: adapter for %q would be written to %s",
-					ErrInvalidRoleName, skill.Name, adapter.Path)
+					ErrInvalidSkillName, skill.Name, adapter.Path)
 			}
 			path := filepath.Join(root, adapter.Path)
 			current, _, err := fsx.ReadFileIfExists(path)

@@ -133,7 +133,7 @@ func harnessRolesCommand() *Command {
 			if err != nil {
 				return err
 			}
-			roles, err := harness.LoadRoles(ws.Root)
+			roles, _, err := harness.LoadRoles(ws.Root)
 			if err != nil {
 				return err
 			}
@@ -267,7 +267,7 @@ func runHarnessRole(ctx context.Context, env *Env, args []string) error {
 	}
 	env.Printer.Status(ui.LevelOK, ws.Rel(path), "created")
 
-	roles, err := harness.LoadRoles(ws.Root)
+	roles, _, err := harness.LoadRoles(ws.Root)
 	if err != nil {
 		return err
 	}

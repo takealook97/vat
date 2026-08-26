@@ -167,6 +167,17 @@ Notable changes to `vat`. The format follows
 
 ### Fixed
 
+- **One unreadable role or skill no longer withdraws the adapters of every
+  definition beside it.** The load aborted on the first bad file, so a typo in
+  one skill left every other skill's adapter unwritten and reported only that
+  first problem — a second typo stayed invisible until the first was fixed.
+  Unreadable files are now reported by `harness/definition-malformed` and the
+  rest render. A name that could *escape* the adapter directories remains a
+  refusal rather than a finding: that is not a file vat failed to read, it is a
+  file asking to be written somewhere it must not be.
+- **A skill's name error says "skill".** It reported "invalid role name" for a
+  file under `.agents/skills`, sending the reader to the wrong directory.
+
 - **A changeset identifier is validated before it becomes a path.** `Load` took
   it from a command-line argument and `Save` took it from the `id:` field of a
   file on disk, and neither checked it: `vat changeset abandon` on a record

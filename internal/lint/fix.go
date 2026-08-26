@@ -94,7 +94,7 @@ func RenderHarness(ws *workspace.Workspace) ([]string, error) {
 		}
 	}
 
-	roles, err := harness.LoadRoles(ws.Root)
+	roles, _, err := harness.LoadRoles(ws.Root)
 	if err != nil {
 		return nil, err
 	}
@@ -104,7 +104,7 @@ func RenderHarness(ws *workspace.Workspace) ([]string, error) {
 	}
 	changed = append(changed, adapters...)
 
-	skills, err := harness.LoadSkills(ws.Root)
+	skills, _, err := harness.LoadSkills(ws.Root)
 	if err != nil {
 		return nil, err
 	}

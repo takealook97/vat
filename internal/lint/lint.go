@@ -184,6 +184,7 @@ func RuleNames() []string {
 		"harness/model-ambiguous",
 		"harness/skill-metadata",
 		"harness/runtime-unknown",
+		"harness/definition-malformed",
 		"policy/trust-undeclared",
 		"brain/not-initialised",
 		ruleUnreferencedBrain,
@@ -410,10 +411,11 @@ func checkHarness(ws *workspace.Workspace) ([]Finding, error) {
 		}
 	}
 
-	roles, err := harness.LoadRoles(ws.Root)
+	roles, malformedRoles, err := harness.LoadRoles(ws.Root)
 	if err != nil {
 		return nil, err
 	}
+	findings = append(findings, malformedDefinitions(malformedRoles)...)
 	for _, role := range roles {
 		if strings.TrimSpace(role.Description) == "" {
 			findings = append(findings, Finding{
@@ -449,10 +451,11 @@ func checkHarness(ws *workspace.Workspace) ([]Finding, error) {
 		})
 	}
 
-	skills, err := harness.LoadSkills(ws.Root)
+	skills, malformedSkills, err := harness.LoadSkills(ws.Root)
 	if err != nil {
 		return nil, err
 	}
+	findings = append(findings, malformedDefinitions(malformedSkills)...)
 	for _, skill := range skills {
 		findings = append(findings, unknownRuntimes(skill.Name, skill.Runtimes)...)
 		// A skill with no description is a skill no runtime can offer. It is
@@ -478,6 +481,22 @@ func checkHarness(ws *workspace.Workspace) ([]Finding, error) {
 		})
 	}
 	return findings, nil
+}
+
+// malformedDefinitions reports a role or skill file that could not be read.
+//
+// Aborting the load instead meant one unparseable file withdrew the adapters of
+// every other definition beside it, and reported only the first problem — so a
+// second typo was invisible until the first was fixed.
+func malformedDefinitions(malformed []harness.Malformed) []Finding {
+	findings := make([]Finding, 0, len(malformed))
+	for _, entry := range malformed {
+		findings = append(findings, Finding{
+			Rule: "harness/definition-malformed", Severity: SeverityError, Subject: entry.Path,
+			Message: entry.Problem,
+		})
+	}
+	return findings
 }
 
 // unknownRuntimes reports a runtime name no adapter is generated for.

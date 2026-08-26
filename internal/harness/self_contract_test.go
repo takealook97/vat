@@ -21,7 +21,7 @@ import (
 func TestVatsOwnAdaptersMatchItsOwnRoleDefinitions(t *testing.T) {
 	// Arrange
 	const repositoryRoot = "../.."
-	roles, err := harness.LoadRoles(repositoryRoot)
+	roles, _, err := harness.LoadRoles(repositoryRoot)
 	if err != nil {
 		t.Fatalf("LoadRoles: %v", err)
 	}
@@ -56,7 +56,7 @@ func TestVatsOwnAdaptersMatchItsOwnRoleDefinitions(t *testing.T) {
 func TestNoCommittedAdapterNamesAnotherRuntimesModel(t *testing.T) {
 	// Arrange
 	const repositoryRoot = "../.."
-	roles, err := harness.LoadRoles(repositoryRoot)
+	roles, _, err := harness.LoadRoles(repositoryRoot)
 	if err != nil {
 		t.Fatalf("LoadRoles: %v", err)
 	}

@@ -70,7 +70,7 @@ WARN  brain/source-revision-drift · G-0014     payments has moved 47 commits si
 WARN  changeset/open-too-long · CS-0007        open for 31 days, past the 14-day limit; repositories are mid-contract-change with no closing evidence
 
 Result
-FAIL  lint                      2 errors, 2 warnings across 29 rules
+FAIL  lint                      2 errors, 2 warnings across 30 rules
 2 of these can be repaired with `vat lint --fix`.
 ```
 
