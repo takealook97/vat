@@ -44,6 +44,11 @@ func runRepoAdd(ctx context.Context, env *Env, args []string) error {
 	if strings.TrimSpace(*origin) == "" {
 		return usageErrorf("--origin is required")
 	}
+	if manifest.HasEmbeddedCredential(*origin) {
+		return usageErrorf(
+			"--origin embeds a credential; %s is committed, so it records identity and never access.\n"+
+				"  Keep the token in your git credential helper and pass the plain URL.", manifest.FileName)
+	}
 
 	ws, err := env.Workspace()
 	if err != nil {

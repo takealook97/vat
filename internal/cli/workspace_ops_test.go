@@ -629,8 +629,9 @@ func TestAnOriginCarryingACredentialIsRefused(t *testing.T) {
 		"--origin", "https://user:ghp_EXAMPLETOKEN@example.invalid/acme/console.git", "--no-clone")
 
 	// Assert
-	if code == ExitOK {
-		t.Errorf("an origin carrying a credential was accepted:\n%s", output)
+	if code != ExitUsage {
+		t.Errorf("`repo add` with a credential in --origin exited %d, want %d (called wrong):\n%s",
+			code, ExitUsage, output)
 	}
 	written, err := os.ReadFile(h.path("vat.yaml"))
 	if err != nil {

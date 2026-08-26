@@ -135,7 +135,7 @@ func Validate(m Manifest) error {
 
 		if strings.TrimSpace(repo.Origin) == "" {
 			problems = append(problems, where+": origin is required")
-		} else if hasEmbeddedCredential(repo.Origin) {
+		} else if HasEmbeddedCredential(repo.Origin) {
 			// vat.yaml is committed. A token pasted into an origin would be
 			// published by the next `git push` of the workspace root, and the
 			// only place vat could report it is a message it must not print.
@@ -257,12 +257,12 @@ func countRole(m Manifest, role Role) int {
 	return count
 }
 
-// hasEmbeddedCredential reports whether a URL carries userinfo.
+// HasEmbeddedCredential reports whether a URL carries userinfo.
 //
 // "https://user:token@host/repo.git" is a working remote and a leaked secret
 // the moment the manifest is committed. git keeps credentials in a helper for
 // exactly this reason, and the manifest records identity, not access.
-func hasEmbeddedCredential(url string) bool {
+func HasEmbeddedCredential(url string) bool {
 	_, rest, ok := strings.Cut(strings.TrimSpace(url), "://")
 	if !ok {
 		return false
