@@ -47,6 +47,7 @@ func Check(store *Store, policy CheckPolicy, now time.Time) []Finding {
 	findings := make([]Finding, 0, len(store.Records))
 	index := store.ByID()
 
+	findings = append(findings, checkMalformed(store)...)
 	findings = append(findings, checkIdentity(store)...)
 	findings = append(findings, checkStatuses(store)...)
 	findings = append(findings, checkProvenance(store, policy, now)...)
@@ -76,6 +77,24 @@ func Errors(findings []Finding) int {
 		}
 	}
 	return count
+}
+
+// checkMalformed reports the files that could not be read as records at all.
+//
+// The severity is error rather than warning because an unreadable record is
+// invisible to every other rule here: its identifier is not checked for
+// duplication, its claims are not checked for provenance, and its links are
+// checked by nobody. A layer that quietly holds files it cannot read is a layer
+// whose own report is incomplete.
+func checkMalformed(store *Store) []Finding {
+	findings := make([]Finding, 0, len(store.Malformed))
+	for _, broken := range store.Malformed {
+		findings = append(findings, Finding{
+			Rule: "brain/record-malformed", Severity: SeverityError, Path: broken.Path,
+			Message: fmt.Sprintf("could not be read as a record: %s", broken.Problem),
+		})
+	}
+	return findings
 }
 
 func checkIdentity(store *Store) []Finding {

@@ -219,6 +219,10 @@ type Record struct {
 	Path  string
 	Title string
 	Body  string
+	// Archived reports that the record has been moved out of the working set.
+	// It is still loaded — the supersession chain it belongs to is checked
+	// from both ends — but it is not part of what the layer is working on.
+	Archived bool
 }
 
 // Rel returns the record's path relative to the brain root.

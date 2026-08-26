@@ -18,12 +18,33 @@ const (
 	CurrentFile = "CURRENT.md"
 	GraphFile   = "graph.json"
 	MarkerFile  = ".brain"
+
+	// archiveDir holds the records that have reached an end state. They are
+	// still loaded — a supersession chain is checked from both ends — but they
+	// are out of the working set, out of the entry point, and in one directory
+	// an external index can exclude wholesale.
+	archiveDir = "archive"
 )
+
+// Malformed is a record file that could not be read as a record.
+//
+// It is kept beside the sound records rather than raised as a load error: one
+// unparseable file — a merge conflict marker in a header is the common case —
+// used to take down check, query, sweep, build, doctor, and lint at once, so
+// the layer said nothing at all about the records that were fine.
+type Malformed struct {
+	// Path is relative to the brain root, using forward slashes.
+	Path string `json:"path"`
+	// Problem is why the file could not be read. It quotes the parser, never
+	// the file: a record vat could not parse may still hold anything.
+	Problem string `json:"problem"`
+}
 
 // Store is a loaded brain repository.
 type Store struct {
-	Root    string
-	Records []Record
+	Root      string
+	Records   []Record
+	Malformed []Malformed
 }
 
 // IsBrain reports whether a directory looks like a brain repository: it has
@@ -44,21 +65,28 @@ func IsBrain(root string) bool {
 func Load(root string) (*Store, error) {
 	store := &Store{Root: filepath.Clean(root)}
 	for _, kind := range Kinds() {
-		records, err := loadKind(store.Root, kind)
-		if err != nil {
-			return nil, err
+		for _, dir := range []string{kind.Dir(), JoinPath(archiveDir, kind.Dir())} {
+			records, malformed, err := loadKind(store.Root, kind, dir)
+			if err != nil {
+				return nil, err
+			}
+			store.Records = append(store.Records, records...)
+			store.Malformed = append(store.Malformed, malformed...)
 		}
-		store.Records = append(store.Records, records...)
 	}
+	sort.SliceStable(store.Malformed, func(i, j int) bool {
+		return store.Malformed[i].Path < store.Malformed[j].Path
+	})
 	return store, nil
 }
 
-func loadKind(root string, kind Kind) ([]Record, error) {
-	dir := filepath.Join(root, kind.Dir())
+func loadKind(root string, kind Kind, relative string) ([]Record, []Malformed, error) {
+	dir := filepath.Join(root, filepath.FromSlash(relative))
 	if !fsx.IsDir(dir) {
-		return nil, nil
+		return nil, nil, nil
 	}
 	var records []Record
+	var malformed []Malformed
 	err := filepath.WalkDir(dir, func(path string, entry fs.DirEntry, err error) error {
 		if err != nil {
 			return err
@@ -71,26 +99,29 @@ func loadKind(root string, kind Kind) ([]Record, error) {
 		}
 		record, err := loadRecord(root, kind, path)
 		if err != nil {
-			return err
+			// A defect in one file is a finding about that file, not a reason
+			// to stop reporting on every other one.
+			malformed = append(malformed, Malformed{Path: relTo(root, path), Problem: err.Error()})
+			return nil
 		}
 		records = append(records, record)
 		return nil
 	})
 	if err != nil {
-		return nil, fmt.Errorf("scan %s: %w", dir, err)
+		return nil, nil, fmt.Errorf("scan %s: %w", dir, err)
 	}
-	return records, nil
+	return records, malformed, nil
 }
 
 func loadRecord(root string, kind Kind, path string) (Record, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
-		return Record{}, fmt.Errorf("read %s: %w", path, err)
+		return Record{}, fmt.Errorf("read: %w", err)
 	}
 	doc := frontmatter.Split(string(data))
 	var metadata Metadata
 	if err := doc.Decode(&metadata); err != nil {
-		return Record{}, fmt.Errorf("%s: %w", relTo(root, path), err)
+		return Record{}, err
 	}
 	relative := relTo(root, path)
 	if metadata.ID == "" {
@@ -111,6 +142,7 @@ func loadRecord(root string, kind Kind, path string) (Record, error) {
 		Path:     relative,
 		Title:    cleanTitle(title, metadata.ID),
 		Body:     doc.Body,
+		Archived: strings.HasPrefix(relative, archiveDir+"/"),
 	}, nil
 }
 
@@ -163,6 +195,18 @@ func (s *Store) OfKind(kind Kind) []Record {
 	var matching []Record
 	for _, record := range s.Records {
 		if record.Kind == kind {
+			matching = append(matching, record)
+		}
+	}
+	return SortRecords(matching)
+}
+
+// WorkingSet returns the records that have not been archived: what the layer
+// is currently working on, as opposed to what it has finished with.
+func (s *Store) WorkingSet() []Record {
+	var matching []Record
+	for _, record := range s.Records {
+		if !record.Archived {
 			matching = append(matching, record)
 		}
 	}
@@ -250,9 +294,15 @@ func trailingDigits(id string) string {
 	return digits
 }
 
-// RecentMemories returns the newest dated memory records.
+// RecentMemories returns the newest dated memory records still in the working
+// set.
 func (s *Store) RecentMemories(limit int) []Record {
-	memories := s.OfKind(KindMemory)
+	var memories []Record
+	for _, record := range s.OfKind(KindMemory) {
+		if !record.Archived {
+			memories = append(memories, record)
+		}
+	}
 	sort.SliceStable(memories, func(i, j int) bool {
 		return memories[i].Path > memories[j].Path
 	})

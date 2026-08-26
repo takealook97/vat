@@ -555,3 +555,50 @@ func TestSweepPreservesHeaderFieldsTheSchemaDoesNotModel(t *testing.T) {
 		}
 	}
 }
+
+// One record with a git merge conflict marker in its header used to take down
+// check, query, sweep, build, doctor, and lint together — the layer reporting
+// nothing at all about the records that were fine. "Report every finding at
+// once" has to hold hardest exactly when something is broken.
+func TestOneUnparseableRecordDoesNotHideEveryOtherRecord(t *testing.T) {
+	// Arrange
+	root := newStore(t)
+	mustCreate(t, root, NewRecordInput{Kind: KindGoal, ID: "O-0001", Title: "Ship weekly"})
+	broken := filepath.Join(root, "decisions", "D-0001-broken.md")
+	if err := os.WriteFile(broken,
+		[]byte("---\nid: D-0001\n<<<<<<< HEAD\nstatus: active\n=======\nstatus: provisional\n---\n\n# D-0001\n"),
+		0o644); err != nil {
+		t.Fatalf("write: %v", err)
+	}
+
+	// Act
+	store, err := Load(root)
+	if err != nil {
+		t.Fatalf("load refused to return anything: %v", err)
+	}
+
+	// Assert
+	if len(store.Records) != 1 || store.Records[0].ID != "O-0001" {
+		t.Errorf("the sound records were not loaded: %+v", store.Records)
+	}
+	if len(store.Malformed) != 1 {
+		t.Fatalf("the broken record was not reported: %+v", store.Malformed)
+	}
+	if store.Malformed[0].Path != "decisions/D-0001-broken.md" {
+		t.Errorf("malformed path = %q", store.Malformed[0].Path)
+	}
+
+	findings := Check(store, CheckPolicy{StaleAfterDays: 90}, longAfter)
+	var reported bool
+	for _, finding := range findings {
+		if finding.Rule == "brain/record-malformed" {
+			reported = true
+			if finding.Severity != SeverityError {
+				t.Errorf("severity = %q, want error", finding.Severity)
+			}
+		}
+	}
+	if !reported {
+		t.Errorf("check did not report the malformed record: %+v", findings)
+	}
+}

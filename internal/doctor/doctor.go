@@ -453,10 +453,23 @@ func checkBrain(ws *workspace.Workspace, now time.Time) []Finding {
 		StaleAfterDays: ws.Manifest.Policy.Brain.StaleAfterDays,
 		ReviewSLADays:  ws.Manifest.Policy.Brain.ReviewSLADays,
 	}
+	working := len(store.WorkingSet())
+	detail := fmt.Sprintf("%d in the working set, %d citable", working, len(store.Answerable()))
+	if archived := len(store.Records) - working; archived > 0 {
+		detail += fmt.Sprintf(", %d archived", archived)
+	}
 	findings := []Finding{{
-		Section: sectionBrain, Subject: "records", Status: StatusOK,
-		Detail: fmt.Sprintf("%d total, %d citable", len(store.Records), len(store.Answerable())),
+		Section: sectionBrain, Subject: "records", Status: StatusOK, Detail: detail,
 	}}
+	// A record vat cannot parse is invisible to every other rule about it, so
+	// saying nothing here would report a clean knowledge layer that is not one.
+	if len(store.Malformed) > 0 {
+		findings = append(findings, Finding{
+			Section: sectionBrain, Subject: "records", Status: StatusFail,
+			Detail: fmt.Sprintf("%d could not be read as records; run `vat brain check` for the list",
+				len(store.Malformed)),
+		})
+	}
 
 	queue := brain.ReviewQueue(store, policy, now)
 	overdue := 0

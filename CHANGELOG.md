@@ -8,6 +8,11 @@ Notable changes to `vat`. The format follows
 
 ### Added
 
+- `brain/record-malformed`, reported for a file that cannot be read as a record.
+  Previously one unparseable header — a merge conflict marker is the common
+  case — aborted the whole load and took `check`, `query`, `sweep`, `build`,
+  `doctor`, and `lint` down together, so the layer said nothing at all about the
+  records that were fine.
 - Two lint rules that audit the state a workspace is already in, rather than the
   invocation that creates it. `repo/credential-in-remote` reports a token left in
   a clone's `.git/config` — the state v0.1.5 produced, and one the remote
