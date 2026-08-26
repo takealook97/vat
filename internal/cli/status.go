@@ -2,7 +2,6 @@ package cli
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"strings"
 	"sync"
@@ -51,12 +50,9 @@ type repoStatus struct {
 
 func runStatus(ctx context.Context, env *Env, args []string) error {
 	set := newFlagSet("status")
-	group := set.String("group", "", "only repositories in these groups (comma-separated)")
-	role := set.String("role", "", "only repositories with these roles")
-	only := set.String("only", "", "only these repositories by name")
+	selection := bindSelector(set, true)
 	dirtyOnly := set.Bool("dirty", false, "only repositories with uncommitted work")
 	fetch := set.Bool("fetch", false, "update remote-tracking refs first")
-	archived := set.Bool("archived", false, "include archived repositories")
 	if err := parseFlags(set, args); err != nil {
 		return err
 	}
@@ -65,13 +61,9 @@ func runStatus(ctx context.Context, env *Env, args []string) error {
 	if err != nil {
 		return err
 	}
-	repos, err := ws.Select(manifest.Selector{
-		Names:  append(splitList(*only), set.Args()...),
-		Groups: splitList(*group), Roles: splitList(*role),
-		IncludeArchive: *archived,
-	})
+	repos, err := selection.resolve(ws, set)
 	if err != nil {
-		return usageErrorf("%v", err)
+		return err
 	}
 
 	statuses := collectStatuses(ctx, ws, repos, *fetch)
@@ -86,9 +78,7 @@ func runStatus(ctx context.Context, env *Env, args []string) error {
 	}
 
 	if env.JSON {
-		encoder := json.NewEncoder(env.Printer.Out())
-		encoder.SetIndent("", "  ")
-		return encoder.Encode(statuses)
+		return emitJSON(env, statuses)
 	}
 	renderStatusTable(env, ws, statuses)
 	return nil

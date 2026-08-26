@@ -2,10 +2,8 @@ package cli
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 
-	"github.com/takealook97/vat/internal/manifest"
 	"github.com/takealook97/vat/internal/syncx"
 	"github.com/takealook97/vat/internal/ui"
 )
@@ -42,9 +40,7 @@ func runSync(ctx context.Context, env *Env, args []string) error {
 	set := newFlagSet("sync")
 	dryRun := set.Bool("dry-run", false, "print the plan without changing anything")
 	offline := set.Bool("offline", false, "skip all network operations")
-	group := set.String("group", "", "only repositories in these groups")
-	role := set.String("role", "", "only repositories with these roles")
-	only := set.String("only", "", "only these repositories by name")
+	selection := bindSelector(set, false)
 	jobs := set.Int("jobs", 0, "concurrent git operations (default: policy.sync.parallelism)")
 	if err := parseFlags(set, args); err != nil {
 		return err
@@ -54,12 +50,9 @@ func runSync(ctx context.Context, env *Env, args []string) error {
 	if err != nil {
 		return err
 	}
-	repos, err := ws.Select(manifest.Selector{
-		Names:  append(splitList(*only), set.Args()...),
-		Groups: splitList(*group), Roles: splitList(*role),
-	})
+	repos, err := selection.resolve(ws, set)
 	if err != nil {
-		return usageErrorf("%v", err)
+		return err
 	}
 
 	report := syncx.Run(ctx, ws, repos, syncx.Options{
@@ -68,9 +61,7 @@ func runSync(ctx context.Context, env *Env, args []string) error {
 	report.Results = syncx.SortResults(report.Results, repos)
 
 	if env.JSON {
-		encoder := json.NewEncoder(env.Printer.Out())
-		encoder.SetIndent("", "  ")
-		if err := encoder.Encode(report); err != nil {
+		if err := emitJSON(env, report); err != nil {
 			return err
 		}
 	} else {

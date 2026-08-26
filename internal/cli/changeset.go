@@ -2,7 +2,6 @@ package cli
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"strings"
 	"time"
@@ -54,7 +53,7 @@ func changesetNewCommand() *Command {
 	return &Command{
 		Name:    "new",
 		Summary: "Open a changeset",
-		Usage:   `vat changeset new "<objective>" [--repos a,b] [--non-goal "..."] [--decision D-0001]`,
+		Usage:   `vat changeset new "<objective>" [--repos a,b] [--non-goal "..."] [--contract "..."] [--decision D-0001]`,
 		Run:     runChangesetNew,
 	}
 }
@@ -340,9 +339,7 @@ func changesetShowCommand() *Command {
 				return usageErrorf("%v", err)
 			}
 			if env.JSON {
-				encoder := json.NewEncoder(env.Printer.Out())
-				encoder.SetIndent("", "  ")
-				return encoder.Encode(current)
+				return emitJSON(env, current)
 			}
 			env.Printer.Printf("%s  %s\n", current.ID, current.Objective)
 			env.Printer.Printf("status: %s · opened %s · %d days\n",
@@ -395,9 +392,7 @@ func changesetListCommand() *Command {
 				return err
 			}
 			if env.JSON {
-				encoder := json.NewEncoder(env.Printer.Out())
-				encoder.SetIndent("", "  ")
-				return encoder.Encode(sets)
+				return emitJSON(env, sets)
 			}
 			rows := make([][]string, 0, len(sets))
 			for _, current := range sets {

@@ -3,7 +3,6 @@ package cli
 import (
 	"bufio"
 	"context"
-	"encoding/json"
 	"flag"
 	"fmt"
 	"os"
@@ -49,12 +48,10 @@ func repoListCommand() *Command {
 	return &Command{
 		Name:    "list",
 		Summary: "List every governed repository",
-		Usage:   "vat repo list [--group <g>] [--role <r>] [--archived]",
+		Usage:   "vat repo list [--only <names>] [--group <g>] [--role <r>] [--archived]",
 		Run: func(ctx context.Context, env *Env, args []string) error {
 			set := newFlagSet("repo list")
-			group := set.String("group", "", "only these groups")
-			role := set.String("role", "", "only these roles")
-			archived := set.Bool("archived", false, "include archived repositories")
+			selection := bindSelector(set, true)
 			if err := parseFlags(set, args); err != nil {
 				return err
 			}
@@ -62,11 +59,9 @@ func repoListCommand() *Command {
 			if err != nil {
 				return err
 			}
-			repos, err := ws.Select(manifest.Selector{
-				Groups: splitList(*group), Roles: splitList(*role), IncludeArchive: *archived,
-			})
+			repos, err := selection.resolve(ws, set)
 			if err != nil {
-				return usageErrorf("%v", err)
+				return err
 			}
 			if env.JSON {
 				// An empty slice rather than nil, so a consumer can iterate the
@@ -74,9 +69,7 @@ func repoListCommand() *Command {
 				if repos == nil {
 					repos = []manifest.Repo{}
 				}
-				encoder := json.NewEncoder(env.Printer.Out())
-				encoder.SetIndent("", "  ")
-				return encoder.Encode(repos)
+				return emitJSON(env, repos)
 			}
 			rows := make([][]string, 0, len(repos))
 			for _, repo := range repos {
@@ -211,7 +204,7 @@ func repoNewCommand() *Command {
 	return &Command{
 		Name:    "new",
 		Summary: "Create a brand-new repository, scaffold it, and enrol it",
-		Usage:   "vat repo new <name> [--role <r>] [--group <g>] [--branch <b>] [--checks <cmds>] [--access <a>] [--description <text>] [--private] [--remote <url>] [--no-remote]",
+		Usage:   "vat repo new <name> [--role <r>] [--group <g>] [--branch <b>] [--checks <cmds>] [--access <a>] [--description <text>] [--required=false] [--private] [--remote <url>] [--no-remote]",
 		Long: `Create a repository that does not exist yet.
 
 It is initialised locally with a starter harness, a README, and a .gitignore,

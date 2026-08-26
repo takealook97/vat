@@ -373,7 +373,16 @@ func newFlagSet(name string) *flag.FlagSet {
 // the command.
 var ErrHelpRequested = errors.New("help requested")
 
+// onFlagsParsed, when set, is handed every flag set a command builds. It exists
+// so a test can compare the flags a command actually registers against the ones
+// its usage line advertises, without a second list to keep in step. Production
+// leaves it nil and pays one comparison.
+var onFlagsParsed func(set *flag.FlagSet)
+
 func parseFlags(set *flag.FlagSet, args []string) error {
+	if onFlagsParsed != nil {
+		onFlagsParsed(set)
+	}
 	if err := set.Parse(permute(set, args)); err != nil {
 		// A command nested three levels deep reaches its own flag set before
 		// the dispatcher sees --help, and Go's package reports that as the

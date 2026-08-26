@@ -2,7 +2,6 @@ package cli
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"strings"
 
@@ -50,9 +49,7 @@ func runDoctor(ctx context.Context, env *Env, args []string) error {
 	})
 
 	if env.JSON {
-		encoder := json.NewEncoder(env.Printer.Out())
-		encoder.SetIndent("", "  ")
-		if err := encoder.Encode(report); err != nil {
+		if err := emitJSON(env, report); err != nil {
 			return err
 		}
 	} else {

@@ -2,12 +2,10 @@ package cli
 
 import (
 	"context"
-	"encoding/json"
 	"strings"
 	"time"
 
 	"github.com/takealook97/vat/internal/gitx"
-	"github.com/takealook97/vat/internal/manifest"
 	"github.com/takealook97/vat/internal/runner"
 	"github.com/takealook97/vat/internal/ui"
 )
@@ -48,9 +46,7 @@ fragments by contract, and do run through a shell.`,
 
 func runExec(ctx context.Context, env *Env, args []string) error {
 	set := newFlagSet("exec")
-	group := set.String("group", "", "only repositories in these groups")
-	role := set.String("role", "", "only repositories with these roles")
-	only := set.String("only", "", "only these repositories by name")
+	selection := bindSelector(set, false)
 	useChecks := set.Bool("checks", false, "run each repository's canonical checks from the manifest")
 	jobs := set.Int("jobs", 0, "concurrent commands (default: policy.sync.parallelism)")
 	timeout := set.Duration("timeout", 10*time.Minute, "per-command timeout")
@@ -76,11 +72,11 @@ func runExec(ctx context.Context, env *Env, args []string) error {
 	if err != nil {
 		return err
 	}
-	repos, err := ws.Select(manifest.Selector{
-		Names: splitList(*only), Groups: splitList(*group), Roles: splitList(*role),
-	})
+	// Bare arguments are the command, not repository names, so the selector is
+	// resolved from its flags alone here.
+	repos, err := selection.resolve(ws, nil)
 	if err != nil {
-		return usageErrorf("%v", err)
+		return err
 	}
 
 	var jobList []runner.Job
@@ -121,9 +117,7 @@ func runExec(ctx context.Context, env *Env, args []string) error {
 	})
 
 	if env.JSON {
-		encoder := json.NewEncoder(env.Printer.Out())
-		encoder.SetIndent("", "  ")
-		if err := encoder.Encode(results); err != nil {
+		if err := emitJSON(env, results); err != nil {
 			return err
 		}
 	} else {

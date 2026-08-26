@@ -2,7 +2,6 @@ package cli
 
 import (
 	"context"
-	"encoding/json"
 	"path/filepath"
 	"strings"
 
@@ -42,7 +41,9 @@ func evidenceNewCommand() *Command {
 	return &Command{
 		Name:    "new",
 		Summary: "Create an evidence packet",
-		Usage:   `vat evidence new <id> "<objective>" --repos a,b --acceptance "..."`,
+		Usage: `vat evidence new <id> "<objective>" --repos a,b [--acceptance "..."]
+                        [--non-goal "..."] [--contract "..."] [--refs <ids>]
+                        [--changeset <id>] [--release-authority] [--markdown]`,
 		Examples: []string{
 			`vat evidence new EP-001 "Add idempotency keys" --repos payments --acceptance "a repeated request creates one charge"`,
 		},
@@ -150,9 +151,7 @@ func evidenceShowCommand() *Command {
 				return usageErrorf("%v", err)
 			}
 			if env.JSON {
-				encoder := json.NewEncoder(env.Printer.Out())
-				encoder.SetIndent("", "  ")
-				return encoder.Encode(packet)
+				return emitJSON(env, packet)
 			}
 			if *markdown {
 				env.Printer.Println(evidence.Markdown(packet))
@@ -193,9 +192,7 @@ func evidenceListCommand() *Command {
 				return err
 			}
 			if env.JSON {
-				encoder := json.NewEncoder(env.Printer.Out())
-				encoder.SetIndent("", "  ")
-				return encoder.Encode(packets)
+				return emitJSON(env, packets)
 			}
 			if len(packets) == 0 {
 				env.Printer.Println("No evidence packets.")
@@ -257,9 +254,7 @@ func evidenceCheckCommand() *Command {
 				})
 			}
 			if env.JSON {
-				encoder := json.NewEncoder(env.Printer.Out())
-				encoder.SetIndent("", "  ")
-				if err := encoder.Encode(reports); err != nil {
+				if err := emitJSON(env, reports); err != nil {
 					return err
 				}
 			} else {

@@ -2,7 +2,6 @@ package cli
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"path/filepath"
 	"strings"
@@ -126,7 +125,7 @@ func brainNewCommand() *Command {
 	return &Command{
 		Name:    "new",
 		Summary: "Create an atomic record",
-		Usage:   `vat brain new <goal|gap|decision|memory> --title "..." [--claim current-state --owner <repo>]`,
+		Usage:   `vat brain new <goal|gap|decision|memory> --title "..." [--claim <kind>] [--owner <repo>] [--axis <a>] [--refs <ids>] [--id <id>]`,
 		Long: `Create one record holding one fact.
 
 A record enters as provisional, never as truth. Promoting it is a separate,
@@ -280,9 +279,7 @@ are run in a loop while cleaning up a repository.`,
 			findings := brain.Check(store, brainPolicy(ws), env.Now)
 			switch {
 			case env.JSON:
-				encoder := json.NewEncoder(env.Printer.Out())
-				encoder.SetIndent("", "  ")
-				if err := encoder.Encode(findings); err != nil {
+				if err := emitJSON(env, findings); err != nil {
 					return err
 				}
 			case len(findings) == 0:
@@ -356,9 +353,7 @@ are auditing why something was decided rather than asking what is true now.`,
 				IncludeHistory: *all, IncludeTerminal: *all, Limit: *limit,
 			})
 			if env.JSON {
-				encoder := json.NewEncoder(env.Printer.Out())
-				encoder.SetIndent("", "  ")
-				return encoder.Encode(hits)
+				return emitJSON(env, hits)
 			}
 			if len(hits) == 0 {
 				env.Printer.Println("No matches on the current surface.")
@@ -423,9 +418,7 @@ to prevent.`,
 				items = filtered
 			}
 			if env.JSON {
-				encoder := json.NewEncoder(env.Printer.Out())
-				encoder.SetIndent("", "  ")
-				return encoder.Encode(items)
+				return emitJSON(env, items)
 			}
 			if len(items) == 0 {
 				env.Printer.Status(ui.LevelOK, "review queue", "empty")
@@ -488,9 +481,7 @@ that keeps the layer honest across years rather than months.`,
 				return err
 			}
 			if env.JSON {
-				encoder := json.NewEncoder(env.Printer.Out())
-				encoder.SetIndent("", "  ")
-				return encoder.Encode(transitions)
+				return emitJSON(env, transitions)
 			}
 			if len(transitions) == 0 {
 				env.Printer.Status(ui.LevelOK, "sweep", "every claim is within its window")

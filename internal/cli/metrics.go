@@ -2,7 +2,6 @@ package cli
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 
 	"github.com/takealook97/vat/internal/metrics"
@@ -53,9 +52,7 @@ func runMetrics(ctx context.Context, env *Env, args []string) error {
 			return err
 		}
 		if env.JSON {
-			encoder := json.NewEncoder(env.Printer.Out())
-			encoder.SetIndent("", "  ")
-			return encoder.Encode(snapshots)
+			return emitJSON(env, snapshots)
 		}
 		if len(snapshots) == 0 {
 			env.Printer.Println("No snapshots recorded yet. Run `vat metrics --record`.")
@@ -94,9 +91,7 @@ func runMetrics(ctx context.Context, env *Env, args []string) error {
 	}
 
 	if env.JSON {
-		encoder := json.NewEncoder(env.Printer.Out())
-		encoder.SetIndent("", "  ")
-		if err := encoder.Encode(snapshot); err != nil {
+		if err := emitJSON(env, snapshot); err != nil {
 			return err
 		}
 	} else {

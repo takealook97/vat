@@ -2,7 +2,6 @@ package cli
 
 import (
 	"context"
-	"encoding/json"
 
 	"github.com/takealook97/vat/internal/version"
 )
@@ -19,9 +18,7 @@ func versionCommand() *Command {
 				return err
 			}
 			if env.JSON {
-				encoder := json.NewEncoder(env.Printer.Out())
-				encoder.SetIndent("", "  ")
-				return encoder.Encode(map[string]string{
+				return emitJSON(env, map[string]string{
 					"version": version.Short(),
 					"commit":  version.Revision(),
 					"date":    version.BuildDate(),

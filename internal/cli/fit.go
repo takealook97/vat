@@ -2,7 +2,6 @@ package cli
 
 import (
 	"context"
-	"encoding/json"
 
 	"github.com/takealook97/vat/internal/fit"
 	"github.com/takealook97/vat/internal/harness"
@@ -85,9 +84,7 @@ func runFit(ctx context.Context, env *Env, args []string) error {
 
 	verdicts := fit.Assess(signals)
 	if env.JSON {
-		encoder := json.NewEncoder(env.Printer.Out())
-		encoder.SetIndent("", "  ")
-		return encoder.Encode(verdicts)
+		return emitJSON(env, verdicts)
 	}
 
 	for _, verdict := range verdicts {

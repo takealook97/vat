@@ -2,7 +2,6 @@ package cli
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"path/filepath"
 	"strings"
@@ -90,9 +89,7 @@ func harnessCheckCommand() *Command {
 			}
 			switch {
 			case env.JSON:
-				encoder := json.NewEncoder(env.Printer.Out())
-				encoder.SetIndent("", "  ")
-				if err := encoder.Encode(report); err != nil {
+				if err := emitJSON(env, report); err != nil {
 					return err
 				}
 			case len(report.Findings) == 0:
@@ -148,9 +145,7 @@ func harnessRolesCommand() *Command {
 				for _, role := range roles {
 					listed = append(listed, summariseRole(role))
 				}
-				encoder := json.NewEncoder(env.Printer.Out())
-				encoder.SetIndent("", "  ")
-				return encoder.Encode(listed)
+				return emitJSON(env, listed)
 			}
 			if len(roles) == 0 {
 				env.Printer.Println("No roles defined.")
