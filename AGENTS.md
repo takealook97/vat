@@ -94,8 +94,8 @@ cannot be selected with `--only` or documented.
 make check
 ```
 
-Formatting, `go vet`, the race-enabled suite, and a build. Nothing else counts
-as proof.
+Formatting, `go vet`, `golangci-lint` when it is installed, the race-enabled
+suite, and a build. Nothing else counts as proof.
 
 New behaviour needs a test that fails without the change. A bug fix without a
 regression test is an invitation for the bug to return.

@@ -34,6 +34,7 @@ const (
 	sectionRepositories = "repositories"
 	sectionCredentials  = "credentials"
 	sectionBrain        = "brain"
+	subjectRecords      = "records"
 	sectionChangesets   = "changesets"
 	sectionNetwork      = "network"
 )
@@ -446,7 +447,7 @@ func checkBrain(ws *workspace.Workspace, now time.Time) []Finding {
 	store, err := brain.Load(root)
 	if err != nil {
 		return []Finding{{
-			Section: sectionBrain, Subject: "records", Status: StatusFail, Detail: err.Error(),
+			Section: sectionBrain, Subject: subjectRecords, Status: StatusFail, Detail: err.Error(),
 		}}
 	}
 	policy := brain.CheckPolicy{
@@ -459,13 +460,13 @@ func checkBrain(ws *workspace.Workspace, now time.Time) []Finding {
 		detail += fmt.Sprintf(", %d archived", archived)
 	}
 	findings := []Finding{{
-		Section: sectionBrain, Subject: "records", Status: StatusOK, Detail: detail,
+		Section: sectionBrain, Subject: subjectRecords, Status: StatusOK, Detail: detail,
 	}}
 	// A record vat cannot parse is invisible to every other rule about it, so
 	// saying nothing here would report a clean knowledge layer that is not one.
 	if len(store.Malformed) > 0 {
 		findings = append(findings, Finding{
-			Section: sectionBrain, Subject: "records", Status: StatusFail,
+			Section: sectionBrain, Subject: subjectRecords, Status: StatusFail,
 			Detail: fmt.Sprintf("%d could not be read as records; run `vat brain check` for the list",
 				len(store.Malformed)),
 		})

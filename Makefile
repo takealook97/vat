@@ -23,8 +23,8 @@ COVERAGE_MIN ?= 80
 .DEFAULT_GOAL := check
 .PHONY: check build install test cover lint fmt vet tidy clean release-snapshot help
 
-## check: format, vet, test, and build — the canonical proof a change is complete
-check: fmt vet test build
+## check: format, vet, lint, test, and build — the canonical proof a change is complete
+check: fmt vet lint test build
 
 ## build: compile the binary into ./bin
 build:
@@ -63,6 +63,10 @@ fmt:
 vet:
 	go vet ./...
 
+# Part of `check`. CI runs golangci-lint and `check` did not, so `check` could
+# pass on a change CI then rejected — which makes it not the proof this file
+# claims it is. It stays a soft dependency: a contributor without the linter
+# gets a skip rather than a blocked build, and CI is still the backstop.
 ## lint: run golangci-lint when it is installed
 lint:
 	@if command -v golangci-lint >/dev/null 2>&1; then \

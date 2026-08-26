@@ -27,7 +27,7 @@ configured.
 make help      # every available target
 make test      # the suite, with the race detector
 make cover     # coverage per package
-make lint      # golangci-lint, if installed
+make lint      # golangci-lint alone; `make check` already runs it
 ```
 
 ## Commit convention
@@ -66,8 +66,8 @@ Commit messages, code, comments, and documentation are all in English.
 
 - **A test that fails without it.** New behaviour, and every bug fix, needs one.
   A bug fix without a regression test is an invitation for the bug to return.
-- **`make check` passing.** Formatting, vet, the race-enabled suite, and a
-  build. This is the canonical proof; nothing else counts as one.
+- **`make check` passing.** Formatting, vet, the linter, the race-enabled
+  suite, and a build. This is the canonical proof; nothing else counts as one.
 - **Doc comments on exported names.** Every package has a package comment
   saying what it owns.
 - **Comments that explain why.** The code already says what it does. A comment

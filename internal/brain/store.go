@@ -100,9 +100,11 @@ func loadKind(root string, kind Kind, relative string) ([]Record, []Malformed, e
 		record, err := loadRecord(root, kind, path)
 		if err != nil {
 			// A defect in one file is a finding about that file, not a reason
-			// to stop reporting on every other one.
+			// to stop reporting on every other one. The error is deliberately
+			// not propagated: it is carried out as a Malformed entry instead,
+			// which is the entire point of the recovery.
 			malformed = append(malformed, Malformed{Path: relTo(root, path), Problem: err.Error()})
-			return nil
+			return nil //nolint:nilerr // reported as a finding, not as a failed load
 		}
 		records = append(records, record)
 		return nil
