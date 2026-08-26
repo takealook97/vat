@@ -16,7 +16,8 @@ func brainCommand() *Command {
 	return &Command{
 		Name:    "brain",
 		Summary: "The reviewed-knowledge layer: facts with provenance and an expiry",
-		Usage:   "vat brain <init|new|build|check|query|review|sweep|promote|supersede|adopt>",
+		Usage: "vat brain <init|new|build|check|query|review|sweep|promote|supersede|" +
+			"quarantine|revoke|resolve|adopt>",
 		Long: `Hold what the organisation believes is true, and know when it stopped
 being verified.
 
@@ -40,6 +41,9 @@ becoming a confident liar over a few years.`,
 			brainSweepCommand(),
 			brainPromoteCommand(),
 			brainSupersedeCommand(),
+			brainQuarantineCommand(),
+			brainRevokeCommand(),
+			brainResolveCommand(),
 			brainAdoptCommand(),
 		},
 	}

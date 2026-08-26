@@ -137,7 +137,7 @@ func TestAProvisionalRecordIsNotAnswerableAndAPromotedOneIs(t *testing.T) {
 
 	// Act
 	before := recordByID(t, mustLoad(t, root), "D-0001")
-	if err := Promote(root, before, "reviewer", observedOn); err != nil {
+	if err := Promote(root, before, PromoteRequest{Reviewer: "reviewer", Now: observedOn}); err != nil {
 		t.Fatalf("promote: %v", err)
 	}
 	after := recordByID(t, mustLoad(t, root), "D-0001")
@@ -231,7 +231,8 @@ func TestSupersedeLinksBothRecordsAndCheckAcceptsTheChain(t *testing.T) {
 	store := mustLoad(t, root)
 
 	// Act
-	if err := Supersede(root, recordByID(t, store, "D-0001"), recordByID(t, store, "D-0002")); err != nil {
+	if err := Supersede(root, recordByID(t, store, "D-0001"), recordByID(t, store, "D-0002"),
+		SupersedeOptions{}); err != nil {
 		t.Fatalf("supersede: %v", err)
 	}
 	updated := mustLoad(t, root)
@@ -600,5 +601,202 @@ func TestOneUnparseableRecordDoesNotHideEveryOtherRecord(t *testing.T) {
 	}
 	if !reported {
 		t.Errorf("check did not report the malformed record: %+v", findings)
+	}
+}
+
+// The gate the policy declares has to cost something, or it is an instruction
+// leaflet. These four are the ways a promotion could previously produce a
+// citable record that nobody had actually re-checked.
+func TestPromoteRefusesToReviveATombstone(t *testing.T) {
+	// Arrange
+	root := newStore(t)
+	mustCreate(t, root, NewRecordInput{
+		Kind: KindDecision, ID: "D-0001", Title: "Pricing is per seat",
+		Status: StatusRevoked,
+	})
+	record := recordByID(t, mustLoad(t, root), "D-0001")
+
+	// Act
+	err := Promote(root, record, PromoteRequest{Reviewer: "alex", Now: observedOn})
+
+	// Assert
+	if err == nil {
+		t.Fatal("a withdrawn claim was promoted back to citable")
+	}
+	if !strings.Contains(err.Error(), "revoked") {
+		t.Errorf("error should name the status it refused, got %v", err)
+	}
+}
+
+func TestPromoteRefusesAnUnattributedPromotionWhenTheGateIsManual(t *testing.T) {
+	// Arrange
+	root := newStore(t)
+	mustCreate(t, root, NewRecordInput{Kind: KindDecision, ID: "D-0001", Title: "Per seat"})
+	record := recordByID(t, mustLoad(t, root), "D-0001")
+
+	// Act
+	err := Promote(root, record, PromoteRequest{Now: observedOn, RequireReviewer: true})
+
+	// Assert
+	if err == nil {
+		t.Fatal("a manual gate accepted a promotion nobody signed")
+	}
+	if !strings.Contains(err.Error(), "reviewer") {
+		t.Errorf("error should say what is missing, got %v", err)
+	}
+}
+
+func TestPromoteRefusesToRestampAClaimWhoseSourceHasMoved(t *testing.T) {
+	// Arrange: stamping observed_at without re-reading the source is how a
+	// four-hundred-day-old claim becomes "just verified" with one keystroke.
+	root := newStore(t)
+	mustCreate(t, root, NewRecordInput{
+		Kind: KindGap, ID: "G-0001", Title: "Retries double-submit",
+		Status: StatusStale, ClaimKind: ClaimCurrentState,
+		OwnedBy: "payments", SourceRef: "payments@3f9a1c2e8b74:docs/ORDERING.md",
+	})
+	record := recordByID(t, mustLoad(t, root), "G-0001")
+
+	// Act
+	err := Promote(root, record, PromoteRequest{
+		Reviewer: "alex", Now: longAfter, SourceRevision: "9d4e7b1a0c62",
+	})
+
+	// Assert
+	if err == nil {
+		t.Fatal("a claim was re-dated against evidence that had moved")
+	}
+	if !strings.Contains(err.Error(), "--reverified") {
+		t.Errorf("error should say how to proceed honestly, got %v", err)
+	}
+}
+
+func TestPromoteRepinsTheSourceWhenTheReviewerSaysTheyReReadIt(t *testing.T) {
+	// Arrange
+	root := newStore(t)
+	mustCreate(t, root, NewRecordInput{
+		Kind: KindGap, ID: "G-0001", Title: "Retries double-submit",
+		Status: StatusStale, ClaimKind: ClaimCurrentState,
+		OwnedBy: "payments", SourceRef: "payments@3f9a1c2e8b74:docs/ORDERING.md",
+	})
+	record := recordByID(t, mustLoad(t, root), "G-0001")
+
+	// Act
+	if err := Promote(root, record, PromoteRequest{
+		Reviewer: "alex", Now: longAfter, SourceRevision: "9d4e7b1a0c62", Reverified: true,
+	}); err != nil {
+		t.Fatalf("promote: %v", err)
+	}
+
+	// Assert
+	after := recordByID(t, mustLoad(t, root), "G-0001")
+	if after.SourceRef != "payments@9d4e7b1a0c62:docs/ORDERING.md" {
+		t.Errorf("source_ref = %q; the evidence was not re-pinned to what was read", after.SourceRef)
+	}
+	if after.ObservedAt != longAfter.Format("2006-01-02") {
+		t.Errorf("observed_at = %q, want %s", after.ObservedAt, longAfter.Format("2006-01-02"))
+	}
+}
+
+// Superseding used to promote the replacement on the way past, which is the one
+// path that made a record canonical without anyone crossing the gate.
+func TestSupersedeLeavesTheReplacementProvisionalWhenPromotionIsGated(t *testing.T) {
+	// Arrange
+	root := newStore(t)
+	mustCreate(t, root, NewRecordInput{Kind: KindDecision, ID: "D-0001", Title: "Old", Status: StatusActive})
+	mustCreate(t, root, NewRecordInput{Kind: KindDecision, ID: "D-0002", Title: "New"})
+	store := mustLoad(t, root)
+
+	// Act
+	if err := Supersede(root, recordByID(t, store, "D-0001"), recordByID(t, store, "D-0002"),
+		SupersedeOptions{PromotionGated: true}); err != nil {
+		t.Fatalf("supersede: %v", err)
+	}
+
+	// Assert
+	after := mustLoad(t, root).ByID()
+	if after["D-0001"].Status != StatusSuperseded {
+		t.Errorf("old status = %q, want superseded", after["D-0001"].Status)
+	}
+	if after["D-0002"].Status != StatusProvisional {
+		t.Errorf("the replacement became %q without review", after["D-0002"].Status)
+	}
+}
+
+// Half the lifecycle had states and check rules but no command, so reaching
+// quarantined or revoked meant hand-editing YAML — the manual step the tool
+// exists to remove, performed on the record whose trustworthiness is already in
+// question.
+func TestRetireMovesARecordOutOfTheAnswerableSetWithItsReason(t *testing.T) {
+	// Arrange
+	root := newStore(t)
+	mustCreate(t, root, NewRecordInput{
+		Kind: KindDecision, ID: "D-0001", Title: "Pricing is per seat", Status: StatusActive,
+	})
+	record := recordByID(t, mustLoad(t, root), "D-0001")
+
+	// Act
+	if err := Retire(root, record, StatusQuarantined, "contradicted by the billing export"); err != nil {
+		t.Fatalf("retire: %v", err)
+	}
+
+	// Assert
+	after := recordByID(t, mustLoad(t, root), "D-0001")
+	if after.Status != StatusQuarantined {
+		t.Errorf("status = %q, want quarantined", after.Status)
+	}
+	if !strings.Contains(after.Reason, "billing export") {
+		t.Errorf("reason = %q; the trail of why it was doubted was not kept", after.Reason)
+	}
+}
+
+func TestRetireRefusesAWithdrawalWithNoStatedCause(t *testing.T) {
+	// Arrange: check already fails on a reasonless tombstone. Writing one and
+	// then reporting it is worse than refusing to write it.
+	root := newStore(t)
+	mustCreate(t, root, NewRecordInput{Kind: KindDecision, ID: "D-0001", Title: "Per seat"})
+	record := recordByID(t, mustLoad(t, root), "D-0001")
+
+	// Act
+	err := Retire(root, record, StatusRevoked, "  ")
+
+	// Assert
+	if err == nil {
+		t.Fatal("a revocation with no reason was written")
+	}
+	if !strings.Contains(err.Error(), "reason") {
+		t.Errorf("error = %v", err)
+	}
+}
+
+func TestRetireRefusesToResolveAnythingThatIsNotAGap(t *testing.T) {
+	// Arrange
+	root := newStore(t)
+	mustCreate(t, root, NewRecordInput{Kind: KindDecision, ID: "D-0001", Title: "Per seat"})
+	record := recordByID(t, mustLoad(t, root), "D-0001")
+
+	// Act
+	err := Retire(root, record, StatusResolved, "")
+
+	// Assert
+	if err == nil {
+		t.Fatal("a decision was marked resolved, a status that only describes a closed gap")
+	}
+}
+
+func TestRetireRefusesToReopenAnEndState(t *testing.T) {
+	// Arrange
+	root := newStore(t)
+	mustCreate(t, root, NewRecordInput{
+		Kind: KindDecision, ID: "D-0001", Title: "Per seat", Status: StatusRevoked,
+	})
+	record := recordByID(t, mustLoad(t, root), "D-0001")
+
+	// Act
+	err := Retire(root, record, StatusQuarantined, "second thoughts")
+
+	// Assert
+	if err == nil {
+		t.Fatal("a tombstone was moved back into the lifecycle")
 	}
 }

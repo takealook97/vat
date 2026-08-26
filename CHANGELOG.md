@@ -13,6 +13,18 @@ Notable changes to `vat`. The format follows
   case — aborted the whole load and took `check`, `query`, `sweep`, `build`,
   `doctor`, and `lint` down together, so the layer said nothing at all about the
   records that were fine.
+- `vat brain quarantine`, `revoke`, and `resolve`. These three states carried
+  check rules and review-queue weights from the first release and had no
+  command, so reaching one meant hand-editing the YAML of the record whose
+  trustworthiness was already in doubt. A quarantine or a revocation must state
+  a reason; `resolved` is refused for anything that is not a gap; and an end
+  state is never reopened, by these commands or by `promote`.
+- `brain/record-secret-suspected`, reported for a record that appears to carry a
+  credential. "A record holds no secret" was the one rule in this layer with
+  nothing checking it, which by this project's first rule makes it not a rule.
+  The finding names the line and the kind of credential and never the value.
+- `vat brain promote --reverified`, and the refusal that makes it necessary.
+
 - Two lint rules that audit the state a workspace is already in, rather than the
   invocation that creates it. `repo/credential-in-remote` reports a token left in
   a clone's `.git/config` — the state v0.1.5 produced, and one the remote
@@ -28,6 +40,19 @@ Notable changes to `vat`. The format follows
 
 ### Changed
 
+- `vat brain promote` no longer moves a claim's observation date forward on
+  request alone. When the owning repository is still at the revision the claim
+  was pinned to, nothing about the evidence has changed and the date moves
+  freely; when it has moved, or vat cannot read the repository, the date only
+  moves with `--reverified`, which re-pins `source_ref` to the revision the
+  reviewer actually read. Stamping "observed today" without re-reading anything
+  turned a four-hundred-day-old sentence into a verified one with a single
+  keystroke. `promote` also refuses to revive a terminal record, and requires
+  `--reviewer` when `policy.gates.brain_promote` is `manual`.
+- `vat brain supersede` leaves the replacement `provisional` when
+  `policy.brain.require_promotion_gate` is set. Promoting it on the way past was
+  the one path by which a record became canonical without anyone reviewing it —
+  the gate the policy declared, unenforced.
 - The containment check both the commands and the new lint rule depend on moved
   to `workspace.Contains`, so an entry-point guard and an audit cannot disagree
   about what "inside the workspace" means.

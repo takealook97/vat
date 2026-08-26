@@ -288,8 +288,11 @@ vat brain check
 vat brain query     <terms...> [--all] [--limit n]
 vat brain review    [--overdue] [--limit n]
 vat brain sweep     [--apply]
-vat brain promote   <id> [--reviewer <name>]
+vat brain promote   <id> [--reviewer <name>] [--reverified]
 vat brain supersede <old-id> <new-id>
+vat brain quarantine <id> --reason "..."
+vat brain revoke    <id> --reason "..."
+vat brain resolve   <id> [--reason "..."]
 vat brain adopt     <repository-name>
 ```
 
@@ -306,6 +309,25 @@ how long it has gone unverified.
 `sweep` lists proposed demotions; `--apply` writes them.
 
 `promote` refuses a current-state claim with no `owned_by` and no `source_ref`.
+It also refuses to move the observation date forward unless the evidence is
+demonstrably unchanged — the owning repository is still at the pinned revision —
+or you pass `--reverified` to state that you re-read the source yourself, in
+which case the claim is re-pinned to the revision you read. When
+`policy.gates.brain_promote` is `manual`, `--reviewer` is required.
+
+`supersede` leaves the replacement `provisional` when
+`policy.brain.require_promotion_gate` is set, so a new decision still crosses the
+gate rather than becoming canonical on its way past.
+
+`quarantine`, `revoke`, and `resolve` are the rest of the lifecycle. A
+quarantine or a revocation must state a reason: a withdrawal nobody explained
+cannot be reviewed later. An end state is one-way — none of these commands, and
+not `promote`, will reopen one.
+
+`check` reports `brain/record-malformed` for a file it cannot read as a record
+and keeps loading the rest, and `brain/record-secret-suspected` for a record
+that appears to carry a credential. The second names the line and the kind of
+credential, never the value.
 
 `adopt` points the workspace at an existing knowledge repository and reports
 which records do not yet meet the schema. Nothing is rewritten.

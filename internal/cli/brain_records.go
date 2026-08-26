@@ -125,26 +125,56 @@ func sourceReferenceFor(ctx context.Context, ws *workspace.Workspace, owner stri
 	return fmt.Sprintf("%s@%s", owner, revision), nil
 }
 
+// currentRevisionOf reports where the owning repository stands right now, or
+// "" when vat cannot tell. Not being able to see the source is a reason to ask
+// the reviewer, never a reason to assume the evidence held.
+func currentRevisionOf(ctx context.Context, ws *workspace.Workspace, owner string) string {
+	if strings.TrimSpace(owner) == "" {
+		return ""
+	}
+	repo, ok := ws.Manifest.Find(owner)
+	if !ok {
+		return ""
+	}
+	dir := ws.RepoPath(repo)
+	if !fsx.IsDir(dir) {
+		return ""
+	}
+	revision, err := headRevision(ctx, dir)
+	if err != nil {
+		return ""
+	}
+	return revision
+}
+
 func brainPromoteCommand() *Command {
 	return &Command{
 		Name:    "promote",
 		Summary: "Mark a reviewed record as citable",
-		Usage:   "vat brain promote <id> [--reviewer <name>]",
+		Usage:   "vat brain promote <id> [--reviewer <name>] [--reverified]",
 		Long: `Move a record to active after a human has checked it.
 
 A current-state claim with no owner and no source revision cannot be promoted at
 all. That refusal is what makes the promotion gate real rather than an honour
-system: analysis does not become organisational truth because it was useful.`,
+system: analysis does not become organisational truth because it was useful.
+
+vat reads the owning repository to see whether the evidence is still the
+revision the claim was read from. When it is, the observation date moves freely.
+When it has moved — or vat cannot see the repository — the date only moves if
+you pass --reverified, which is you stating that you re-read the source
+yourself. Otherwise one keystroke would re-date a year-old claim as verified
+today.`,
 		Run: func(ctx context.Context, env *Env, args []string) error {
 			set := newFlagSet("brain promote")
 			reviewer := set.String("reviewer", "", "who reviewed it")
+			reverified := set.Bool("reverified", false, "you re-read the source yourself")
 			if err := parseFlags(set, args); err != nil {
 				return err
 			}
 			if set.NArg() != 1 {
 				return usageErrorf("expected exactly one record identifier")
 			}
-			_, store, err := openBrain(env)
+			ws, store, err := openBrain(env)
 			if err != nil {
 				return err
 			}
@@ -152,7 +182,12 @@ system: analysis does not become organisational truth because it was useful.`,
 			if !ok {
 				return usageErrorf("no record with id %q", set.Arg(0))
 			}
-			if err := brain.Promote(store.Root, record, *reviewer, env.Now); err != nil {
+			request := brain.PromoteRequest{
+				Reviewer: *reviewer, Now: env.Now, Reverified: *reverified,
+				RequireReviewer: ws.Manifest.Policy.Gates.BrainPromote == manifest.GateManual,
+				SourceRevision:  currentRevisionOf(ctx, ws, record.OwnedBy),
+			}
+			if err := brain.Promote(store.Root, record, request); err != nil {
 				return err
 			}
 			env.Printer.Status(ui.LevelOK, record.ID,
@@ -183,7 +218,7 @@ made sense.`,
 			if set.NArg() != 2 {
 				return usageErrorf("expected an old identifier and a new one")
 			}
-			_, store, err := openBrain(env)
+			ws, store, err := openBrain(env)
 			if err != nil {
 				return err
 			}
@@ -202,11 +237,18 @@ made sense.`,
 			if previous.ID == replacement.ID {
 				return usageErrorf("%s cannot supersede itself", previous.ID)
 			}
-			if err := brain.Supersede(store.Root, previous, replacement); err != nil {
+			gated := ws.Manifest.Policy.Brain.RequirePromotionGate
+			if err := brain.Supersede(store.Root, previous, replacement,
+				brain.SupersedeOptions{PromotionGated: gated}); err != nil {
 				return err
 			}
 			env.Printer.Status(ui.LevelOK, previous.ID, "superseded by "+replacement.ID)
-			env.Printer.Status(ui.LevelOK, replacement.ID, "active, supersedes "+previous.ID)
+			if gated {
+				env.Printer.Status(ui.LevelOK, replacement.ID, "provisional, supersedes "+previous.ID)
+				env.Printer.Hint("The replacement is not citable until: vat brain promote %s", replacement.ID)
+			} else {
+				env.Printer.Status(ui.LevelOK, replacement.ID, "active, supersedes "+previous.ID)
+			}
 			env.Printer.Hint("Run `vat brain build` to refresh the index.")
 			return nil
 		},

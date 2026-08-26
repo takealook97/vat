@@ -214,7 +214,49 @@ Analysis does not become organisational truth because it was useful. A claim
 about the present with no owner and no source revision cannot be promoted at
 all — the refusal is what makes the gate real rather than decorative.
 
-Promotion stamps the observation date and the reviewer.
+Promotion stamps the observation date and the reviewer, and there are three
+further things it will not do.
+
+**It will not re-date a claim against evidence nobody looked at.** vat reads the
+owning repository. If it is still at the revision the claim was pinned to,
+nothing about the source has changed and the date moves freely. If it has moved
+— or vat cannot see the repository at all — the date only moves with
+`--reverified`, which is you stating you re-read the source. Without that, one
+keystroke turns a four-hundred-day-old sentence into "verified today", which is
+the exact failure the whole layer exists to prevent.
+
+```console
+$ vat brain promote G-0014 --reviewer alex
+error: G-0014: payments has moved since this was observed (pinned 3f9a1c2e8b74,
+  now 9d4e7b1a0c62), so the observation date cannot be advanced.
+  Re-read the source at the new revision, then: vat brain promote G-0014 --reverified
+```
+
+Passing `--reverified` re-pins `source_ref` to the revision you actually read.
+Leaving the old one would date the record today against something nobody opened.
+
+**It will not revive an end state.** A superseded, revoked, or resolved record
+stays that way; if the claim turns out to hold after all, record a new one. A
+tombstone that can be flipped back is not a tombstone.
+
+**It will not accept an unsigned promotion** when
+`policy.gates.brain_promote` is `manual`. A gate nobody has to sign is a note.
+
+The same gate closes the path around it: with
+`policy.brain.require_promotion_gate` set, `vat brain supersede` leaves the
+replacement `provisional` instead of promoting it on the way past.
+
+### What is worth promoting
+
+- a conclusion drawn across two or more repositories
+- a comparison or audit that is expensive to redo
+- anything that changes a goal judgement, a gap, an execution order, or an
+  approval boundary
+- a current-state analysis likely to be asked about repeatedly
+
+### What is not
+
+One-off lookups. Ideas with no evidence. Conversation summaries.
 
 ### What is worth promoting
 
@@ -245,6 +287,45 @@ The original is never edited to say something new — that would destroy the onl
 account of why it once made sense. Both files are updated so the chain reads
 correctly from either end, and `vat brain check` fails on a one-way link or a
 cycle.
+
+---
+
+## Withdrawing, doubting, closing
+
+```console
+$ vat brain quarantine D-0031 --reason "contradicted by the billing export"
+OK    D-0031    quarantined
+
+$ vat brain revoke D-0031 --reason "the export was right; this was never true"
+OK    D-0031    revoked
+
+$ vat brain resolve G-0022
+OK    G-0022    resolved
+```
+
+These states carried check rules and review-queue weights from the first
+release and had no command, so reaching one meant hand-editing the YAML of the
+record whose trustworthiness was already in doubt — the manual step the tool
+exists to remove, performed at the worst possible moment.
+
+A reason is required for a quarantine and a revocation. `resolved` describes a
+gap that has been closed, so only a gap can take it.
+
+---
+
+## Two rules about the records themselves
+
+**A file that cannot be read is a finding, not a crash.** One record with a
+merge conflict marker in its header used to take down `check`, `query`, `sweep`,
+`build`, `doctor`, and `lint` together. Now it is `brain/record-malformed` and
+everything else still loads and still reports.
+
+**A record must not carry a credential.** `brain/record-secret-suspected` names
+the line and the kind of credential and never the value — a finding that repeats
+a secret has published it a second time, somewhere people paste into chat. This
+rule was the one thing the methodology asserted with nothing checking it, and it
+matters most here: a brain repository is exactly what an organisation points a
+search index at.
 
 ---
 

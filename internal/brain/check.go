@@ -48,6 +48,7 @@ func Check(store *Store, policy CheckPolicy, now time.Time) []Finding {
 	index := store.ByID()
 
 	findings = append(findings, checkMalformed(store)...)
+	findings = append(findings, checkSecrets(store)...)
 	findings = append(findings, checkIdentity(store)...)
 	findings = append(findings, checkStatuses(store)...)
 	findings = append(findings, checkProvenance(store, policy, now)...)

@@ -292,7 +292,7 @@ claim_kind: current-state
 	store := reload(t, root)
 
 	// Act
-	err := brain.Promote(root, store.ByID()["G-0001"], "alex", reference)
+	err := brain.Promote(root, store.ByID()["G-0001"], brain.PromoteRequest{Reviewer: "alex", Now: reference})
 
 	// Assert
 	if err == nil {
@@ -310,7 +310,7 @@ func TestPromoteStampsTheObservationDateAndReviewer(t *testing.T) {
 	store := reload(t, root)
 
 	// Act
-	if err := brain.Promote(root, store.ByID()["D-0001"], "alex", reference); err != nil {
+	if err := brain.Promote(root, store.ByID()["D-0001"], brain.PromoteRequest{Reviewer: "alex", Now: reference}); err != nil {
 		t.Fatalf("Promote returned an error: %v", err)
 	}
 
@@ -337,7 +337,7 @@ func TestSupersedeUpdatesBothEndsAndPreservesTheOriginalBody(t *testing.T) {
 	index := store.ByID()
 
 	// Act
-	if err := brain.Supersede(root, index["D-0001"], index["D-0002"]); err != nil {
+	if err := brain.Supersede(root, index["D-0001"], index["D-0002"], brain.SupersedeOptions{}); err != nil {
 		t.Fatalf("Supersede returned an error: %v", err)
 	}
 

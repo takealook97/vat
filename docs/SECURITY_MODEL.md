@@ -204,6 +204,24 @@ own stderr, and the arguments of a failed git command — goes through `Redact`
 first, which masks the userinfo of every URL in the string rather than the first
 one it finds.
 
+### A record is written by a person, so it is checked rather than trusted
+
+Everything above concerns what `vat` itself writes. A brain record is written by
+a human or an agent, and "a record holds no secret" was for a long time a rule
+stated only in prose — which by this project's first rule makes it not a rule.
+It is now `brain/record-secret-suspected`: unmistakable shapes (a PEM private
+key block, a cloud access key id, a provider token, credentials inside a URL)
+fail the check; heuristics such as `api_key = <long value>` warn instead, so a
+rule that fires on ordinary writing does not get switched off.
+
+The finding names the record, the line, and the kind of credential, and never
+the value. A report that repeats a secret has published it a second time,
+somewhere people paste into chat.
+
+This rule earns its place because of where these records go. A knowledge
+repository is precisely the thing an organisation points a search index at, so a
+token pasted into a record becomes a token in a search index.
+
 Nothing `vat` writes contains a secret, so this is not a disclosure path in
 itself. It does mean that on Windows the mode reported by `vat doctor` for a
 credential file describes an attribute, not an access control, and should not be

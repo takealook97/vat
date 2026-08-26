@@ -158,10 +158,80 @@ func SetStatus(root string, record Record, status Status, reason string) error {
 	return fsx.WriteFileAtomic(path, rendered, fsx.DefaultFileMode)
 }
 
+// Retire moves a record out of the answerable set by hand: quarantined for a
+// claim that is suspect, revoked for one that is withdrawn, resolved for a gap
+// that has been closed.
+//
+// These three states carried check rules and review-queue weights from the
+// start, and no command could reach them — so the way to a quarantine ran
+// through hand-editing the YAML of the very record whose trustworthiness was in
+// doubt. Promotion is deliberately not reachable from here: bringing a record
+// back is a review, and a review goes through the gate.
+func Retire(root string, record Record, to Status, reason string) error {
+	switch to {
+	case StatusQuarantined, StatusRevoked, StatusResolved:
+	default:
+		return fmt.Errorf("%s cannot be set by hand; promote a record to make it citable", to)
+	}
+	if record.Status.Terminal() {
+		return fmt.Errorf("%s is already %s; an end state is not reopened, record a new claim instead",
+			record.ID, record.Status)
+	}
+	if to == StatusResolved && record.Kind != KindGap {
+		return fmt.Errorf("%s is a %s; resolved describes a gap that has been closed", record.ID, record.Kind)
+	}
+	if to == StatusQuarantined || to == StatusRevoked {
+		// check already fails on a tombstone with no stated cause. Writing one
+		// and then reporting it is worse than refusing to write it.
+		if strings.TrimSpace(reason) == "" {
+			return fmt.Errorf("%s: a %s record must state a reason, or nobody can review it later",
+				record.ID, to)
+		}
+	}
+	return SetStatus(root, record, to, strings.TrimSpace(reason))
+}
+
+// PromoteRequest is what a promotion has to satisfy before a record becomes
+// citable.
+type PromoteRequest struct {
+	// Reviewer is who checked it.
+	Reviewer string
+	// Now is the date the promotion stamps.
+	Now time.Time
+	// RequireReviewer refuses an unattributed promotion. It carries
+	// policy.gates.brain_promote: a manual gate nobody has to sign is not a
+	// gate, it is a note.
+	RequireReviewer bool
+	// SourceRevision is the revision the owning repository is at right now,
+	// when the caller could read it. Empty means it could not be checked.
+	SourceRevision string
+	// Reverified is the reviewer stating they re-read the source themselves.
+	// It is the only thing that lets an observation date move forward when the
+	// evidence is not demonstrably unchanged.
+	Reverified bool
+}
+
 // Promote moves a record to active, recording who reviewed it and when it was
-// observed. It refuses to promote a claim that has no provenance, which is what
-// makes the promotion gate more than an honour system.
-func Promote(root string, record Record, reviewer string, now time.Time) error {
+// observed.
+//
+// Three refusals are what make this a gate rather than a status field. A claim
+// with no provenance cannot be promoted at all. A withdrawn or replaced record
+// cannot be revived — a tombstone that can be flipped back to active is not a
+// tombstone, and check would then fail forever with no command able to clear
+// it. And a claim about the present cannot have its observation date moved
+// forward unless the evidence is provably unchanged or the reviewer says they
+// re-read it: otherwise a four-hundred-day-old statement becomes "verified
+// today" with one keystroke, which is the exact failure this whole layer exists
+// to prevent.
+func Promote(root string, record Record, request PromoteRequest) error {
+	if record.Status.Terminal() {
+		return fmt.Errorf("%s is %s; record a new claim rather than reviving this one",
+			record.ID, record.Status)
+	}
+	if request.RequireReviewer && strings.TrimSpace(request.Reviewer) == "" {
+		return fmt.Errorf("%s: policy.gates.brain_promote is manual, so a promotion must name its reviewer", record.ID)
+	}
+	metadata := record.Metadata
 	if record.IsCurrentStateClaim() {
 		if strings.TrimSpace(record.SourceRef) == "" {
 			return fmt.Errorf("%s: a current-state claim needs source_ref before it can be promoted", record.ID)
@@ -169,6 +239,11 @@ func Promote(root string, record Record, reviewer string, now time.Time) error {
 		if strings.TrimSpace(record.OwnedBy) == "" {
 			return fmt.Errorf("%s: a current-state claim needs owned_by before it can be promoted", record.ID)
 		}
+		repointed, err := confirmEvidence(record, request)
+		if err != nil {
+			return err
+		}
+		metadata.SourceRef = repointed
 	}
 	path := filepath.Join(root, filepath.FromSlash(record.Path))
 	data, err := os.ReadFile(path)
@@ -176,22 +251,69 @@ func Promote(root string, record Record, reviewer string, now time.Time) error {
 		return fmt.Errorf("read %s: %w", record.Path, err)
 	}
 	doc := frontmatter.Split(string(data))
-	metadata := record.Metadata
 	metadata.Status = StatusActive
-	metadata.ObservedAt = now.Format("2006-01-02")
-	if reviewer != "" {
-		metadata.ReviewedBy = reviewer
+	metadata.ObservedAt = request.Now.Format("2006-01-02")
+	if request.Reviewer != "" {
+		metadata.ReviewedBy = request.Reviewer
 	}
-	rendered, err := frontmatter.Render(metadata, doc.Body)
+	rendered, err := doc.Merge(metadata)
 	if err != nil {
 		return fmt.Errorf("%s: %w", record.Path, err)
 	}
 	return fsx.WriteFileAtomic(path, rendered, fsx.DefaultFileMode)
 }
 
+// confirmEvidence decides whether the observation date may move, and returns
+// the source_ref the promotion should write.
+//
+// Unchanged evidence is the one case where re-dating needs no ceremony: the
+// repository is at the same revision the claim was read from, so nothing about
+// the source has changed since. Everything else — the source moved, or vat
+// could not see it — needs the reviewer to say they looked.
+func confirmEvidence(record Record, request PromoteRequest) (string, error) {
+	repo, revision, filePath, ok := record.SourceParts()
+	if !ok {
+		return "", fmt.Errorf("%s: source_ref %q is not <repo>@<revision>[:<path>]", record.ID, record.SourceRef)
+	}
+	if request.SourceRevision != "" && request.SourceRevision == revision {
+		return record.SourceRef, nil
+	}
+	if !request.Reverified {
+		if request.SourceRevision == "" {
+			return "", fmt.Errorf(
+				"%s: vat could not read %s to confirm the evidence is unchanged.\n"+
+					"  Re-read the source yourself, then: vat brain promote %s --reverified",
+				record.ID, repo, record.ID)
+		}
+		return "", fmt.Errorf(
+			"%s: %s has moved since this was observed (pinned %s, now %s), so the observation date cannot be advanced.\n"+
+				"  Re-read the source at the new revision, then: vat brain promote %s --reverified",
+			record.ID, repo, revision, request.SourceRevision, record.ID)
+	}
+	if request.SourceRevision == "" {
+		return record.SourceRef, nil
+	}
+	// The reviewer read the source as it stands now, so that is the revision
+	// the claim is evidence for. Leaving the old one would date the record
+	// today against a revision nobody looked at.
+	if filePath != "" {
+		return fmt.Sprintf("%s@%s:%s", repo, request.SourceRevision, filePath), nil
+	}
+	return fmt.Sprintf("%s@%s", repo, request.SourceRevision), nil
+}
+
+// SupersedeOptions bounds what superseding is allowed to do beyond linking.
+type SupersedeOptions struct {
+	// PromotionGated keeps the replacement provisional. It carries
+	// policy.brain.require_promotion_gate, and it closes the one path by which
+	// a record used to become canonical without anyone reviewing it: writing a
+	// new decision and superseding an old one with it.
+	PromotionGated bool
+}
+
 // Supersede links a replacement decision to the one it replaces, updating both
 // records so the chain reads correctly from either end.
-func Supersede(root string, previous, replacement Record) error {
+func Supersede(root string, previous, replacement Record, opts SupersedeOptions) error {
 	previousMeta := previous.Metadata
 	previousMeta.Status = StatusSuperseded
 	previousMeta.SupersededBy = replacement.ID
@@ -200,7 +322,7 @@ func Supersede(root string, previous, replacement Record) error {
 	if !contains(replacementMeta.Supersedes, previous.ID) {
 		replacementMeta.Supersedes = append(replacementMeta.Supersedes, previous.ID)
 	}
-	if replacementMeta.Status == StatusProvisional {
+	if replacementMeta.Status == StatusProvisional && !opts.PromotionGated {
 		replacementMeta.Status = StatusActive
 	}
 
