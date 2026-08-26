@@ -32,15 +32,16 @@ func Init(root string, now time.Time) ([]string, error) {
 	}
 
 	files := map[string]string{
-		MarkerFile:                 markerContent(),
-		"AGENTS.md":                agentsContent(),
-		"README.md":                readmeContent(),
-		"GOAL.md":                  projectionStub("Goals", "goal", "What this organisation is trying to become, and how each outcome is judged."),
-		"STATUS.md":                projectionStub("Status", "current-state", "What is actually running right now, with the revision each claim was read from."),
-		"GAP_ANALYSIS.md":          projectionStub("Gap analysis", "gap", "The distance between the goals and the present, one gap at a time."),
-		"ROADMAP.md":               projectionStub("Roadmap", "intent", "What happens next, in dependency order."),
-		"DECISIONS.md":             projectionStub("Decisions", "decision", "Judgements that should not be reversed by accident."),
-		"MEMORY.md":                projectionStub("Memory", "memory", "What changed recently that the next session needs to know."),
+		MarkerFile:        markerContent(),
+		"AGENTS.md":       agentsContent(),
+		"README.md":       readmeContent(),
+		"GOAL.md":         projectionStub("Goals", "goal", "What this organisation is trying to become, and how each outcome is judged."),
+		"STATUS.md":       projectionStub("Status", "current-state", "What is actually running right now, with the revision each claim was read from."),
+		"GAP_ANALYSIS.md": projectionStub("Gap analysis", "gap", "The distance between the goals and the present, one gap at a time."),
+		"ROADMAP.md":      projectionStub("Roadmap", "intent", "What happens next, in dependency order."),
+		"DECISIONS.md":    projectionStub("Decisions", "decision", "Judgements that should not be reversed by accident."),
+		"MEMORY.md": projectionStub("Memory", "memory",
+			"Observations reviewed as worth reaching for again, with what should bring each one back."),
 		"AGENT_OPERATING_MODEL.md": operatingModelContent(),
 		"history/.gitkeep":         "",
 		"archive/.gitkeep":         "",
@@ -77,7 +78,7 @@ decided, and how far the present is from the goal.
 | ` + "`goals/`" + ` | One outcome per file, with the criterion that judges it. |
 | ` + "`gaps/`" + ` | One distance between a goal and the present per file. |
 | ` + "`decisions/`" + ` | One judgement per file. Never rewritten — replaced. |
-| ` + "`memory/YYYY-MM/`" + ` | Dated observations worth carrying forward. |
+| ` + "`memory/YYYY-MM/`" + ` | Reviewed observations worth reaching for again — not session notes. |
 | ` + "`CURRENT.md`" + ` | Generated index. The entry point for every question. |
 | ` + "`graph.json`" + ` | Generated relation graph. Navigation only, never truth. |
 
@@ -120,8 +121,10 @@ func agentsContent() string {
 
 ## What this repository owns
 
-Reviewed organisational facts: goals, gaps, decisions, dated memory. It does not
-own implementation detail, secrets, or any agent's own journal.
+Reviewed organisational facts: goals, gaps, decisions, and observations reviewed
+as reusable. It does not own implementation detail, secrets, an agent's own
+journal, or where the last session got to — those belong to the runtime and to
+the agent's own repository.
 
 ## Write boundary
 

@@ -31,7 +31,12 @@ const (
 	KindGap Kind = "gap"
 	// KindDecision is a judgement that should not be silently reversed.
 	KindDecision Kind = "decision"
-	// KindMemory is a dated observation worth carrying to the next session.
+	// KindMemory is a reviewed observation worth reaching for again: the
+	// situation that should bring it back, and what to do differently when it
+	// does. It is deliberately not a session handoff and not an agent's
+	// journal — those belong to the runtime and to the agent's own repository,
+	// and letting them in here is how a knowledge repository fills with
+	// material nobody can cite.
 	KindMemory Kind = "memory"
 )
 

@@ -159,25 +159,31 @@ check` warns when a `source_ref` names a branch.
 ## Lifecycle
 
 ```text
-            ┌──────────────┐
-   new ────►│ provisional  │──── promote ───┐
-            └──────────────┘                │
-                                            ▼
-            ┌──────────────┐  sweep   ┌──────────┐
-            │    stale     │◄─────────│  active  │
-            └──────┬───────┘          └────┬─────┘
-                   │  promote (re-verified)│
-                   └──────────────►────────┤
-                                           │
-            ┌──────────────┐               │
-            │ quarantined  │◄──────────────┤  suspected wrong
-            └──────┬───────┘               │
-                   │                       │
-                   ▼                       ▼
-            ┌──────────────┐        ┌──────────────┐
-            │   revoked    │        │  superseded  │
-            └──────────────┘        └──────────────┘
+   new ───►┌─────────────┐
+           │ provisional │──────── promote ────────┐
+           └─────────────┘                         │
+                                                   ▼
+           ┌─────────────┐        sweep      ┌───────────┐
+           │    stale    │◄──────────────────│  active   │
+           └──────┬──────┘                   └─────┬─────┘
+                  │  promote --reverified          │
+                  └───────────────►────────────────┤
+                                                   │
+           ┌─────────────┐      quarantine         │
+           │ quarantined │◄────────────────────────┤
+           └──────┬──────┘                         │
+                  │ revoke            supersede / resolve
+                  ▼                                ▼
+   ════════════════════════════════════════════════════════════
+           ┌─────────────┐   ┌──────────────┐   ┌──────────┐
+           │   revoked   │   │  superseded  │   │ resolved │
+           └─────────────┘   └──────────────┘   └──────────┘
 ```
+
+Below the line is one way. Nothing promotes back out — if a withdrawn claim
+turns out to hold, it is recorded again rather than revived, because a tombstone
+that can be flipped is not a tombstone. `vat brain archive` moves these three
+out of the working directories.
 
 | Status | Citable | Meaning |
 | --- | --- | --- |
