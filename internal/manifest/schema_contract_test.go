@@ -131,7 +131,7 @@ func TestThePublishedSchemaEnumsMatchTheValuesVatAccepts(t *testing.T) {
 		return values
 	}
 
-	roles := make([]string, 0)
+	roles := make([]string, 0, len(manifest.Roles()))
 	for _, role := range manifest.Roles() {
 		roles = append(roles, string(role))
 	}
@@ -217,10 +217,11 @@ func TestASavedManifestPointsAtTheSchemaThisRepositoryPublishes(t *testing.T) {
 	// The published file is what the URL resolves to, so its name has to be the
 	// tail of the URL. A schema renamed and a URL left behind is a 404 in
 	// everybody's editor and a green test suite here.
-	name := schemaPath[strings.LastIndex(schemaPath, "/")+1:]
-	if !strings.HasSuffix(manifest.SchemaURL, "/"+name) {
-		t.Errorf("SchemaURL ends %q, but the schema in this repository is named %q",
-			manifest.SchemaURL, name)
+	published := schemaPath[strings.LastIndex(schemaPath, "/")+1:]
+	pointedAt := manifest.SchemaURL[strings.LastIndex(manifest.SchemaURL, "/")+1:]
+	if pointedAt != published {
+		t.Errorf("manifests point at %q, but the schema in this repository is named %q",
+			pointedAt, published)
 	}
 	if id, _ := schema["$id"].(string); id != manifest.SchemaURL {
 		t.Errorf("the schema calls itself %q, manifests point at %q", id, manifest.SchemaURL)
