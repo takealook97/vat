@@ -4,6 +4,34 @@ Notable changes to `vat`. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- Two lint rules that audit the state a workspace is already in, rather than the
+  invocation that creates it. `repo/credential-in-remote` reports a token left in
+  a clone's `.git/config` — the state v0.1.5 produced, and one the remote
+  comparison cannot see because it strips userinfo before comparing, so a
+  token-bearing remote matched the plain manifest origin exactly and nothing
+  reported it. `repo/outside-workspace` reports a governed directory that
+  resolves, through a symlink, outside the root — the class v0.1.2 through
+  v0.1.4 produced, previously diagnosed as "exists but holds no git repository".
+  Neither is repairable: `vat` does not rewrite a remote, and where a repository
+  lives is a decision.
+- `make cover` fails below `COVERAGE_MIN` (80) instead of only printing the
+  figure, and CI runs that target so the threshold lives in one place.
+
+### Changed
+
+- The containment check both the commands and the new lint rule depend on moved
+  to `workspace.Contains`, so an entry-point guard and an audit cannot disagree
+  about what "inside the workspace" means.
+
+### Fixed
+
+- Two doc comments were separated from the functions they document by a blank
+  line, which hides them from `go doc` entirely.
+
 ## [0.1.0] - 2026-08-25
 
 The first release.

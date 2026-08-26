@@ -8,6 +8,7 @@ import (
 	"reflect"
 	"regexp"
 	"sort"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -263,4 +264,31 @@ func yamlFieldNames(value any) []string {
 	}
 	sort.Strings(names)
 	return names
+}
+
+// TestTheReadmeQuotesTheRuleCountItActuallyHas guards a figure that had already
+// drifted before anyone noticed: the sample run in the README said "21 rules"
+// while the tool reported 22, and the reader has no way to tell which is true.
+// The README's console blocks are meant to be output the tool actually prints,
+// so the one number in them that the code can verify is verified here.
+func TestTheReadmeQuotesTheRuleCountItActuallyHas(t *testing.T) {
+	// Arrange
+	content, err := os.ReadFile("../../README.md")
+	if err != nil {
+		t.Fatalf("read README: %v", err)
+	}
+	quoted := regexp.MustCompile(`across (\d+) rules`).FindAllStringSubmatch(string(content), -1)
+	if len(quoted) == 0 {
+		t.Fatal("no rule count found in the README; the sample changed shape and this test stopped checking anything")
+	}
+
+	// Act
+	actual := strconv.Itoa(len(lint.RuleNames()))
+
+	// Assert
+	for _, match := range quoted {
+		if match[1] != actual {
+			t.Errorf("the README says %q but lint reports %s rules", match[0], actual)
+		}
+	}
 }
