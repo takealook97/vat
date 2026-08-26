@@ -98,3 +98,32 @@ func TestContainsRefusesARootThatCannotBeResolved(t *testing.T) {
 		t.Error("an unresolvable root was treated as containing its child")
 	}
 }
+
+func TestTheWorkspaceMethodAndThePackageFunctionAgree(t *testing.T) {
+	// Arrange: the method is what lint calls and the function is what the
+	// commands call. Two entry points to one answer is only safe while they
+	// cannot diverge.
+	root := t.TempDir()
+	inside := filepath.Join(root, "payments")
+	if err := os.MkdirAll(inside, 0o755); err != nil {
+		t.Fatalf("create: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(root, "vat.yaml"),
+		[]byte("version: 1\nworkspace:\n  name: acme\n"), 0o644); err != nil {
+		t.Fatalf("write manifest: %v", err)
+	}
+	ws, err := workspace.OpenAt(root)
+	if err != nil {
+		t.Fatalf("OpenAt: %v", err)
+	}
+
+	// Act & Assert
+	for _, path := range []string{inside, root, t.TempDir()} {
+		if ws.Contains(path) != workspace.Contains(root, path) {
+			t.Errorf("the method and the function disagree about %q", path)
+		}
+	}
+	if !ws.Contains(inside) {
+		t.Error("a directory inside the workspace was reported as outside it")
+	}
+}

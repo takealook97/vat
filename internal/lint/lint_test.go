@@ -259,3 +259,36 @@ func TestEveryReportedRuleIsListedInRuleNames(t *testing.T) {
 		}
 	}
 }
+
+func TestFixableCountsOnlyWhatFixCanActuallyRepair(t *testing.T) {
+	// Arrange: the number is printed as "N of these can be repaired with
+	// vat lint --fix", so counting a finding that --fix will not touch sends
+	// the reader to a command that changes nothing.
+	ws := fixture(t, manifest.Repo{
+		Name:   "payments",
+		Origin: "https://example.invalid/acme/payments.git",
+		Role:   manifest.RoleProduct,
+	})
+
+	// Act
+	report := run(t, ws)
+
+	// Assert
+	counted := 0
+	for _, finding := range report.Findings {
+		if finding.Fixable {
+			counted++
+		}
+	}
+	if report.Fixable() != counted {
+		t.Errorf("Fixable() = %d, but %d findings are marked fixable", report.Fixable(), counted)
+	}
+	if report.Fixable() == 0 {
+		t.Fatal("this fixture used to produce repairable findings; the test no longer proves anything")
+	}
+	for _, finding := range report.Findings {
+		if finding.Fixable && finding.Fix == "" {
+			t.Errorf("finding %q is fixable but names no command", finding.Rule)
+		}
+	}
+}

@@ -3,13 +3,13 @@ package gitx_test
 import (
 	"context"
 	"errors"
+	"fmt"
+	"github.com/takealook97/vat/internal/gitx"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
-
-	"github.com/takealook97/vat/internal/gitx"
 )
 
 func TestSameRemoteAcceptsTheSpellingsOfOneRepository(t *testing.T) {
@@ -423,5 +423,34 @@ func TestCommandErrorCarriesWhatGitSaid(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), "does-not-exist") {
 		t.Errorf("the error does not carry git's own message: %v", err)
+	}
+}
+
+func TestACommandErrorUnwrapsToTheFailureUnderneath(t *testing.T) {
+	// Arrange: Unwrap has no direct caller and never will — errors.Is and
+	// errors.As reach it through the standard interface. That makes it exactly
+	// the kind of contract that can be deleted as "unused" and break a
+	// timeout check somewhere else, so it is asserted here instead.
+	underlying := context.DeadlineExceeded
+	failure := &gitx.CommandError{
+		Args:   []string{"fetch", "origin"},
+		Dir:    "/w/payments",
+		Stderr: "",
+		Err:    underlying,
+	}
+
+	// Act
+	wrapped := fmt.Errorf("update payments: %w", failure)
+
+	// Assert
+	if !errors.Is(wrapped, context.DeadlineExceeded) {
+		t.Error("a timed-out git command does not compare equal to context.DeadlineExceeded through the chain")
+	}
+	var target *gitx.CommandError
+	if !errors.As(wrapped, &target) {
+		t.Fatal("errors.As could not recover the CommandError")
+	}
+	if target.Dir != "/w/payments" {
+		t.Errorf("recovered Dir = %q, want the directory the command ran in", target.Dir)
 	}
 }
