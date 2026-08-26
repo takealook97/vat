@@ -45,6 +45,16 @@ const SkillFile = "SKILL.md"
 // directory.
 var ErrInvalidSkillName = errors.New("invalid skill name")
 
+// SkillRuntimeNames lists every runtime a skill adapter is generated for, in
+// the order they are rendered.
+//
+// It is deliberately shorter than RuntimeNames. Codex discovers a skill through
+// the canonical directory itself and is written no adapter, so `runtimes:
+// [codex]` on a skill selects nothing that exists — the definition is inert,
+// and only a rule that knows this list is shorter can say so. Roles and skills
+// are checked against their own list for that reason.
+func SkillRuntimeNames() []string { return []string{runtimeClaude} }
+
 // TargetsRuntime reports whether an adapter should be generated for a runtime.
 func (s Skill) TargetsRuntime(runtime string) bool {
 	if len(s.Runtimes) == 0 {
@@ -139,9 +149,9 @@ func LoadSkill(path string) (Skill, error) {
 // RenderSkillAdapters returns every runtime adapter a skill should have.
 func RenderSkillAdapters(skill Skill) []Adapter {
 	var adapters []Adapter
-	if skill.TargetsRuntime("claude") {
+	if skill.TargetsRuntime(runtimeClaude) {
 		adapters = append(adapters, Adapter{
-			Runtime: "claude",
+			Runtime: runtimeClaude,
 			Path:    filepath.Join(ClaudeSkillDir, skill.Name, SkillFile),
 			Content: renderClaudeSkill(skill),
 		})

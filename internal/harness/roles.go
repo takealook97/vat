@@ -66,9 +66,18 @@ func (r Role) DisplayTitle() string {
 	return r.Name
 }
 
-// RuntimeNames lists every runtime vat generates an adapter for, in the order
-// the adapters are rendered.
-func RuntimeNames() []string { return []string{"claude", "codex"} }
+// The runtime names vat knows. They are constants because a role, a skill, and
+// the adapters rendered for each must agree on the spelling, and a literal
+// repeated across three files is how they stop agreeing.
+const (
+	runtimeClaude = "claude"
+	runtimeCodex  = "codex"
+)
+
+// RuntimeNames lists every runtime vat generates a role adapter for, in the
+// order the adapters are rendered. SkillRuntimeNames is the shorter list that
+// applies to skills.
+func RuntimeNames() []string { return []string{runtimeClaude, runtimeCodex} }
 
 // TargetedRuntimes returns the runtimes this role generates an adapter for.
 func (r Role) TargetedRuntimes() []string {
@@ -314,16 +323,16 @@ type Adapter struct {
 // RenderAdapters returns every runtime adapter a role should have.
 func RenderAdapters(role Role) []Adapter {
 	var adapters []Adapter
-	if role.TargetsRuntime("claude") {
+	if role.TargetsRuntime(runtimeClaude) {
 		adapters = append(adapters, Adapter{
-			Runtime: "claude",
+			Runtime: runtimeClaude,
 			Path:    filepath.Join(ClaudeAgentDir, role.Name+".md"),
 			Content: renderClaudeAgent(role),
 		})
 	}
-	if role.TargetsRuntime("codex") {
+	if role.TargetsRuntime(runtimeCodex) {
 		adapters = append(adapters, Adapter{
-			Runtime: "codex",
+			Runtime: runtimeCodex,
 			Path:    filepath.Join(CodexAgentDir, codexFileName(role.Name)),
 			Content: renderCodexAgent(role),
 		})
@@ -340,7 +349,7 @@ func renderClaudeAgent(role Role) string {
 	b.WriteString("---\n")
 	b.WriteString("name: " + role.Name + "\n")
 	b.WriteString("description: " + yamlScalar(role.Description) + "\n")
-	if model := role.ModelFor("claude"); model != "" {
+	if model := role.ModelFor(runtimeClaude); model != "" {
 		b.WriteString("model: " + model + "\n")
 	}
 	b.WriteString("---\n\n")
@@ -353,7 +362,7 @@ func renderCodexAgent(role Role) string {
 	b.WriteString("# " + adapterWarning(RolesDir) + "\n")
 	b.WriteString("name = " + tomlString(role.DisplayTitle()) + "\n")
 	b.WriteString("description = " + tomlString(role.Description) + "\n")
-	if model := role.ModelFor("codex"); model != "" {
+	if model := role.ModelFor(runtimeCodex); model != "" {
 		b.WriteString("model = " + tomlString(model) + "\n")
 	}
 	if role.ReasoningEffort != "" {

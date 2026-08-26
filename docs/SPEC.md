@@ -374,6 +374,18 @@ because both look authoritative.
 An implementation **MUST** be able to report an adapter that no longer matches
 what its canonical file would generate.
 
+A definition **MAY** name the runtimes it targets; naming none targets every
+runtime that has an adapter of that kind. The two kinds do not share one set: a
+role has an adapter for Claude Code and for Codex, a skill for Claude Code only,
+because Codex discovers a skill through the canonical directory itself.
+
+An implementation **MUST** report a `runtimes:` value that selects no adapter of
+the kind it appears on — including a runtime the implementation otherwise
+supports. Checking both kinds against one list leaves `runtimes: [codex]` on a
+skill correct in spelling, unsupported in effect, and silent: no adapter means
+no drift to report, so the definition generates nothing while every other check
+passes.
+
 ### 7.1 Models are per runtime
 
 A model name belongs to one vendor's namespace. An implementation **MUST NOT**

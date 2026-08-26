@@ -232,3 +232,79 @@ func TestAnEscapingNameStopsTheLoadRatherThanBeingSkipped(t *testing.T) {
 		t.Errorf("a skill problem was reported as a role problem: %v", err)
 	}
 }
+
+// SkillRuntimeNames is a list, and a list is a claim about behaviour that
+// nothing enforces on its own. It exists so `vat lint` can tell a reader that
+// `runtimes: [codex]` on a skill selects nothing; if it ever disagrees with
+// what RenderSkillAdapters actually produces, the rule built on it starts
+// reporting a healthy definition as inert, or an inert one as healthy.
+func TestSkillRuntimeNamesAreExactlyTheRuntimesThatRenderAnAdapter(t *testing.T) {
+	// Arrange
+	root := t.TempDir()
+	writeSkill(t, root, "targets-everything", `---
+name: targets-everything
+description: Names no runtimes, so it targets all of them.
+---
+
+# Targets everything
+`)
+	skills, _, err := harness.LoadSkills(root)
+	if err != nil {
+		t.Fatalf("LoadSkills: %v", err)
+	}
+
+	// Act
+	rendered := map[string]bool{}
+	for _, adapter := range harness.RenderSkillAdapters(skills[0]) {
+		rendered[adapter.Runtime] = true
+	}
+
+	// Assert
+	listed := map[string]bool{}
+	for _, name := range harness.SkillRuntimeNames() {
+		listed[name] = true
+	}
+	for name := range listed {
+		if !rendered[name] {
+			t.Errorf("SkillRuntimeNames lists %q, but a skill targeting every runtime renders no adapter for it", name)
+		}
+	}
+	for name := range rendered {
+		if !listed[name] {
+			t.Errorf("a skill adapter is rendered for %q, which SkillRuntimeNames does not list", name)
+		}
+	}
+}
+
+// Codex is a runtime vat knows and generates a role adapter for, so the name is
+// not a typo and nothing about the file looks wrong. It still produces no skill
+// adapter, which is precisely why the case needs holding down: the definition
+// is inert and every other signal reads healthy.
+func TestASkillTargetingOnlyCodexRendersNothing(t *testing.T) {
+	// Arrange
+	root := t.TempDir()
+	writeSkill(t, root, "codex-only", `---
+name: codex-only
+description: A procedure this workspace wants only Codex to discover.
+runtimes: [codex]
+---
+
+# Codex only
+`)
+	skills, _, err := harness.LoadSkills(root)
+	if err != nil {
+		t.Fatalf("LoadSkills: %v", err)
+	}
+	if len(skills) != 1 {
+		t.Fatalf("loaded %d skills, want 1", len(skills))
+	}
+
+	// Act
+	adapters := harness.RenderSkillAdapters(skills[0])
+
+	// Assert
+	if len(adapters) != 0 {
+		t.Fatalf("rendered %d adapters for a skill no runtime generates one for, want 0: %+v",
+			len(adapters), adapters)
+	}
+}

@@ -203,6 +203,19 @@ Only Claude Code is given a skill adapter today. Codex discovers a skill through
 the `agents/` file inside the canonical directory, which is part of the skill
 itself rather than something vat generates.
 
+So `runtimes:` on a skill chooses from a shorter list than `runtimes:` on a
+role, and `codex` on a skill selects an adapter that does not exist. The name is
+spelled correctly and is right on a role, so nothing else notices: there is no
+adapter, so there is no drift, and the skill sits on disk generating nothing
+while the report reads green. It is reported for that reason.
+
+```console
+$ vat lint
+WARN  harness/runtime-unknown · codex-only  declares runtime "codex", which generates no skill
+                                            adapter; it is one of claude or nothing at all
+      → correct the runtimes: list, or drop it to target every runtime
+```
+
 ---
 
 ### Drift detection

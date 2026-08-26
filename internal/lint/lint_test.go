@@ -470,3 +470,64 @@ func TestAnUnreadableDefinitionDoesNotSilenceTheOtherHarnessRules(t *testing.T) 
 		t.Errorf("a sound role's missing description was not reported beside it: %+v", report.Findings)
 	}
 }
+
+// Codex is spelled correctly, is a runtime vat supports, and generates a role
+// adapter — so checking a skill against the role list finds nothing wrong with
+// it. No skill adapter is written for Codex, though, so the definition selects
+// nothing that exists: the exact state this rule is documented as catching,
+// reached through a value that is not a typo.
+func TestASkillTargetingARuntimeWithNoSkillAdapterIsReported(t *testing.T) {
+	// Arrange
+	ws := fixture(t)
+	dir := filepath.Join(ws.Root, ".agents", "skills", "codex-only")
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatalf("create: %v", err)
+	}
+	skill := "---\nname: codex-only\ndescription: A procedure only Codex should discover.\nruntimes: [codex]\n---\n\n# Codex only\n"
+	if err := os.WriteFile(filepath.Join(dir, "SKILL.md"), []byte(skill), 0o644); err != nil {
+		t.Fatalf("write: %v", err)
+	}
+
+	// Act
+	report := run(t, ws)
+
+	// Assert
+	finding, found := rules(report)["harness/runtime-unknown"]
+	if !found {
+		t.Fatalf("a skill that generates no adapter went unreported: %+v", report.Findings)
+	}
+	if finding.Subject != "codex-only" {
+		t.Errorf("subject = %q, want the skill's own name", finding.Subject)
+	}
+	if !strings.Contains(finding.Message, "codex") {
+		t.Errorf("the finding does not name the value that selects nothing: %q", finding.Message)
+	}
+	// Reading "no adapter" when a role adapter for codex plainly exists sends
+	// the reader to look for a bug that is not there.
+	if !strings.Contains(finding.Message, "skill adapter") {
+		t.Errorf("the finding does not say which kind of adapter is missing: %q", finding.Message)
+	}
+}
+
+// The counterpart, so the fix cannot be a rule that reports every codex it
+// sees: on a role, codex is exactly right and must stay silent.
+func TestARoleTargetingCodexIsNotReported(t *testing.T) {
+	// Arrange
+	ws := fixture(t)
+	dir := filepath.Join(ws.Root, ".agents", "roles")
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatalf("create: %v", err)
+	}
+	role := "---\nname: planner\ndescription: Plans things.\nruntimes: [codex]\nmodel: gpt-5.6-sol\n---\n\n# Planner\n"
+	if err := os.WriteFile(filepath.Join(dir, "planner.md"), []byte(role), 0o644); err != nil {
+		t.Fatalf("write: %v", err)
+	}
+
+	// Act
+	report := run(t, ws)
+
+	// Assert
+	if finding, found := rules(report)["harness/runtime-unknown"]; found {
+		t.Errorf("a role targeting codex was reported, and codex is what it should target: %q", finding.Message)
+	}
+}
