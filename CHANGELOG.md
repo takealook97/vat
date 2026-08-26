@@ -8,6 +8,14 @@ Notable changes to `vat`. The format follows
 
 ### Added
 
+- `docs/SPEC.md`, the file formats stated normatively, so that reading a vat
+  workspace does not require being vat. A knowledge layer whose whole claim is
+  that it outlives the tool that wrote it has to be implementable by somebody
+  else, and until now the contract lived in Go structs and in prose that
+  described a program rather than specifying a format. Tests compare its
+  enumerations — roles, record statuses, claim kinds, changeset statuses, schema
+  versions — against the packages that own them, because a specification nobody
+  checks is a description of a program that used to exist.
 - `vat ship`, which judges whether a changeset's verified revisions have
   actually landed on the branch each repository ships from. Verifying proves the
   combination works; it says nothing about whether those revisions ever reached

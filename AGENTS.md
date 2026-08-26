@@ -16,9 +16,12 @@ so it has no `vat.yaml` of its own.
 1. `docs/METHODOLOGY.md` — the operating model every command implements. A
    change that contradicts it is either wrong or a deliberate revision of the
    model, and the second needs saying out loud.
-2. The package comment of the package you are changing. Each one states what it
+2. `docs/SPEC.md` — the file formats, normatively. A change to what vat writes
+   on disk is a change to a published contract other tools may already read, so
+   it belongs there in the same commit or it is not finished.
+3. The package comment of the package you are changing. Each one states what it
    owns and why it exists.
-3. `CONTRIBUTING.md` — the design rules this project holds itself to.
+4. `CONTRIBUTING.md` — the design rules this project holds itself to.
 
 ## Boundaries
 

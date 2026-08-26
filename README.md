@@ -130,7 +130,8 @@ current-state claim with no owner and no source cannot be promoted at all.
 Twenty-four checks run over the result.
 
 Portability is the format. Trust is the contract. `vat` is trying to be right
-about the second one.
+about the second one — and [`docs/SPEC.md`](docs/SPEC.md) writes both down
+normatively, so being right about them is not the same as being `vat`.
 
 `vat` is not a build system, and it will not make your agent smarter. It gives
 the agent a boundary it cannot cross by accident, and leaves behind an account
@@ -628,6 +629,7 @@ Everything above is enforced by a command, or it is not in this tool.
 | | |
 | --- | --- |
 | [Methodology](docs/METHODOLOGY.md) | the full operating model this implements |
+| [Spec](docs/SPEC.md) | the file formats, normatively — what another tool needs to read a workspace |
 | [Commands](docs/COMMANDS.md) | every command, flag, and exit code |
 | [Manifest](docs/MANIFEST.md) | `vat.yaml` reference |
 | [Brain](docs/BRAIN.md) | record schema, lifecycle, and the promotion gate |

@@ -73,6 +73,10 @@ Commit messages, code, comments, and documentation are all in English.
   expose: at 80.5% overall, the three packages holding nearly all the logic were
   each under the stated line, floated there by small pure packages in the
   nineties. An average over unequal packages is not a floor.
+- **The spec, when the format changes.** `docs/SPEC.md` is normative and other
+  tools may already read what it describes. A change to a file vat writes
+  belongs there in the same commit; a test compares its enumerations against the
+  code, so an omission fails the suite rather than shipping quietly.
 - **Doc comments on exported names.** Every package has a package comment
   saying what it owns.
 - **Comments that explain why.** The code already says what it does. A comment
