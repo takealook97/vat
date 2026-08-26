@@ -5,11 +5,14 @@ import (
 	"context"
 	"flag"
 	"os"
+	"reflect"
 	"regexp"
 	"sort"
 	"strings"
 	"testing"
 
+	"github.com/takealook97/vat/internal/lint"
+	"github.com/takealook97/vat/internal/manifest"
 	"github.com/takealook97/vat/internal/ui"
 )
 
@@ -188,4 +191,76 @@ func TestTheReferenceStatesTheExitCodesTheCodeUses(t *testing.T) {
 		t.Errorf("exit codes changed (%d/%d/%d) without the reference following",
 			ExitOK, ExitFindings, ExitUsage)
 	}
+}
+
+func TestTheReferenceListsExactlyTheLintRulesThatExist(t *testing.T) {
+	// Arrange: the rule table is the only place a user learns what `vat lint`
+	// can tell them. A rule missing from it is a rule nobody knows to look for,
+	// and a rule listed but absent sends them hunting for output that will
+	// never appear.
+	reference := readReference(t)
+	documented := map[string]bool{}
+	for _, match := range regexp.MustCompile(`(?m)^\| `+"`"+`([a-z]+/[a-z-]+)`+"`").
+		FindAllStringSubmatch(reference, -1) {
+		documented[match[1]] = true
+	}
+	if len(documented) == 0 {
+		t.Fatal("no lint rules found in the reference; the table changed shape and this test stopped checking anything")
+	}
+
+	real := map[string]bool{}
+	for _, name := range lint.RuleNames() {
+		real[name] = true
+	}
+
+	// Act & Assert
+	for name := range real {
+		if !documented[name] {
+			t.Errorf("lint rule %q is not in the reference's rule table", name)
+		}
+	}
+	for name := range documented {
+		if !real[name] {
+			t.Errorf("the reference documents lint rule %q, which lint never reports", name)
+		}
+	}
+}
+
+func TestTheManifestReferenceNamesEveryFieldTheSchemaAccepts(t *testing.T) {
+	// Arrange: an undocumented manifest field is one nobody sets, and vat.yaml
+	// rejects unknown keys, so a field documented but absent produces a hard
+	// parse failure rather than a shrug.
+	content, err := os.ReadFile("../../docs/MANIFEST.md")
+	if err != nil {
+		t.Fatalf("read manifest reference: %v", err)
+	}
+	reference := string(content)
+
+	// Act & Assert
+	for _, field := range yamlFieldNames(manifest.Repo{}) {
+		if !strings.Contains(reference, "`"+field+"`") {
+			t.Errorf("docs/MANIFEST.md never names the repository field %q", field)
+		}
+	}
+	for _, field := range yamlFieldNames(manifest.Workspace{}) {
+		if !strings.Contains(reference, "`"+field+"`") {
+			t.Errorf("docs/MANIFEST.md never names the workspace field %q", field)
+		}
+	}
+}
+
+// yamlFieldNames returns the on-disk names of a struct's serialised fields.
+func yamlFieldNames(value any) []string {
+	structType := reflect.TypeOf(value)
+	names := make([]string, 0, structType.NumField())
+	for i := 0; i < structType.NumField(); i++ {
+		tag := structType.Field(i).Tag.Get("yaml")
+		name, _, _ := strings.Cut(tag, ",")
+		if name == "" || name == "-" {
+			continue
+		}
+		names = append(names, name)
+	}
+	sort.Strings(names)
+	return names
 }
