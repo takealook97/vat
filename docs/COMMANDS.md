@@ -114,7 +114,7 @@ secret value.
 | tools | `git` version; `gh`, `sops`, `age` presence |
 | workspace | manifest validity, root versioning, `.gitignore` coverage |
 | repositories | presence, origin, branch, cleanliness |
-| credentials | files that look like plaintext secrets, encrypted count, age since last change |
+| credentials | files that look like plaintext secrets, encrypted count, age since last change, key material readable by other users |
 | brain | record counts, review queue, generated-file freshness |
 | changesets | open and overdue work |
 | network | `--network` only: whether the GitHub CLI is authenticated, and the platform vat is running on |

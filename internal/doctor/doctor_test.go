@@ -5,6 +5,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -216,5 +217,64 @@ func TestDoctorNeverRepairsWhatItFinds(t *testing.T) {
 	}
 	if string(after) != "# emptied\n" {
 		t.Errorf("doctor modified .gitignore: %q", after)
+	}
+}
+
+func TestKeyMaterialReadableByOthersIsReported(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("file modes are not POSIX on Windows")
+	}
+	// Arrange: encryption is the primary defence and this is the second one — a
+	// decryption key at 0644 is readable by every account on a shared machine.
+	ws := fixture(t, manifest.Repo{
+		Name: "credential", Origin: "https://example.com/acme/credential.git",
+		Role: manifest.RoleCredential,
+	})
+	dir := ws.RepoPath(manifest.Repo{Name: "credential"})
+	if err := os.WriteFile(filepath.Join(dir, "recovery.key"), []byte("KEY"), 0o644); err != nil {
+		t.Fatalf("write: %v", err)
+	}
+
+	// Act
+	report := run(t, ws)
+
+	// Assert
+	finding, found := find(report, "credentials", "permissions")
+	if !found || finding.Status != doctor.StatusFail {
+		t.Fatalf("world-readable key material was not reported: %+v", finding)
+	}
+	if !strings.Contains(finding.Detail, "recovery.key") {
+		t.Errorf("the finding does not name the file: %q", finding.Detail)
+	}
+	if strings.Contains(finding.Detail, "KEY") {
+		t.Errorf("doctor printed the file's contents: %q", finding.Detail)
+	}
+}
+
+func TestCiphertextWithOpenPermissionsIsNotAFinding(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("file modes are not POSIX on Windows")
+	}
+	// Arrange: an encrypted file at 0644 is exactly what encryption is for.
+	// Reporting it would train people to ignore the check.
+	ws := fixture(t, manifest.Repo{
+		Name: "credential", Origin: "https://example.com/acme/credential.git",
+		Role: manifest.RoleCredential,
+	})
+	dir := ws.RepoPath(manifest.Repo{Name: "credential"})
+	if err := os.WriteFile(filepath.Join(dir, "prod.sops.yaml"), []byte("enc"), 0o644); err != nil {
+		t.Fatalf("write: %v", err)
+	}
+
+	// Act
+	report := run(t, ws)
+
+	// Assert
+	finding, found := find(report, "credentials", "permissions")
+	if !found {
+		t.Fatal("the permissions check did not run")
+	}
+	if finding.Status != doctor.StatusOK {
+		t.Errorf("encrypted material was reported as exposed: %+v", finding)
 	}
 }

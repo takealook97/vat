@@ -173,6 +173,11 @@ func RunOne(ctx context.Context, job Job, timeout time.Duration) Result {
 	}
 	cmd.Dir = job.Dir
 	cmd.Env = append(os.Environ(), job.Env...)
+	// A timed-out job must not leave its children running. exec's default
+	// cancellation kills the process it started and nothing beneath it, which
+	// for a shell command is everything that matters.
+	isolateProcessGroup(cmd)
+	cmd.Cancel = func() error { return terminateGroup(cmd) }
 
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout = &stdout

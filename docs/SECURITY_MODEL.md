@@ -35,6 +35,12 @@ is a third, separate approval.
 - files whose names suggest unencrypted secrets
 - how many encrypted files are tracked
 - how long the oldest has gone unchanged
+- key material any other user on the machine can read
+
+The last of those looks at the mode, not the contents, and deliberately ignores
+ciphertext: an encrypted file at `0644` is what encryption is for, and reporting
+it would train you to ignore the check. It applies on Unix only — see
+**Platform limits**.
 
 No value, no key name from inside a file, no path outside the workspace.
 
@@ -106,6 +112,7 @@ their shell script. `vat` does not sandbox it and does not pretend to.
 | returning a changeset | prints the plan; never carries it out |
 | remote mismatch | fails; never rewrites the remote |
 | `doctor` | judges; never repairs |
+| a timed-out command | its whole process group is signalled, so children do not outlive it |
 | `lint --fix` | regenerates only what is generated; never touches a fact or a working tree |
 
 Stashes get special attention because they are invisible to `git status`, which

@@ -289,6 +289,7 @@ func checkSecrets(ws *workspace.Workspace, now time.Time, maxAgeDays int) []Find
 		Section: sectionCredentials, Subject: "encrypted files", Status: StatusOK,
 		Detail: fmt.Sprintf("%d tracked", encrypted),
 	})
+	findings = append(findings, checkCredentialPermissions(dir, credential.Name)...)
 
 	if maxAgeDays > 0 && !oldest.IsZero() {
 		age := int(now.Sub(oldest).Hours() / 24)
@@ -310,6 +311,84 @@ func checkSecrets(ws *workspace.Workspace, now time.Time, maxAgeDays int) []Find
 		}
 	}
 	return findings
+}
+
+// checkCredentialPermissions reports credential material any other user on the
+// machine can read.
+//
+// Encryption is the primary defence and this is the second one: a decryption
+// key or an unencrypted leftover sitting at 0644 is readable by every account
+// on a shared machine. Only the mode is reported, never a file's contents.
+func checkCredentialPermissions(dir, name string) []Finding {
+	if runtime.GOOS == "windows" {
+		// Windows has no POSIX permission bits; os.Chmod there toggles a
+		// read-only attribute, so a mode would describe an attribute rather
+		// than an access control. docs/SECURITY_MODEL.md says so.
+		return nil
+	}
+	var exposed []string
+	_ = filepath.Walk(dir, func(path string, info os.FileInfo, err error) error {
+		if err != nil || info == nil {
+			return nil //nolint:nilerr // an unreadable entry is reported elsewhere
+		}
+		if info.IsDir() {
+			if info.Name() == ".git" {
+				return filepath.SkipDir
+			}
+			return nil
+		}
+		if info.Mode().Perm()&0o077 == 0 {
+			return nil
+		}
+		if !looksLikeKeyMaterial(info.Name()) {
+			return nil
+		}
+		relative, relErr := filepath.Rel(dir, path)
+		if relErr != nil {
+			relative = info.Name()
+		}
+		exposed = append(exposed, fmt.Sprintf("%s (%o)", relative, info.Mode().Perm()))
+		return nil
+	})
+	if len(exposed) == 0 {
+		return []Finding{{
+			Section: sectionCredentials, Subject: "permissions", Status: StatusOK,
+			Detail: "no key material is readable by other users",
+		}}
+	}
+	sort.Strings(exposed)
+	shown := exposed
+	if len(shown) > 5 {
+		shown = shown[:5]
+	}
+	return []Finding{{
+		Section: sectionCredentials, Subject: "permissions", Status: StatusFail,
+		Detail: fmt.Sprintf("%d file(s) readable by other users: %s",
+			len(exposed), strings.Join(shown, ", ")),
+		Fix: fmt.Sprintf("chmod 600 the files above, inside %s", name),
+	}}
+}
+
+// keyMaterialNames are the files whose exposure actually matters: private keys
+// and anything holding a decrypted value. Ciphertext at 0644 is not a finding —
+// that is what encryption is for.
+var keyMaterialNames = []string{
+	".key", ".pem", "id_rsa", "id_ed25519", "id_ecdsa", ".age", "keys.txt",
+	".env", "credentials.json", "service-account.json",
+}
+
+func looksLikeKeyMaterial(name string) bool {
+	for _, marker := range encryptedMarkers {
+		if strings.Contains(name, marker) {
+			return false
+		}
+	}
+	for _, marker := range keyMaterialNames {
+		if strings.Contains(name, marker) {
+			return true
+		}
+	}
+	return false
 }
 
 // plaintextSecretNames are file names that should never appear in a credential

@@ -40,6 +40,10 @@ The first release.
 - `vat fit` — a per-layer break-even advisor that recommends adopting nothing
   until the problem each layer solves is real.
 - `vat completion` for bash, zsh, and fish.
+- A timed-out command has its whole process group signalled, so a hanging check
+  cannot leave children running after the job is reported as failed.
+- `vat doctor` reports key material other users on the machine can read,
+  ignoring ciphertext because that is what encryption is for.
 - `vat exec` executes your command directly rather than re-parsing it through a
   shell, so quoting survives; manifest checks, which are shell fragments by
   contract, still run through one.
