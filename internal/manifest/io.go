@@ -282,6 +282,14 @@ func ValidateRepoName(name string) error {
 	if strings.TrimSpace(name) == "" {
 		return errors.New("name is required")
 	}
+	// A repository name becomes a directory name and a path segment in a remote
+	// URL. Role names and record ids are vat's own artefacts and cap at 64, but
+	// this one has to match what a git host already accepts, and 100 is the
+	// longest GitHub allows. Without a cap, `repo new` accepted a 200-character
+	// name and left the failure to the filesystem.
+	if len(name) > 100 {
+		return errors.New("name may not be longer than 100 characters")
+	}
 	for _, r := range name {
 		switch {
 		case r >= 'a' && r <= 'z', r >= 'A' && r <= 'Z', r >= '0' && r <= '9':

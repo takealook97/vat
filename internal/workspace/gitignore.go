@@ -38,7 +38,7 @@ func RenderGitignoreRegion(m manifest.Manifest) string {
 		b.WriteString(dir)
 		b.WriteString("\n")
 	}
-	b.WriteString("\n# vat'''s own derived, regenerable local state.\n")
+	b.WriteString("\n# vat's own derived, regenerable local state.\n")
 	b.WriteString(".vat/\n")
 	b.WriteString(ignoreEnd)
 	return b.String()

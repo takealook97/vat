@@ -169,3 +169,50 @@ func TestRepoPathContainsAnEscapingRepositoryDirectory(t *testing.T) {
 		t.Errorf("RepoPath escaped the workspace: %q is not under %q", resolved, ws.Root)
 	}
 }
+
+func TestTheManagedRegionReadsAsEnglish(t *testing.T) {
+	// Arrange: this text is committed into every workspace's .gitignore, so a
+	// typo in it is a typo in every user's repository. It said "vat'''s".
+	ws := newWorkspace(t, productRepo("payments"))
+
+	// Act
+	region := workspace.RenderGitignoreRegion(ws.Manifest)
+
+	// Assert
+	if strings.Contains(region, "'''") {
+		t.Errorf("the generated region contains stray apostrophes:\n%s", region)
+	}
+	if !strings.Contains(region, "vat's own derived") {
+		t.Errorf("the note about vat's own state is missing or misspelt:\n%s", region)
+	}
+}
+
+func TestSyncGitignoreKeepsWhatWasThereBefore(t *testing.T) {
+	// Arrange: a workspace root usually has a .gitignore before vat sees it,
+	// and swallowing those lines would be the silent modification this tool
+	// refuses to make.
+	ws := newWorkspace(t, productRepo("payments"))
+	existing := "# mine\nnode_modules/\n*.log\n"
+	if err := os.WriteFile(ws.GitignorePath(), []byte(existing), 0o644); err != nil {
+		t.Fatalf("write: %v", err)
+	}
+
+	// Act
+	if _, err := ws.SyncGitignore(ws.Manifest); err != nil {
+		t.Fatalf("sync: %v", err)
+	}
+
+	// Assert
+	written, err := os.ReadFile(ws.GitignorePath())
+	if err != nil {
+		t.Fatalf("read: %v", err)
+	}
+	for _, line := range []string{"# mine", "node_modules/", "*.log"} {
+		if !strings.Contains(string(written), line) {
+			t.Errorf("the hand-written line %q was lost:\n%s", line, written)
+		}
+	}
+	if !strings.Contains(string(written), "payments/") {
+		t.Errorf("the governed repository was not excluded:\n%s", written)
+	}
+}

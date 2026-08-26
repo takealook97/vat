@@ -448,3 +448,21 @@ func TestAnOriginCarryingACredentialIsRejected(t *testing.T) {
 		t.Errorf("the refusal quoted the credential back: %v", err)
 	}
 }
+
+func TestARepositoryNameHasALengthTheFilesystemCanHold(t *testing.T) {
+	// Arrange: the name becomes a directory and a URL path segment. With no cap
+	// `repo new` accepted a 200-character name and left the failure to the
+	// filesystem, which reports it as something else entirely.
+	long := strings.Repeat("a", 101)
+
+	// Act & Assert
+	if err := ValidateRepoName(long); err == nil {
+		t.Error("a 101-character repository name was accepted")
+	}
+	if err := ValidateRepoName(strings.Repeat("a", 100)); err != nil {
+		t.Errorf("a 100-character name, which GitHub allows, was rejected: %v", err)
+	}
+	if err := ValidateRepoName("payments"); err != nil {
+		t.Errorf("an ordinary name was rejected: %v", err)
+	}
+}

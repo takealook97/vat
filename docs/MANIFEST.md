@@ -193,6 +193,13 @@ update forever, reported as "on another branch" — a note nobody reads. Declari
 it turns a silent skip into a real update. `vat lint` reports the mismatch, and
 `vat init --adopt` records it for you.
 
+### Names
+
+A repository name may hold only letters, digits, `.`, `_`, and `-`, and may not
+exceed 100 characters — the longest a git host accepts. It becomes a directory
+name and a path segment in a remote URL, so it is checked before either is
+built rather than when the manifest is saved.
+
 ### `origin` records identity, never access
 
 An origin carrying a credential — `https://user:token@host/repo.git` — is
