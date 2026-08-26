@@ -14,6 +14,13 @@ coverage.html
 # Local, derived state
 .vat/
 
+# Coding-agent session state. These hold transcripts, checkpoints, and replay
+# logs of whatever was being worked on, so they are both noise in a diff and
+# the kind of thing that must never reach a public history by accident.
+.omc/
+.claude/state/
+.hermes/
+
 # Editor and OS noise
 .DS_Store
 *.swp
