@@ -190,6 +190,7 @@ func RuleNames() []string {
 		"brain/source-repo-unknown",
 		"changeset/open-too-long",
 		"changeset/invalid",
+		"changeset/closed-unlanded",
 	}
 }
 
@@ -614,6 +615,23 @@ func checkChangesets(ws *workspace.Workspace, now time.Time) ([]Finding, error) 
 				Rule: "changeset/invalid", Severity: SeverityError, Subject: set.ID,
 				Message: problem,
 			})
+		}
+		// `--force` exists because a real workspace sometimes has to close a
+		// record the tool cannot fully confirm. What it must not do is make
+		// that indistinguishable from a change that actually shipped, so the
+		// gap is reported rather than forgotten at the moment it is waived.
+		if set.Status == changeset.StatusClosed && !set.FullyLanded() {
+			for _, participant := range set.Repositories {
+				if participant.Landed() {
+					continue
+				}
+				findings = append(findings, Finding{
+					Rule: "changeset/closed-unlanded", Severity: SeverityWarn,
+					Subject: set.ID + " · " + participant.Name,
+					Message: "closed, but this repository's revision was never observed on the branch it ships from",
+					Fix:     fmt.Sprintf("vat ship %s", set.ID),
+				})
+			}
 		}
 		if !set.Status.Open() || policy.MaxOpenDays <= 0 {
 			continue

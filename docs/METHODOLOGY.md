@@ -337,6 +337,8 @@ plus a closing gate**:
 - record where each one stood, because after the change it can no longer be
   observed
 - verify in dependency order and record the exact revision each check ran on
+- confirm each verified revision actually reached the branch its repository
+  ships from, because verified and shipped are different claims
 - close only with a single end-to-end outcome — every repository's own checks
   passing is not the same as the pieces working together
 - never declare completion when a step failed
@@ -345,6 +347,31 @@ Without this record, "which three revisions were verified together?" is
 unanswerable within weeks, and reverting becomes archaeology. `vat changeset`
 is that record, and it generates the return plan in reverse enrolment order so
 no window exists where a consumer expects an interface that is already gone.
+
+### 7.1 The landing gate is git, not a forge
+
+The last step is the one most easily faked. "We tested it" and "it shipped" feel
+like the same sentence on the day, and read as the same claim forever after —
+which is how a workspace becomes certain about a change still sitting on
+somebody's branch.
+
+The gate must therefore be observable, and it must be observable **everywhere**.
+A pull request is not: GitHub, GitLab, and Gerrit each name and model one
+differently, so gating on it buys a vendor dependency and answers the wrong
+question anyway, because an open pull request is precisely the state of not
+having landed.
+
+What holds on every forge, and on a bare remote on a machine you own, is one
+git question:
+
+```
+git -C <repo> merge-base --is-ancestor <verified-revision> <remote>/<default-branch>
+```
+
+`vat ship` asks it for every participating repository and records the answer.
+Nothing is pushed and nothing is merged — landing the work stays a human act,
+and the tool's job is to refuse to pretend it happened. A pull request URL is
+kept beside the revision as evidence, never as the gate.
 
 ---
 

@@ -70,7 +70,7 @@ WARN  brain/source-revision-drift · G-0014     payments has moved 47 commits si
 WARN  changeset/open-too-long · CS-0007        open for 31 days, past the 14-day limit; repositories are mid-contract-change with no closing evidence
 
 Result
-FAIL  lint                      2 errors, 2 warnings across 26 rules
+FAIL  lint                      2 errors, 2 warnings across 27 rules
 2 of these can be repaired with `vat lint --fix`.
 ```
 
@@ -229,7 +229,7 @@ INFO  console                   return point 8b2e0d19
 **5 · Do the work.** In the repositories, with git, as normal — `vat` is not in
 that loop and does not want to be. `vat status` is how you see all of it at once.
 
-**6 · Verify each repository, then verify the whole.**
+**6 · Verify, land, then close.**
 
 ```console
 $ vat changeset verify CS-0001
@@ -237,12 +237,18 @@ OK    payments · make check     14.2s at a71c93d0
 OK    console · pnpm test       31.8s at 5c1f80ab
 OK    CS-0001                   every repository verified
 
+$ vat ship CS-0001
+OK    payments                  landed on origin/main
+FAIL  console                   5c1f80ab is not on origin/main; verified but not landed
+
 $ vat changeset close CS-0001 --acceptance "cancel-then-refund passes end to end"
 ```
 
-Every repository's own suite passing is not the same as the pieces working
-together, and that gap is where multi-repo changes actually break. Closing
-refuses without the second claim.
+Three different claims, and a workspace that collapses them is confidently wrong
+about at least one. Checks passing is not the pieces working together — that gap
+is where multi-repo changes actually break, and `--acceptance` is required
+because of it. And neither is shipping: `vat ship` asks the one git question that
+means it landed, whichever forge you use.
 
 **7 · Record why, not just what.**
 
@@ -407,12 +413,23 @@ OK    payments · make check     14.2s at a71c93d0
 OK    console · pnpm test       31.8s at 5c1f80ab
 OK    CS-0001                   every repository verified
 
+$ vat ship CS-0001
+OK    payments                  landed on origin/main
+OK    console                   landed on origin/main
+
 $ vat changeset close CS-0001 --acceptance "cancel-then-refund passes end to end"
 ```
 
 `--acceptance` is required, and it must describe something end to end. Every
 repository's own checks passing is not the same as the pieces working together —
 that gap is precisely where multi-repo changes break.
+
+`vat ship` closes the other gap. Verified means the checks passed; it says
+nothing about whether those revisions reached anybody else. The test is whether
+each one is an ancestor of the branch its repository ships from — plain git, so
+it answers the same on GitHub, GitLab, Gitea, or a bare remote. A pull request
+is recorded as evidence and is never the gate, because every forge models one
+differently and an open one is exactly the state of not having landed.
 
 Months later, the question that was previously unanswerable:
 
@@ -497,6 +514,7 @@ never declared one.
 | `vat harness` | `render` `check` `roles` `role new` |
 | `vat brain` | `init` `new` `build` `check` `query` `review` `sweep` `promote` `supersede` `adopt` |
 | `vat changeset` | `new` `add` `verify` `show` `list` `close` `abandon` `undo-plan` |
+| `vat ship` | judge whether a changeset's verified revisions have actually landed |
 | `vat evidence` | `new` `show` `list` `check` |
 | `vat metrics` | measure whether the discipline is holding |
 | `vat fit` | decide which layers are worth adopting yet |

@@ -630,6 +630,8 @@ func TestChangesetVerifyRefusesOnAClosedChangeset(t *testing.T) {
 	commitAll(t, h, "payments")
 	h.mustRun("changeset", "new", "Do a thing", "--repos", "payments")
 	h.mustRun("changeset", "verify", "CS-0001")
+	landOnUpstream(t, h, "payments")
+	h.mustRun("ship", "CS-0001", "--offline")
 	h.mustRun("changeset", "close", "CS-0001", "--acceptance", "it works end to end")
 
 	// Act

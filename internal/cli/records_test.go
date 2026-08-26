@@ -372,6 +372,8 @@ func TestAVerifiedChangesetClosesAndStopsBeingOpen(t *testing.T) {
 	addCheck(t, h, "payments", "echo ok")
 	h.mustRun("changeset", "new", "Move cancellation to v2", "--repos", "payments")
 	h.mustRun("changeset", "verify", "CS-0001")
+	landOnUpstream(t, h, "payments")
+	h.mustRun("ship", "CS-0001", "--offline")
 
 	// Act
 	h.mustRun("changeset", "close", "CS-0001",

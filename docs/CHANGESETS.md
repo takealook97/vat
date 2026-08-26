@@ -50,10 +50,37 @@ A changeset that is already closed also refuses: re-verifying would rewrite its
 status while its closing evidence stayed in the file, leaving a record claiming
 both at once.
 
+Verifying is not shipping. The checks passing proves the combination works; it
+says nothing about whether those revisions ever reached anybody else.
+
+```console
+$ vat ship CS-0001
+OK    payments                  landed on origin/main
+FAIL  console                   5c1f80ab is not on origin/main; verified but not landed
+
+Result
+FAIL  ship                      1 repository of 2 not landed
+```
+
+The test is whether each verified revision is an ancestor of the branch its
+repository ships from — one git question, with the same answer on GitHub,
+GitLab, Gitea, and a bare remote on a machine you own. vat pushes nothing and
+merges nothing; it judges, and landing the work stays yours.
+
+**A pull request is not the gate.** Every forge models one differently, so
+gating on one would buy a dependency and tie the record to a vendor — and an
+open pull request is precisely the state of *not* having landed. Supply one and
+it is recorded as evidence beside the revision; the gate stays plain git.
+
 ```console
 $ vat changeset close CS-0001 --acceptance "cancel-then-refund passes end to end"
 OK    CS-0001                   closed
 ```
+
+`close` refuses a changeset that has not landed, and points at `vat ship`.
+`--force` still closes it — a real workspace sometimes has to — and
+`changeset/closed-unlanded` then reports the gap, so a waiver stays visible
+instead of becoming indistinguishable from a change that shipped.
 
 `--acceptance` is required. Every repository's own checks passing is not the
 same as the pieces working together, and that gap is exactly where
@@ -89,6 +116,9 @@ repositories:
         status: pass
         ran_at: 2026-08-14T09:12:44Z
         revision: a71c93d0e5f218
+    landed_on: origin/main
+    landed_at: 2026-08-14
+    review: https://github.com/acme/payments/pull/318
 
   - name: console
     rollback_point: 8b2e0d19c4a077
@@ -99,7 +129,15 @@ repositories:
         status: pass
         ran_at: 2026-08-14T09:13:22Z
         revision: 5c1f80ab3d9e61
+    landed_on: origin/main
+    landed_at: 2026-08-14
 ```
+
+`revision` is what the checks ran on. `landed_on` is where that revision was
+later observed. Keeping them apart is the whole point: one is "we proved it",
+the other is "it reached everyone", and collapsing them is how a workspace ends
+up certain about a change that never shipped. `review` is optional evidence —
+recorded, never required, and never the gate.
 
 Plain YAML, committed with the workspace. Safe to edit by hand; `vat lint`
 checks it.
@@ -138,6 +176,7 @@ emit a half-plan.
 | the same repository enrolled twice | contradictory records for one repository |
 | closing with no `integration_acceptance` | mistaking per-repository green for a working system |
 | closing while a repository has no passing checks at a known revision | evidence-free completion |
+| closing while a revision was never observed on the branch it ships from | a completion record for work still sitting on a branch |
 | a single-repository changeset | ceremony where a commit would do |
 | open past `max_open_days` | repositories mid-contract-change with no closing evidence |
 

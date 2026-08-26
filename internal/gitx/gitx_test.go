@@ -454,3 +454,54 @@ func TestACommandErrorUnwrapsToTheFailureUnderneath(t *testing.T) {
 		t.Errorf("recovered Dir = %q, want the directory the command ran in", target.Dir)
 	}
 }
+
+// Landing is judged with this and nothing else, so its edges are the edges of
+// the whole shipping gate: a revision nobody pushed, a branch that was rewound
+// under it, and a revision that no longer exists at all must each come back as
+// "not landed" rather than as an error.
+func TestIsAncestorAnswersTheQuestionTheShippingGateAsks(t *testing.T) {
+	// Arrange
+	dir := newRepo(t)
+	ctx := context.Background()
+	first, err := gitx.HeadRevision(ctx, dir)
+	if err != nil {
+		t.Fatalf("HeadRevision: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "README.md"), []byte("two\n"), 0o644); err != nil {
+		t.Fatalf("write: %v", err)
+	}
+	run(t, dir, "commit", "--quiet", "-am", "second")
+	second, err := gitx.HeadRevision(ctx, dir)
+	if err != nil {
+		t.Fatalf("HeadRevision: %v", err)
+	}
+
+	// Act & Assert: an earlier revision is reachable from a later one.
+	landed, err := gitx.IsAncestor(ctx, dir, first, second)
+	if err != nil {
+		t.Fatalf("IsAncestor returned an error: %v", err)
+	}
+	if !landed {
+		t.Error("the first commit is an ancestor of the second and was not reported as one")
+	}
+
+	// A later revision is not reachable from an earlier one: this is the
+	// verified-but-not-landed case, and it is not a failure.
+	landed, err = gitx.IsAncestor(ctx, dir, second, first)
+	if err != nil {
+		t.Fatalf("IsAncestor returned an error for a plain negative: %v", err)
+	}
+	if landed {
+		t.Error("the second commit was reported as an ancestor of the first")
+	}
+
+	// A revision that is not there at all is the force-pushed case. Reporting
+	// it as an error would turn a rewritten branch into a broken command.
+	landed, err = gitx.IsAncestor(ctx, dir, "0000000000000000000000000000000000000000", second)
+	if err != nil {
+		t.Fatalf("a missing revision must not be an error: %v", err)
+	}
+	if landed {
+		t.Error("a revision that does not exist was reported as landed")
+	}
+}

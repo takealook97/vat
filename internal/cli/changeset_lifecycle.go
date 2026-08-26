@@ -175,6 +175,19 @@ naming the outcome loses the only record of whether anyone checked.`,
 				}
 				return findingsErrorf("Run `vat changeset verify %s` first, or pass --force.", current.ID)
 			}
+			// Verified is not shipped. Closing on checks alone produced a record
+			// saying a change was released while its revisions sat on branches
+			// nobody else could see — and that record is the thing a reader six
+			// weeks later has no way to doubt.
+			if !current.FullyLanded() && !*force {
+				for _, participant := range current.Repositories {
+					if !participant.Landed() {
+						env.Printer.Status(ui.LevelFail, participant.Name,
+							"verified, but the revision has not been observed on the branch it ships from")
+					}
+				}
+				return findingsErrorf("Run `vat ship %s` once the work has landed, or pass --force.", current.ID)
+			}
 			current.Status = changeset.StatusClosed
 			current.Acceptance = *acceptance
 			current.ApprovedBy = *approvedBy

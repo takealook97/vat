@@ -158,8 +158,13 @@ func runChangesetVerify(ctx context.Context, env *Env, args []string) error {
 		return findingsErrorf("")
 	}
 	env.Printer.Status(ui.LevelOK, current.ID, "every repository verified")
-	env.Printer.Hint("\nStill needed before closing: the one end-to-end outcome that proves")
-	env.Printer.Hint("the pieces work together.")
+	// Naming `close` here sent the reader at a command that now refuses, because
+	// verified is not landed. A hint that walks into a refusal is the same
+	// defect wherever it appears: the tool advertising a step it will reject.
+	env.Printer.Hint("\nStill needed before closing:")
+	env.Printer.Hint("  vat ship %s", current.ID)
+	env.Printer.Hint("      — these revisions have to reach the branches they ship from")
 	env.Printer.Hint("  vat changeset close %s --acceptance \"...\"", current.ID)
+	env.Printer.Hint("      — the one end-to-end outcome that proves the pieces work together")
 	return nil
 }

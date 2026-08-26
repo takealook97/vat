@@ -69,7 +69,23 @@ type Participant struct {
 	Branch   string     `yaml:"branch,omitempty" json:"branch,omitempty"`
 	Checks   []CheckRun `yaml:"checks,omitempty" json:"checks,omitempty"`
 	Notes    string     `yaml:"notes,omitempty" json:"notes,omitempty"`
+	// LandedOn is the ref the verified revision was found to be an ancestor of,
+	// and LandedAt is when that was observed. Verifying a revision proves the
+	// checks passed on it; it says nothing about whether that revision ever
+	// reached the branch the repository ships from. Recording the two
+	// separately is what stops "we tested it" from being read as "we shipped
+	// it" six weeks later.
+	LandedOn string `yaml:"landed_on,omitempty" json:"landed_on,omitempty"`
+	LandedAt string `yaml:"landed_at,omitempty" json:"landed_at,omitempty"`
+	// Review is the forge's own record — a pull request, a merge request, a
+	// change. It is evidence, never the gate: every forge names it differently
+	// and vat refuses to depend on any of them.
+	Review string `yaml:"review,omitempty" json:"review,omitempty"`
 }
+
+// Landed reports whether the verified revision was observed on the branch this
+// repository ships from.
+func (p Participant) Landed() bool { return p.LandedOn != "" }
 
 // Verified reports whether every recorded check for this repository passed and
 // the revision they ran against is known.
@@ -253,6 +269,25 @@ func (c Changeset) FullyVerified() bool {
 	}
 	for _, participant := range c.Repositories {
 		if !participant.Verified() {
+			return false
+		}
+	}
+	return true
+}
+
+// FullyLanded reports whether every participating repository's verified
+// revision was observed on the branch it ships from.
+//
+// Verification and landing are deliberately separate questions. Checks passing
+// on a revision proves the combination works; it says nothing about whether
+// that revision ever reached anyone else's default branch. A changeset closed
+// on the first without the second is a claim that outran its evidence.
+func (c Changeset) FullyLanded() bool {
+	if len(c.Repositories) == 0 {
+		return false
+	}
+	for _, participant := range c.Repositories {
+		if !participant.Landed() {
 			return false
 		}
 	}

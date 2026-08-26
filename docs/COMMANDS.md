@@ -158,6 +158,7 @@ The rules, and what each one prevents:
 | `brain/source-revision-drift` | warn | a claim whose evidence moved on months ago |
 | `brain/source-repo-unknown` | warn | a claim pointing at a repository that is not governed |
 | `changeset/invalid` | error | a completion record that cannot be acted on |
+| `changeset/closed-unlanded` | warn | a changeset closed with `--force` whose revisions never reached a default branch |
 | `changeset/open-too-long` | warn | repositories mid-contract-change with no closing evidence |
 
 `--fix` repairs only what can be repaired without judgement: it regenerates what
@@ -388,6 +389,52 @@ for it in `--json` gets the same answer the table shows.
 point, in reverse enrolment order. `vat` prints and never runs it.
 
 See [CHANGESETS.md](CHANGESETS.md).
+
+---
+
+## vat ship
+
+```
+vat ship <id> [--remote <name>] [--offline]
+```
+
+Report, per repository, whether the revision a changeset verified has reached
+the branch that repository ships from. `vat` pushes nothing and merges nothing:
+this judges, the way `doctor` judges.
+
+The test is one git question — is the verified revision an ancestor of
+`<remote>/<default-branch>` — so it has the same answer on GitHub, GitLab,
+Gitea, and a bare remote on a server you own. A pull request is recorded as
+evidence when you supply one and is never the gate; an open pull request is
+precisely the state of not having landed.
+
+```console
+$ vat ship CS-0007
+OK    payments                  landed on origin/main
+FAIL  console                   9f2a1c4 is not on origin/main; verified but not landed
+
+Result
+FAIL  ship                      1 repository of 2 not landed
+Land the outstanding work, then run this again.
+```
+
+| Exit | Meaning |
+| --- | --- |
+| 0 | every repository landed |
+| 1 | at least one has not, or the changeset is not verified yet |
+| 2 | no such changeset, none enrolled, or the changeset is already finished |
+
+What was observed is written back to the changeset — `landed_on` and `landed_at`
+per repository — including a partial result, because a half-landed change is the
+state somebody needs to see the next morning. A previous run's answer is cleared
+first: landing is a claim about now, and a stale one on a force-pushed branch is
+the worst thing this record could say.
+
+`--offline` judges against refs already fetched, without contacting the remote.
+
+`vat changeset close` refuses a changeset that has not landed, and points here.
+`--force` still closes it, and `changeset/closed-unlanded` then reports the gap
+rather than letting the waiver disappear.
 
 ---
 

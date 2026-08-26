@@ -176,6 +176,34 @@ func AheadBehind(ctx context.Context, dir, local, upstream string) (Divergence, 
 	return Divergence{Ahead: ahead, Behind: behind}, nil
 }
 
+// IsAncestor reports whether one revision is reachable from another.
+//
+// This is what lets vat judge that a change has actually landed without asking
+// a forge anything. A pull request is a vendor's idea — GitHub names it one
+// thing, GitLab another, Gerrit a third — but "the verified revision is an
+// ancestor of the branch this repository ships from" is the same sentence
+// everywhere git runs, and it is exactly the sentence a changeset is making.
+//
+// A revision that is not present at all is reported as not an ancestor rather
+// than as an error: a rewritten, dropped, or never-pushed commit is precisely
+// the case the caller needs to hear about, and it is not a malfunction.
+func IsAncestor(ctx context.Context, dir, ancestor, descendant string) (bool, error) {
+	if !RevisionExists(ctx, dir, ancestor) || !RevisionExists(ctx, dir, descendant) {
+		return false, nil
+	}
+	if _, err := Run(ctx, dir, "merge-base", "--is-ancestor", ancestor, descendant); err != nil {
+		// git exits 1 for "not an ancestor" and prints nothing. Anything
+		// carrying stderr is a real failure and must not be reported as a
+		// clean negative, or a broken repository reads as an unshipped one.
+		var cmdErr *CommandError
+		if errors.As(err, &cmdErr) && strings.TrimSpace(cmdErr.Stderr) == "" {
+			return false, nil
+		}
+		return false, err
+	}
+	return true, nil
+}
+
 // Fetch updates remote-tracking refs and prunes deleted ones.
 func Fetch(ctx context.Context, dir, remote string) error {
 	_, err := Run(ctx, dir, "fetch", remote, "--prune", "--quiet")
