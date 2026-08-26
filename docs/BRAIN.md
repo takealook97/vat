@@ -81,7 +81,7 @@ brain/
 ├── gaps/G-0001-....md
 ├── decisions/D-0001-....md
 ├── memory/2026-08/M-0001-....md
-├── history/
+├── history/                  long-form past material, written by people
 └── archive/decisions/D-0002-....md   records that reached an end state
 ```
 
@@ -359,6 +359,13 @@ both ends — but it is out of the entry point, out of the default search surfac
 and in one directory an external index can exclude wholesale.
 
 Relative links inside a moved record are repointed so they still resolve.
+
+`history/` is the other half of that separation and vat never writes to it. It
+is where people put long-form past material — the analysis a decision was drawn
+from, a narrative that has been overtaken — so that it stays searchable under
+`--all` without sitting in the surface that answers ordinary questions. vat
+creating it and filling it would make it a second archive with no rule
+governing what belongs there.
 
 ---
 

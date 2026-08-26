@@ -81,6 +81,8 @@ decided, and how far the present is from the goal.
 | ` + "`memory/YYYY-MM/`" + ` | Reviewed observations worth reaching for again — not session notes. |
 | ` + "`CURRENT.md`" + ` | Generated index. The entry point for every question. |
 | ` + "`graph.json`" + ` | Generated relation graph. Navigation only, never truth. |
+| ` + "`archive/`" + ` | Records that reached an end state. Moved here by ` + "`vat brain archive`" + `. |
+| ` + "`history/`" + ` | Long-form past material you put here yourself. vat never writes to it. |
 
 ## Rules that are enforced, not suggested
 
