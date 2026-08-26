@@ -94,8 +94,10 @@ jobs:
           git config --global user.email "ci@example.com"
           git config --global init.defaultBranch main
 
-      # make cover, not a bare go test: the threshold lives in one place so a
-      # local run and CI cannot disagree about whether a change passes.
+      # make cover, not a bare go test: the thresholds live in one place so a
+      # local run and CI cannot disagree about whether a change passes. It
+      # gates the total and each package separately — a total is an average,
+      # and an average over unequal packages hides the ones that matter.
       - name: Measure coverage
         run: make cover
 

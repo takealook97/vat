@@ -26,7 +26,7 @@ configured.
 ```bash
 make help      # every available target
 make test      # the suite, with the race detector
-make cover     # coverage per package
+make cover     # coverage: 80% overall, and no package below 75%
 make lint      # golangci-lint alone; `make check` already runs it
 ```
 
@@ -68,6 +68,11 @@ Commit messages, code, comments, and documentation are all in English.
   A bug fix without a regression test is an invitation for the bug to return.
 - **`make check` passing.** Formatting, vet, the linter, the race-enabled
   suite, and a build. This is the canonical proof; nothing else counts as one.
+- **Coverage holding.** `make cover` enforces 80% overall *and* a 75% floor per
+  package. The second exists because the first was hiding what it was meant to
+  expose: at 80.5% overall, the three packages holding nearly all the logic were
+  each under the stated line, floated there by small pure packages in the
+  nineties. An average over unequal packages is not a floor.
 - **Doc comments on exported names.** Every package has a package comment
   saying what it owns.
 - **Comments that explain why.** The code already says what it does. A comment
