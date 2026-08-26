@@ -137,7 +137,10 @@ func renderLintReport(env *Env, report lint.Report) {
 		pluralise(warnings, "warning", "warnings"),
 		pluralise(report.Checked, "rule", "rules")))
 	if fixable := report.Fixable(); fixable > 0 {
-		printer.Hint("%s can be repaired with `vat lint --fix`.",
-			pluralise(fixable, "one of these", "of these"))
+		if fixable == 1 {
+			printer.Hint("One of these can be repaired with `vat lint --fix`.")
+		} else {
+			printer.Hint("%d of these can be repaired with `vat lint --fix`.", fixable)
+		}
 	}
 }

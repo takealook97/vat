@@ -272,8 +272,11 @@ func checkRepositories(ctx context.Context, ws *workspace.Workspace) []Finding {
 			if err == nil && current != "" && current != ws.Manifest.Workspace.DefaultBranch {
 				findings = append(findings, Finding{
 					Rule: "repo/default-branch-missing", Severity: SeverityWarn, Subject: repo.Name,
-					Message: fmt.Sprintf("checked out on %q but declares no default_branch, so sync will skip it silently", current),
-					Fix:     fmt.Sprintf("set default_branch: %s in %s", current, manifest.FileName),
+					Message: fmt.Sprintf(
+						"checked out on %q while the workspace default is %q, and it declares no default_branch of its own; if %q is this repository's real default, sync skips it silently forever",
+						current, ws.Manifest.Workspace.DefaultBranch, current),
+					Fix: fmt.Sprintf("if that is its default, set default_branch: %s in %s; if it is a working branch, nothing to do",
+						current, manifest.FileName),
 				})
 			}
 		}

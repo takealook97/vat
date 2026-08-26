@@ -232,8 +232,7 @@ func syncOne(ctx context.Context, ws *workspace.Workspace, repo manifest.Repo, r
 	case divergence.Diverged():
 		return Result{Repo: name, State: StateDiverged, Branch: branch, Revision: revision,
 			Ahead: divergence.Ahead, Behind: divergence.Behind,
-			Detail: "history diverged; inspect with `git -C " + repo.Dir() +
-				" log --oneline --left-right HEAD..." + upstream + "`"}
+			Detail: "history diverged; see git log --left-right HEAD..." + upstream}
 	case divergence.Ahead > 0:
 		return Result{Repo: name, State: StateAhead, Branch: branch, Revision: revision,
 			Ahead: divergence.Ahead, Detail: "local commits not pushed"}

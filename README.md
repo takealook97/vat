@@ -16,6 +16,8 @@ carry where they came from, and stop counting as true when nobody re-checks them
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![Release](https://img.shields.io/github/v/release/takealook97/vat?sort=semver)](https://github.com/takealook97/vat/releases)
 
+<img src="docs/assets/demo.svg" alt="vat init, status, sync, and lint run against a three-repository workspace" width="820">
+
 </div>
 
 ---

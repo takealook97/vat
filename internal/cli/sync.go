@@ -83,8 +83,12 @@ func runSync(ctx context.Context, env *Env, args []string) error {
 			// followed by prose and unparseable by the caller that asked for it.
 			return findingsErrorf("")
 		}
-		return findingsErrorf("%s need attention before the workspace is consistent.",
-			pluralise(report.Failures, "repository", "repositories"))
+		verb := "need"
+		if report.Failures == 1 {
+			verb = "needs"
+		}
+		return findingsErrorf("%s %s attention before the workspace is consistent.",
+			pluralise(report.Failures, "repository", "repositories"), verb)
 	}
 	return nil
 }
@@ -107,10 +111,15 @@ func renderSyncReport(env *Env, report syncx.Report) {
 			skipped++
 		}
 	}
-	env.Printer.Hint("\n%d advanced · %d left alone on purpose · %d need attention",
-		updated, skipped, report.Failures)
+	needs := "need attention"
+	if report.Failures == 1 {
+		needs = "needs attention"
+	}
+	env.Printer.Hint("\n%d advanced · %d left alone on purpose · %d %s",
+		updated, skipped, report.Failures, needs)
 	if report.Failures > 0 {
 		env.Printer.Status(ui.LevelFail, "result",
-			fmt.Sprintf("%d repositories could not be brought to a known-good state", report.Failures))
+			fmt.Sprintf("%s could not be brought to a known-good state",
+				pluralise(report.Failures, "repository", "repositories")))
 	}
 }
