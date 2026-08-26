@@ -1,0 +1,139 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/takealook97/vat/main/schemas/vat-manifest-v1.schema.json",
+  "title": "vat workspace manifest, version 1",
+  "description": "The single declaration of which repositories a workspace governs. Normative prose is docs/SPEC.md section 4; where the two disagree, SPEC.md is the specification and this file has a bug.",
+  "type": "object",
+  "required": ["version", "workspace"],
+  "additionalProperties": false,
+  "properties": {
+    "version": {
+      "description": "Manifest schema version. An implementation MUST refuse a version it does not understand rather than read it partially.",
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 1
+    },
+    "workspace": {
+      "type": "object",
+      "required": ["name"],
+      "additionalProperties": false,
+      "properties": {
+        "name": { "type": "string", "minLength": 1 },
+        "default_branch": {
+          "description": "Branch vat treats as the trunk of a repository that names none of its own.",
+          "type": "string"
+        },
+        "remote_template": {
+          "description": "URL template for created repositories. MUST contain {name}: without it every repository is handed the same origin, and two repositories sharing an upstream fetch and push over each other. MUST NOT embed a credential; vat.yaml is committed.",
+          "type": "string",
+          "pattern": "\\{name\\}"
+        },
+        "description": { "type": "string" }
+      }
+    },
+    "policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "sync": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "fast_forward_only": { "type": "boolean" },
+            "allow_autostash": {
+              "description": "Whether an update may stash a dirty working tree. Turning this on gives up the guarantee that vat never silently modifies uncommitted work.",
+              "type": "boolean"
+            },
+            "allow_auto_push": { "type": "boolean" },
+            "parallelism": { "type": "integer", "minimum": 1 }
+          }
+        },
+        "trust": {
+          "description": "Which content an agent may treat as instruction and which is data. A harness that names no untrusted sources cannot tell an agent which text is data.",
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "canonical": { "type": "array", "items": { "type": "string" } },
+            "semi_trusted": { "type": "array", "items": { "type": "string" } },
+            "untrusted": { "type": "array", "items": { "type": "string" } }
+          }
+        },
+        "brain": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "repo": { "type": "string" },
+            "stale_after_days": { "type": "integer", "minimum": 0 },
+            "review_sla_days": { "type": "integer", "minimum": 0 },
+            "require_promotion_gate": { "type": "boolean" }
+          }
+        },
+        "changeset": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "max_open_days": { "type": "integer", "minimum": 0 },
+            "require_rollback_point": { "type": "boolean" }
+          }
+        },
+        "gates": {
+          "description": "A gate is crossed by a human or not gated at all; there is deliberately no middle value.",
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "deploy": { "$ref": "#/$defs/gate" },
+            "external_write": { "$ref": "#/$defs/gate" },
+            "brain_promote": { "$ref": "#/$defs/gate" }
+          }
+        }
+      }
+    },
+    "repos": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/repo" }
+    }
+  },
+  "$defs": {
+    "gate": {
+      "type": "string",
+      "enum": ["manual", "auto"]
+    },
+    "role": {
+      "description": "What a repository is canonical for. Checks, harness templates, and lint rules all branch on it.",
+      "type": "string",
+      "enum": ["product", "brain", "credential", "docs", "agent", "infra"]
+    },
+    "repo": {
+      "type": "object",
+      "required": ["name", "origin", "role"],
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "description": "Becomes a directory name and a path segment in a remote URL, so it is bounded by what a git host already accepts.",
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100,
+          "pattern": "^[A-Za-z0-9_-][A-Za-z0-9._-]*$"
+        },
+        "origin": {
+          "description": "MUST NOT embed a credential. vat.yaml is committed, so a token pasted here is published by the next push of the workspace root.",
+          "type": "string",
+          "minLength": 1
+        },
+        "role": { "$ref": "#/$defs/role" },
+        "path": { "type": "string" },
+        "group": { "type": "string" },
+        "default_branch": { "type": "string" },
+        "required": { "type": "boolean" },
+        "access": {
+          "description": "Metadata for humans and for the harness. The manifest records identity, not access.",
+          "type": "string",
+          "enum": ["public", "private"]
+        },
+        "checks": { "type": "array", "items": { "type": "string" } },
+        "archived": { "type": "boolean" },
+        "description": { "type": "string" }
+      }
+    }
+  }
+}

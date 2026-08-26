@@ -26,6 +26,18 @@ Every format here is versioned independently. An implementation that meets a
 version's requirements **MUST** be able to read anything another conforming
 implementation writes at that version.
 
+Prose is the specification; a machine-readable schema is published beside it for
+the readers that are not people:
+
+| Format | Schema |
+| --- | --- |
+| workspace manifest, version 1 | [`schemas/vat-manifest-v1.schema.json`](../schemas/vat-manifest-v1.schema.json) |
+
+A schema is a projection of this document, not a second source of truth. Where
+the two disagree, this document is the specification and the schema has a bug.
+Every manifest `vat` writes carries a `yaml-language-server` modeline naming its
+schema, so a file can be validated by a tool that has never heard of `vat`.
+
 ## 2. What this does not specify
 
 Being explicit about the boundary is the difference between a specification and

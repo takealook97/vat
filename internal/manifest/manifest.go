@@ -18,6 +18,14 @@ const SchemaVersion = 1
 // FileName is the manifest's fixed name at the workspace root.
 const FileName = "vat.yaml"
 
+// SchemaURL is where the published JSON Schema for this manifest version
+// lives. It is written into every manifest vat saves, so the file carries the
+// means of validating itself to any tool that reads YAML modelines — vat need
+// not be the only reader, and a reader that is not a person needs more than
+// prose. The schema version is in the filename, so this URL does not move when
+// a version 2 is published beside it.
+const SchemaURL = "https://raw.githubusercontent.com/takealook97/vat/main/schemas/vat-manifest-v1.schema.json"
+
 // Role classifies what a repository is canonical for. Checks, harness
 // templates, and lint rules all branch on it.
 type Role string

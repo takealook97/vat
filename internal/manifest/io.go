@@ -325,6 +325,11 @@ func Save(path string, m Manifest) error {
 // Marshal renders a manifest to its on-disk YAML form.
 func Marshal(m Manifest) ([]byte, error) {
 	var builder strings.Builder
+	// A modeline, not decoration: it makes the file self-describing, so an
+	// editor or a validator that has never heard of vat can still check it
+	// against the published schema. The schema version lives in the filename,
+	// so this URL does not have to move when a version 2 is added beside it.
+	builder.WriteString("# yaml-language-server: $schema=" + SchemaURL + "\n")
 	builder.WriteString("# vat workspace manifest — https://github.com/takealook97/vat\n")
 	builder.WriteString("# The single declaration of which repositories this workspace governs.\n")
 	builder.WriteString("# Edit by hand or through `vat repo add|new|adopt|remove`, then run `vat lint`.\n")
