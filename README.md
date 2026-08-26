@@ -105,7 +105,32 @@ Being clear about the neighbours is more useful than pretending there are none.
 | one build graph and task runner over many projects | [Nx](https://nx.dev), [Turborepo](https://turbo.build), [Bazel](https://bazel.build) |
 | a place to file architecture decision records | [`adr-tools`](https://github.com/npryce/adr-tools), [Log4brains](https://github.com/thomvaill/log4brains) |
 | semantic recall over your documents for an agent | a retrieval layer — and point it at `vat brain`, which decides what is canonical |
+| portable agent memory, so what one tool learned another can read | one of the several markdown-and-folders memory formats now converging on that — `vat brain` is readable the same way, and answers a different question, below |
 | **a history of what crossed between repositories, and rules that fail loudly when reality moves away from them** | `vat` |
+
+### On agent memory
+
+Several projects are independently converging on the same good idea: take the
+memory out of the tool and write it as folders and markdown a person can read,
+so switching assistants does not mean explaining yourself again. `vat brain` is
+that shape already — plain files, a documented on-disk contract, a version in
+the marker so another tool can tell what it is reading.
+
+But *storing* it portably is the easy half. The hard half is the one that
+decides whether anybody can rely on it: **who is allowed to write a fact, and
+how does a reader know it is still true?** A memory file an agent can append to
+freely is a file that will confidently tell the next agent something nobody
+checked, and markdown does not have an opinion about that.
+
+So the brain is built around the other question. Every current-state claim
+carries the revision it was read from. A claim nobody has re-checked inside the
+policy window is demoted automatically rather than aging silently into
+authority. Becoming canonical is a promotion step a human takes, and a
+current-state claim with no owner and no source cannot be promoted at all.
+Twenty-four checks run over the result.
+
+Portability is the format. Trust is the contract. `vat` is trying to be right
+about the second one.
 
 `vat` is not a build system, and it will not make your agent smarter. It gives
 the agent a boundary it cannot cross by accident, and leaves behind an account

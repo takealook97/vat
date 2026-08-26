@@ -8,6 +8,55 @@ Notable changes to `vat`. The format follows
 
 ### Added
 
+- `vat ship`, which judges whether a changeset's verified revisions have
+  actually landed on the branch each repository ships from. Verifying proves the
+  combination works; it says nothing about whether those revisions ever reached
+  anybody else, and a workspace that only asks the first question accumulates
+  changesets closed on work still sitting on a branch. The gate is
+  `merge-base --is-ancestor` and deliberately nothing more: a pull request is a
+  forge's own idea, gating on one would buy a dependency and tie the record to a
+  vendor, and an open pull request is precisely the state of not having landed.
+  A review URL is recorded beside the revision as evidence and is never the
+  gate. `vat changeset close` now refuses a changeset that has not landed, and
+  `changeset/closed-unlanded` reports the gap when `--force` waives it, so a
+  waiver stays visible instead of becoming indistinguishable from a change that
+  shipped.
+- Skill adapters. `.agents/skills/<name>/SKILL.md` is canonical and
+  `vat harness render` generates the per-runtime pointer, the same way it
+  already did for roles. `ClaudeSkillDir` and `SkillsDir` had been declared
+  since the first release and used by nothing: the layer was designed and never
+  wired up, so a workspace keeping skills had to maintain every copy by hand —
+  which is the drift the harness exists to prevent. `harness/skill-metadata`
+  reports a skill no runtime can advertise.
+- `models:` on a role, mapping each runtime to the model it should use, and
+  `harness/model-ambiguous` for a role that names one model for several. A model
+  name lives in a vendor's namespace, and vat was writing `model = "opus"` into
+  Codex TOML files — a name Codex cannot resolve — from the very tool whose job
+  is to stop one role behaving differently per runtime. A bare `model` is now
+  honoured only when the role targets a single runtime, because writing a name a
+  runtime has never heard of is worse than writing nothing.
+- A schema version in the brain marker, and `brain/schema-newer`. A knowledge
+  layer whose whole claim is that it outlives the tool that wrote it will
+  eventually be handed to an older tool; reading it quietly and reporting it
+  clean is the worst available outcome, because the records look sound while
+  half of what governs them is invisible. `docs/BRAIN.md` now documents the
+  on-disk contract another tool may rely on.
+- A `recovery` section in `vat doctor`, answering the one question a backup
+  exists to answer: if this machine stopped working now, what would be gone. For
+  a git repository that has a precise form — does its history exist anywhere but
+  here — and unpushed commits and stashes are the two states where the answer is
+  no. `vat` takes no backups and will not: where an archive goes and who holds
+  the key are organisational facts it owns none of, and writing outside the
+  workspace root is the boundary everything else rests on.
+- `brain/unreferenced`, for a scaffolded brain the manifest never adopted.
+  `brain/not-initialised` fires only for a repository already declared as the
+  brain, so a complete brain layout that no `vat brain` command could reach was
+  reported by nothing at all.
+- A test that renders vat's own role adapters and compares them with what is
+  committed. vat generates the contracts it asks every other workspace to
+  generate, and until now nothing checked that its own were in step — which is
+  exactly how the Codex model name survived to a release.
+
 - `brain.RuleNames()`, `vat brain check --list`, and `--only`, with the rule
   table in BRAIN.md. `vat brain check` reported twenty-four rules and two of
   them were named in any document; the other twenty-two had gone undocumented
@@ -57,6 +106,14 @@ Notable changes to `vat`. The format follows
 
 ### Changed
 
+- `make cover` gates each package as well as the total. The total alone was
+  hiding what it was meant to expose: at 80.5% overall, the three packages
+  holding nearly all the logic were each below the stated line, floated there by
+  small pure packages scoring in the nineties. An average over unequal packages
+  is not a floor. The per-package minimum is set below where every package
+  stands today, because it is a ratchet against sliding rather than a target to
+  grind toward.
+
 - `vat brain promote` no longer moves a claim's observation date forward on
   request alone. When the owning repository is still at the revision the claim
   was pinned to, nothing about the evidence has changed and the date moves
@@ -96,6 +153,13 @@ Notable changes to `vat`. The format follows
   uncalled exported function has no possible user.
 
 ### Fixed
+
+- `vat brain init <directory>` advertised `vat brain new` after scaffolding, and
+  that command then answered "this workspace has no brain repository". Every
+  other `vat brain` command resolves the brain through the manifest, and `init`
+  does not put it there, so the tool created a state its own commands could not
+  reach and named the one command guaranteed to fail. The hint now says what
+  will actually work, and `brain/unreferenced` reports the state itself.
 
 - A lifecycle transition no longer deletes the parts of a record's header that
   vat's own schema does not model. `sweep --apply` re-rendered the typed struct,
