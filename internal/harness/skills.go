@@ -74,21 +74,26 @@ func LoadSkills(root string) ([]Skill, []Malformed, error) {
 		if !entry.IsDir() {
 			continue
 		}
+		rel := filepath.Join(SkillsDir, entry.Name(), SkillFile)
 		path := filepath.Join(dir, entry.Name(), SkillFile)
 		if _, err := os.Stat(path); err != nil {
-			// A directory of references with no SKILL.md is not a skill. It is
-			// also not an error worth stopping the whole harness for.
+			// A directory of references with no SKILL.md is not a skill, and is
+			// not worth stopping the harness for. Anything else — a permission
+			// denial, a symlink loop — is a file vat cannot read, which this
+			// package now says is a finding rather than a reason to do nothing.
+			if os.IsNotExist(err) {
+				continue
+			}
+			if malformed, err = record(malformed, root, rel, err); err != nil {
+				return nil, nil, err
+			}
 			continue
 		}
 		skill, err := LoadSkill(path)
 		if err != nil {
-			// See Malformed: an escaping name is a refusal, not a finding.
-			if errors.Is(err, ErrInvalidSkillName) {
-				return nil, malformed, err
+			if malformed, err = record(malformed, root, rel, err); err != nil {
+				return nil, nil, err
 			}
-			malformed = append(malformed, Malformed{
-				Path: filepath.Join(SkillsDir, entry.Name(), SkillFile), Problem: err.Error(),
-			})
 			continue
 		}
 		skills = append(skills, skill)
@@ -99,7 +104,7 @@ func LoadSkills(root string) ([]Skill, []Malformed, error) {
 			filepath.Join(SkillsDir, skill.Dir, SkillFile))
 	}
 	if err := refuseDuplicateNames(byName); err != nil {
-		return nil, malformed, err
+		return nil, nil, err
 	}
 	sort.Slice(skills, func(i, j int) bool { return skills[i].Name < skills[j].Name })
 	return skills, malformed, nil
@@ -124,8 +129,9 @@ func LoadSkill(path string) (Skill, error) {
 	// The name becomes a directory under every runtime, so it is validated the
 	// same way a role name is: this is the value that decides where vat writes.
 	if !ValidRoleName(skill.Name) {
-		return Skill{}, fmt.Errorf("%w %q in %s: use letters, digits, '-', and '_' only",
-			ErrInvalidSkillName, skill.Name, path)
+		// See ErrRefused: a name that could escape is refused, not recorded.
+		return Skill{}, refuse(fmt.Errorf("%w %q in %s: use letters, digits, '-', and '_' only",
+			ErrInvalidSkillName, skill.Name, path))
 	}
 	return skill, nil
 }

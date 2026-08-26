@@ -405,3 +405,68 @@ func TestARoleTargetingARuntimeThatGeneratesNothingIsReported(t *testing.T) {
 		t.Errorf("the finding does not name the bad value: %q", finding.Message)
 	}
 }
+
+// The rule was added and documented, and nothing exercised it end to end. A
+// finding nobody has seen produced is a finding whose Rule, Severity, or
+// Subject may be wrong in a way no reader will notice until they need it.
+func TestAnUnreadableDefinitionIsReportedByLint(t *testing.T) {
+	// Arrange
+	ws := fixture(t)
+	dir := filepath.Join(ws.Root, ".agents", "roles")
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatalf("create: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "broken.md"),
+		[]byte("---\nname: [not valid\n  bad: :\n---\n"), 0o644); err != nil {
+		t.Fatalf("write: %v", err)
+	}
+
+	// Act
+	report := run(t, ws)
+
+	// Assert
+	finding, found := rules(report)["harness/definition-malformed"]
+	if !found {
+		t.Fatalf("an unreadable role went unreported: %+v", report.Findings)
+	}
+	if finding.Severity != lint.SeverityError {
+		t.Errorf("severity = %s, want error: a definition nobody can read renders no adapter", finding.Severity)
+	}
+	if want := ".agents/roles/broken.md"; finding.Subject != want {
+		t.Errorf("subject = %q, want %q", finding.Subject, want)
+	}
+	if finding.Message == "" {
+		t.Error("the finding does not say what is wrong with the file")
+	}
+}
+
+// The sound definitions beside it must still be checked, or one bad file
+// silences every other harness rule in the workspace.
+func TestAnUnreadableDefinitionDoesNotSilenceTheOtherHarnessRules(t *testing.T) {
+	// Arrange
+	ws := fixture(t)
+	dir := filepath.Join(ws.Root, ".agents", "roles")
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatalf("create: %v", err)
+	}
+	for name, body := range map[string]string{
+		"broken.md":   "---\nname: [not valid\n  bad: :\n---\n",
+		"nameless.md": "---\nname: nameless\n---\n\n# Nameless\n",
+	} {
+		if err := os.WriteFile(filepath.Join(dir, name), []byte(body), 0o644); err != nil {
+			t.Fatalf("write %s: %v", name, err)
+		}
+	}
+
+	// Act
+	report := run(t, ws)
+
+	// Assert
+	found := rules(report)
+	if _, ok := found["harness/definition-malformed"]; !ok {
+		t.Errorf("the unreadable file went unreported: %+v", report.Findings)
+	}
+	if _, ok := found["harness/role-metadata"]; !ok {
+		t.Errorf("a sound role's missing description was not reported beside it: %+v", report.Findings)
+	}
+}

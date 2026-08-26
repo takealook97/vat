@@ -1,6 +1,7 @@
 package harness_test
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
@@ -223,5 +224,82 @@ func TestARoleCanRestrictWhichRuntimesGetAnAdapter(t *testing.T) {
 	// Assert
 	if len(adapters) != 1 || adapters[0].Runtime != "claude" {
 		t.Errorf("adapters = %+v, want only claude", adapters)
+	}
+}
+
+// The skills loader has this test and the roles loader did not, which is how
+// the two drift: one unreadable file must not withdraw the definitions beside
+// it, and a name that could escape the adapter directories must still stop
+// everything.
+func TestOneUnreadableRoleDoesNotWithdrawTheOthers(t *testing.T) {
+	// Arrange
+	root := t.TempDir()
+	dir := filepath.Join(root, harness.RolesDir)
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatalf("create: %v", err)
+	}
+	write := func(name, body string) {
+		if err := os.WriteFile(filepath.Join(dir, name), []byte(body), 0o644); err != nil {
+			t.Fatalf("write %s: %v", name, err)
+		}
+	}
+	write("broken.md", "---\nname: [not valid\n  bad: :\n---\n")
+	write("sound.md", "---\nname: sound\ndescription: Works.\n---\n\n# Sound\n")
+
+	// Act
+	roles, malformed, err := harness.LoadRoles(root)
+
+	// Assert
+	if err != nil {
+		t.Fatalf("one bad file stopped the load: %v", err)
+	}
+	if len(roles) != 1 || roles[0].Name != "sound" {
+		t.Errorf("loaded %+v, want only the sound role", roles)
+	}
+	if len(malformed) != 1 {
+		t.Fatalf("the unreadable file was not reported: %+v", malformed)
+	}
+	// The path is repo-relative with forward slashes, matching what the brain
+	// package records and what docs/SPEC.md specifies.
+	if want := ".agents/roles/broken.md"; malformed[0].Path != want {
+		t.Errorf("Path = %q, want %q", malformed[0].Path, want)
+	}
+	// And the problem does not repeat the location, absolute or otherwise.
+	if strings.Contains(malformed[0].Problem, root) {
+		t.Errorf("the problem discloses the machine's layout: %q", malformed[0].Problem)
+	}
+	if strings.HasPrefix(malformed[0].Problem, ".agents/") {
+		t.Errorf("the problem repeats the path it is printed beside: %q", malformed[0].Problem)
+	}
+}
+
+// The exception, asserted for roles as it is for skills.
+func TestAnEscapingRoleNameStopsTheLoadRatherThanBeingSkipped(t *testing.T) {
+	// Arrange
+	root := t.TempDir()
+	dir := filepath.Join(root, harness.RolesDir)
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatalf("create: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "escaping.md"),
+		[]byte("---\nname: ../../escape\ndescription: no.\n---\n"), 0o644); err != nil {
+		t.Fatalf("write: %v", err)
+	}
+
+	// Act
+	roles, malformed, err := harness.LoadRoles(root)
+
+	// Assert
+	if err == nil {
+		t.Fatal("an escaping name was recorded as malformed rather than refused")
+	}
+	if !errors.Is(err, harness.ErrInvalidRoleName) {
+		t.Errorf("err = %v, want ErrInvalidRoleName", err)
+	}
+	// Nothing partial comes back with a refusal: every caller discards both
+	// values when err is non-nil, and returning data nobody reads invites
+	// somebody to start reading it.
+	if roles != nil || malformed != nil {
+		t.Errorf("a refusal returned partial data: roles=%+v malformed=%+v", roles, malformed)
 	}
 }

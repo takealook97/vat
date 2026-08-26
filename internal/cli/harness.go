@@ -133,7 +133,7 @@ func harnessRolesCommand() *Command {
 			if err != nil {
 				return err
 			}
-			roles, _, err := harness.LoadRoles(ws.Root)
+			roles, malformed, err := harness.LoadRoles(ws.Root)
 			if err != nil {
 				return err
 			}
@@ -145,7 +145,14 @@ func harnessRolesCommand() *Command {
 				for _, role := range roles {
 					listed = append(listed, summariseRole(role))
 				}
-				return emitJSON(env, listed)
+				// The payload stays the array every listing command emits; a
+				// consumer iterating it must not have to special-case a shape
+				// change. What did not load is said on the error stream and in
+				// the exit code, and reported properly by `vat lint`.
+				if err := emitJSON(env, listed); err != nil {
+					return err
+				}
+				return reportUnreadableRoles(env, malformed)
 			}
 			if len(roles) == 0 {
 				env.Printer.Println("No roles defined.")
@@ -165,9 +172,25 @@ func harnessRolesCommand() *Command {
 				})
 			}
 			env.Printer.Table([]string{"ROLE", "MODEL", "WRITES", "RUNTIMES", "DESCRIPTION"}, rows)
-			return nil
+			return reportUnreadableRoles(env, malformed)
 		},
 	}
+}
+
+// reportUnreadableRoles surfaces the definitions that did not load.
+//
+// Before this package returned them separately, a role that failed to parse
+// failed the command outright. Collecting them so the sound ones still render
+// must not also mean the broken ones stop being mentioned: a listing that omits
+// a role in silence is how somebody concludes it was deleted.
+func reportUnreadableRoles(env *Env, malformed []harness.Malformed) error {
+	if len(malformed) == 0 {
+		return nil
+	}
+	for _, entry := range malformed {
+		env.Printer.Errorf("%s: %s", entry.Path, entry.Problem)
+	}
+	return findingsErrorf("These define no role until they parse. `vat lint` reports them too.")
 }
 
 // roleSummary is the shape `vat harness roles` reports, in either form.
@@ -267,7 +290,7 @@ func runHarnessRole(ctx context.Context, env *Env, args []string) error {
 	}
 	env.Printer.Status(ui.LevelOK, ws.Rel(path), "created")
 
-	roles, _, err := harness.LoadRoles(ws.Root)
+	roles, malformed, err := harness.LoadRoles(ws.Root)
 	if err != nil {
 		return err
 	}
@@ -277,6 +300,12 @@ func runHarnessRole(ctx context.Context, env *Env, args []string) error {
 	}
 	for _, adapter := range adapters {
 		env.Printer.Status(ui.LevelOK, adapter, "generated")
+	}
+	// A role that was already broken is not this command's fault and must not
+	// fail it, but creating a new role beside one nobody can read while saying
+	// nothing leaves the workspace quietly short of an adapter.
+	for _, entry := range malformed {
+		env.Printer.Status(ui.LevelWarn, entry.Path, "cannot be read, so it renders no adapter: "+entry.Problem)
 	}
 	env.Printer.Hint("\nWrite the role's contract in %s. The adapters regenerate from it.", ws.Rel(path))
 	return nil

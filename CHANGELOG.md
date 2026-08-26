@@ -167,6 +167,28 @@ Notable changes to `vat`. The format follows
 
 ### Fixed
 
+- **`vat harness roles` reports the role files it could not read, and fails
+  again.** Returning malformed definitions separately so the sound ones still
+  render meant the command discarded them: a broken role file disappeared from
+  the listing with exit 0, where the previous release failed loudly. A listing
+  that omits a role in silence is how somebody concludes it was deleted. The
+  `--json` payload stays the array every listing command emits — what did not
+  load is on the error stream and in the exit code, and reported properly by
+  `vat lint`. `vat harness role new` mentions them without failing on them.
+- **A `SKILL.md` that cannot be stat'ed for any reason other than absence is
+  recorded.** A permission denial or a symlink loop was stepped past as though
+  the directory simply held no skill — the same "could not read, so said
+  nothing" this batch was fixing everywhere else.
+- **Whether a load stops is a property of the error, not of the loop that meets
+  it.** `ErrRefused` marks the errors that must halt, so roles and skills cannot
+  drift on the question, and a future error that should halt is handled in one
+  place rather than remembered in two. Both loaders now share the classify-and-
+  accumulate step.
+- **`Malformed.Path` uses forward slashes** — matching what `internal/brain`
+  records and what `docs/SPEC.md` specifies as a canonical format — **and
+  `Problem` no longer repeats the path** it is printed beside, in absolute form,
+  into issues and CI logs.
+
 - **One unreadable role or skill no longer withdraws the adapters of every
   definition beside it.** The load aborted on the first bad file, so a typo in
   one skill left every other skill's adapter unwritten and reported only that

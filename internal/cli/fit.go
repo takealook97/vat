@@ -107,8 +107,9 @@ func runFit(ctx context.Context, env *Env, args []string) error {
 
 // definesRoles reports whether the workspace has any agent role defined.
 func definesRoles(ws *workspace.Workspace) bool {
-	roles, _, err := harness.LoadRoles(ws.Root)
-	return err == nil && len(roles) > 0
+	// A role file nobody can parse is still evidence that somebody wrote one.
+	roles, malformed, err := harness.LoadRoles(ws.Root)
+	return err == nil && len(roles)+len(malformed) > 0
 }
 
 func countCredentialRepos(ws *workspace.Workspace) int {

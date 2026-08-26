@@ -148,16 +148,9 @@ func LoadRoles(root string) ([]Role, []Malformed, error) {
 		path := filepath.Join(dir, entry.Name())
 		role, err := LoadRole(path)
 		if err != nil {
-			// A name that could escape the adapter directories is not a broken
-			// file to be skipped past: it is a file asking to be written
-			// somewhere vat must not write, and writing outside the workspace
-			// root is what retracted three releases. That stops the load.
-			if errors.Is(err, ErrInvalidRoleName) {
-				return nil, malformed, err
+			if malformed, err = record(malformed, root, filepath.Join(RolesDir, entry.Name()), err); err != nil {
+				return nil, nil, err
 			}
-			malformed = append(malformed, Malformed{
-				Path: filepath.Join(RolesDir, entry.Name()), Problem: err.Error(),
-			})
 			continue
 		}
 		roles = append(roles, role)
@@ -165,7 +158,7 @@ func LoadRoles(root string) ([]Role, []Malformed, error) {
 	// A duplicate is not one bad file: it is an ambiguity between two good ones,
 	// and rendering either is wrong. That still stops the load.
 	if err := refuseDuplicateNames(roleNames(roles)); err != nil {
-		return nil, malformed, err
+		return nil, nil, err
 	}
 	sort.Slice(roles, func(i, j int) bool { return roles[i].Name < roles[j].Name })
 	return roles, malformed, nil
@@ -215,6 +208,40 @@ type Malformed struct {
 	Path string `json:"path"`
 	// Problem quotes the parser rather than the file.
 	Problem string `json:"problem"`
+}
+
+// ErrRefused marks an error that must stop a load rather than be recorded as a
+// malformed file and stepped past.
+//
+// The distinction is a property of the error, not of the loop that meets it.
+// Deciding it at each call site meant two files had to agree, and a future
+// error that should stop a load would be handled in one of them and forgotten
+// in the other.
+var ErrRefused = errors.New("refused")
+
+// refuse wraps an error so a loader stops on it.
+func refuse(err error) error { return fmt.Errorf("%w: %w", ErrRefused, err) }
+
+// record classifies a load failure: an error marked as a refusal is returned to
+// stop everything, anything else is appended for the caller to report.
+//
+// This is the shared half of LoadRoles and LoadSkills, so the two cannot drift
+// on the question of which failures are fatal.
+func record(malformed []Malformed, root, relPath string, err error) ([]Malformed, error) {
+	if errors.Is(err, ErrRefused) {
+		return nil, err
+	}
+	// The problem is shown beside Path, so repeating the location adds nothing a
+	// reader needs — and the absolute form puts the layout of the machine into
+	// output that gets pasted into issues and CI logs.
+	problem := strings.ReplaceAll(err.Error(), root+string(filepath.Separator), "")
+	problem = strings.TrimPrefix(problem, relPath+": ")
+	return append(malformed, Malformed{
+		// Forward slashes, matching what the brain package records and what
+		// docs/SPEC.md specifies: a path that renders differently per platform
+		// is not a canonical format.
+		Path: filepath.ToSlash(relPath), Problem: problem,
+	}), nil
 }
 
 // ErrDuplicateName is returned when two definitions claim the same name.
@@ -267,8 +294,11 @@ func LoadRole(path string) (Role, error) {
 		role.Title = frontmatter.Title(doc.Body)
 	}
 	if !ValidRoleName(role.Name) {
-		return Role{}, fmt.Errorf("%w %q in %s: use letters, digits, '-', and '_' only",
-			ErrInvalidRoleName, role.Name, path)
+		// A name that could escape the adapter directories is not a broken file
+		// to be stepped past: it is a file asking to be written somewhere vat
+		// must not write, and that is what retracted three releases.
+		return Role{}, refuse(fmt.Errorf("%w %q in %s: use letters, digits, '-', and '_' only",
+			ErrInvalidRoleName, role.Name, path))
 	}
 	return role, nil
 }
