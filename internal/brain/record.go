@@ -264,8 +264,6 @@ func ParseSourceRef(ref string) (repo, revision, filePath string, ok bool) {
 	return match[1], match[2], match[3], true
 }
 
-// numericID extracts the leading number of an identifier for sorting, so G-2
-// sorts before G-10.
 // ValidateID reports whether an identifier is safe to build a filename from.
 //
 // Ids are normally generated, but `vat brain new --id` lets a caller supply
@@ -294,6 +292,8 @@ func ValidateID(id string) error {
 	return nil
 }
 
+// numericID extracts the leading number of an identifier for sorting, so G-2
+// sorts before G-10.
 func numericID(id string) int {
 	digits := regexp.MustCompile(`\d+`).FindString(id)
 	if digits == "" {
