@@ -6,6 +6,10 @@
 
 **Git records each repository. `vat` records what happened across them.**
 
+*Your repositories are the body, `vat` the vessel, `vat brain` the memory
+suspended inside it — where nothing counts as a fact until someone records when
+they last checked.*
+
 `vat` makes a folder of repositories into one workspace you can work from the
 top of: one manifest, one contract your coding agents read in every repository,
 and one history of the work that crossed a boundary — which revisions were
