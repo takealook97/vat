@@ -474,7 +474,16 @@ func contains(list []string, want string) bool {
 // would look clean because half of what governs them was invisible.
 func checkSchema(store *Store) []Finding {
 	declared, ok := DeclaredSchema(store.Root)
-	if !ok || declared <= SchemaVersion {
+	if !ok {
+		return nil
+	}
+	if declared == 0 {
+		return []Finding{{
+			Rule: "brain/schema-newer", Severity: SeverityError, Path: MarkerFile,
+			Message: "declares a schema version this build cannot parse, so it cannot tell whether these checks apply",
+		}}
+	}
+	if declared <= SchemaVersion {
 		return nil
 	}
 	return []Finding{{

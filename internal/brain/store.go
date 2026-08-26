@@ -330,7 +330,9 @@ func (s *Store) RecentMemories(limit int) []Record {
 //
 // A brain scaffolded before versioning existed has no line to read, which is
 // not an error: it is the same contract, written before the contract had a
-// number.
+// number. That case returns false. A line that is present but unparseable
+// returns (0, true), so a caller can tell "no version" from "a version I do
+// not understand".
 func DeclaredSchema(root string) (int, bool) {
 	data, found, err := fsx.ReadFileIfExists(filepath.Join(root, MarkerFile))
 	if err != nil || !found {
@@ -341,9 +343,14 @@ func DeclaredSchema(root string) (int, bool) {
 		if !ok {
 			continue
 		}
+		// Not the same as no line at all. A version this cannot make sense of
+		// is the strongest available signal that something other than vat wrote
+		// the marker — which is the case the field exists for — so it must not
+		// fall through to "predates versioning". A schema is numbered from 1;
+		// zero and below are as unreadable as a word.
 		version, err := strconv.Atoi(strings.TrimSpace(rest))
-		if err != nil {
-			return 0, false
+		if err != nil || version < 1 {
+			return 0, true
 		}
 		return version, true
 	}

@@ -188,6 +188,10 @@ naming the outcome loses the only record of whether anyone checked.`,
 				}
 				return findingsErrorf("Run `vat ship %s` once the work has landed, or pass --force.", current.ID)
 			}
+			// Closing without the evidence is allowed; closing without a trace
+			// of having done so is not. This is what keeps a waiver visible
+			// instead of indistinguishable from a change that shipped.
+			current.LandingWaived = !current.FullyLanded()
 			current.Status = changeset.StatusClosed
 			current.Acceptance = *acceptance
 			current.ApprovedBy = *approvedBy

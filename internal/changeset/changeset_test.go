@@ -1,6 +1,8 @@
 package changeset_test
 
 import (
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -193,5 +195,92 @@ func TestAgeDaysCountsFromTheOpeningDate(t *testing.T) {
 	// Assert
 	if age != 24 {
 		t.Errorf("AgeDays = %d, want 24", age)
+	}
+}
+
+// The identifier decides where the file is written. An unchecked traversing id
+// escaped the workspace entirely — through Load from a command-line argument,
+// and through Save from the `id:` field of a changeset somebody committed.
+// Writing outside the root is the boundary the whole tool rests on, and the
+// defect class that retracted three releases.
+func TestATraversingIdentifierIsRefusedRatherThanFollowed(t *testing.T) {
+	// Arrange
+	root := t.TempDir()
+	traversing := []string{
+		"../../../escaped",
+		"../escaped",
+		"CS-0001/../../escaped",
+		"/absolute",
+		"CS-0001; rm -rf /",
+		"",
+	}
+
+	// Act & Assert
+	for _, id := range traversing {
+		if _, err := changeset.Load(root, id); err == nil {
+			t.Errorf("Load accepted %q", id)
+		}
+		if err := changeset.Save(root, changeset.Changeset{ID: id}); err == nil {
+			t.Errorf("Save accepted %q", id)
+		}
+	}
+	// Nothing may have been created anywhere above the root.
+	parent := filepath.Dir(root)
+	entries, err := os.ReadDir(parent)
+	if err != nil {
+		t.Fatalf("read parent: %v", err)
+	}
+	for _, entry := range entries {
+		if strings.Contains(entry.Name(), "escaped") {
+			t.Errorf("a file escaped the workspace: %s", filepath.Join(parent, entry.Name()))
+		}
+	}
+}
+
+// The refusal must not cost the valid case anything.
+func TestAWellFormedIdentifierStillRoundTrips(t *testing.T) {
+	// Arrange
+	root := t.TempDir()
+	set := changeset.New("CS-0001", "Move cancellation to v2", reference)
+
+	// Act
+	if err := changeset.Save(root, set); err != nil {
+		t.Fatalf("Save: %v", err)
+	}
+	loaded, err := changeset.Load(root, "CS-0001")
+
+	// Assert
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	if loaded.ID != "CS-0001" || loaded.Objective != set.Objective {
+		t.Errorf("round trip lost content: %+v", loaded)
+	}
+}
+
+// The identifier decides where the next Save writes, so a file whose id
+// disagrees with its own name would be read as one changeset and written back
+// over another.
+func TestAChangesetWhoseIdentifierDisagreesWithItsFilenameIsRefused(t *testing.T) {
+	// Arrange
+	root := t.TempDir()
+	dir := filepath.Join(root, changeset.Dir)
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatalf("create: %v", err)
+	}
+	body := "id: CS-0009\nobjective: impostor\nstatus: open\nopened_at: 2026-08-26\nrepositories: []\n"
+	if err := os.WriteFile(filepath.Join(dir, "CS-0001.yaml"), []byte(body), 0o644); err != nil {
+		t.Fatalf("write: %v", err)
+	}
+
+	// Act
+	_, err := changeset.Load(root, "CS-0001")
+
+	// Assert
+	if err == nil {
+		t.Fatal("a changeset claiming another identifier was accepted")
+	}
+	if !strings.Contains(err.Error(), "CS-0009") {
+		t.Errorf("the error does not say which identifier it found: %v", err)
 	}
 }

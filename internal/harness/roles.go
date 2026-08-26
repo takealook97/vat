@@ -151,13 +151,48 @@ func LoadRoles(root string) ([]Role, error) {
 		}
 		roles = append(roles, role)
 	}
+	if err := refuseDuplicateNames(roleNames(roles)); err != nil {
+		return nil, err
+	}
 	sort.Slice(roles, func(i, j int) bool { return roles[i].Name < roles[j].Name })
 	return roles, nil
+}
+
+func roleNames(roles []Role) map[string][]string {
+	byName := map[string][]string{}
+	for _, role := range roles {
+		byName[role.Name] = append(byName[role.Name], role.Path)
+	}
+	return byName
+}
+
+// refuseDuplicateNames reports the first name claimed twice, naming both files.
+func refuseDuplicateNames(byName map[string][]string) error {
+	names := make([]string, 0, len(byName))
+	for name := range byName {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+	for _, name := range names {
+		if sources := byName[name]; len(sources) > 1 {
+			sort.Strings(sources)
+			return fmt.Errorf("%w %q: %s", ErrDuplicateName, name, strings.Join(sources, " and "))
+		}
+	}
+	return nil
 }
 
 // ErrInvalidRoleName is returned for a role whose name could escape the
 // directories adapters are written into.
 var ErrInvalidRoleName = errors.New("invalid role name")
+
+// ErrDuplicateName is returned when two definitions claim the same name.
+//
+// The name decides the adapter path, so a duplicate is not a style problem: two
+// definitions render to one file with different content, rendering never
+// converges, and `vat lint` can never come back clean. Which one wins is not
+// even stable between runs.
+var ErrDuplicateName = errors.New("duplicate name")
 
 // ValidRoleName reports whether a name is safe to build an adapter path from.
 //

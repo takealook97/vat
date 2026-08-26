@@ -45,16 +45,26 @@ a description of a program.
 2. Every file **MUST** be writable atomically — written to a temporary file in
    the same directory and renamed. A reader **MUST** tolerate finding a
    temporary file and **MUST NOT** treat it as content.
-3. Dates are `YYYY-MM-DD`. Timestamps are RFC 3339 in UTC.
-4. A revision is a **full** git object name. A branch name is not a revision:
-   a branch moves and takes the evidence with it.
+3. Dates are `YYYY-MM-DD`. Timestamps are RFC 3339 **with an explicit offset**,
+   which may be local. A reader **MUST NOT** assume `Z`.
+4. A revision is a git object name, full or unambiguously abbreviated — at
+   least seven hexadecimal characters. A branch name is not a revision: a
+   branch moves and takes the evidence with it, which is the half of this rule
+   that matters.
 5. No file described here **MAY** contain a secret. Implementations that surface
    credential state **MUST** limit themselves to existence, permissions, and
    age.
 6. An identifier used to build a path **MUST** be validated before it is joined
-   to one. Implementations **MUST** reject any identifier that is not letters,
-   digits, `-`, and `_`, and **MUST** refuse to write outside the workspace
-   root.
+   to one, and an implementation **MUST** refuse to write outside the workspace
+   root. The permitted set differs by identifier, because they are joined into
+   different things:
+
+   | Identifier | Permitted | Length | Also |
+   | --- | --- | --- | --- |
+   | repository name | letters, digits, `-`, `_`, `.` | ≤ 100 | **MUST NOT** begin with `.` |
+   | brain record id | letters, digits, `-`, `_`, `.` | ≤ 64 | **MUST NOT** begin with `.` |
+   | changeset id | `CS-` followed by digits | — | the whole identifier is the pattern |
+   | role or skill name | letters, digits, `-`, `_` | ≤ 64 | no `.`: it is joined into a runtime's own directory layout |
 
 ---
 
@@ -112,8 +122,12 @@ repos:
 
 `product`, `brain`, `credential`, `docs`, `agent`, `infra`.
 
-At most **one** repository **MAY** have role `brain`. Two repositories **MUST
-NOT** declare the same `origin`.
+At most **one** repository **MAY** have role `brain`.
+
+Two repositories **MUST NOT** declare the same `origin` *and* resolve to the
+same branch: they would fetch and push over each other, and nothing else here
+would report it. Sharing an origin across **different** branches is a
+worktree-per-branch layout and is permitted.
 
 ### 4.3 What an implementation must not do
 
@@ -146,14 +160,24 @@ brain/
 
 ### 5.1 The marker
 
-The marker **MUST** exist. It **MUST** contain a line `schema: <integer>` for
-schema 1 and later. A marker with no `schema:` line predates versioning and
-**MUST** be read as schema 1.
+An implementation writing a brain **MUST** create the marker, and it **MUST**
+contain a line `schema: <integer>` for schema 1 and later. A marker with no
+`schema:` line predates versioning and **MUST** be read as schema 1.
 
-A reader encountering a schema greater than it implements **MUST** refuse rather
-than read. Reading a newer brain and reporting it sound is the failure mode this
-version number exists to prevent: the records look clean because half of what
-governs them is invisible.
+A reader **SHOULD** also recognise a directory that has the record directories
+but no marker: brains predate the marker, and refusing to read one loses the
+records the format exists to keep.
+
+A reader encountering a schema it does not implement — greater than its own, or
+a value it cannot parse — **MUST** report that fact and **MUST NOT** present the
+records as a complete picture. Reading a newer brain and reporting it sound is
+the failure mode this version number exists to prevent: the records look clean
+because half of what governs them is invisible.
+
+Reporting rather than refusing is deliberate. A reader that refuses outright is
+useless to somebody trying to find out what they are holding, and this layer's
+whole claim is that the files remain readable. What it may not do is stay
+quiet.
 
 ### 5.2 A record
 
@@ -223,7 +247,10 @@ therefore decays. For such a record:
 - `source_ref` **MUST** be present and **MUST** name a revision, not a branch.
 - `observed_at` **MUST** be present.
 - Once `observed_at` is older than the policy window, an implementation **MUST**
-  treat the record as `stale` and **MUST NOT** present it as current.
+  report the record as aged out and **MUST NOT** present it as verified.
+  Demoting it to `stale` on disk **MAY** require an explicit action, so that a
+  read-only reader never rewrites records. It is the age test, not the stored
+  status, that decides whether a claim may be cited as current.
 
 `historical` records what happened and does not decay. `intent` records what the
 organisation means to do. Neither requires provenance.
@@ -336,7 +363,7 @@ window exists in which a consumer expects an interface that is already gone.
 .agents/skills/<name>/SKILL.md       canonical procedure
 .claude/agents/<name>.md             generated adapter
 .claude/skills/<name>/SKILL.md       generated adapter
-.codex/agents/<name>.toml            generated adapter
+.codex/agents/<name>.toml            generated adapter; `-` in the name becomes `_`
 ```
 
 A canonical file holds the prose. An adapter holds **discovery metadata and a
@@ -378,9 +405,21 @@ conforming: it is the one instruction the agent cannot derive for itself.
 | changeset | 1 | implied by `id` pattern `CS-NNNN` |
 
 A version is incremented when a change would make an existing conforming reader
-wrong — not when a field is added. Adding an optional field is not a version
-change, and readers **MUST** ignore fields they do not recognise **except**
-where this document says otherwise.
+wrong.
+
+The three formats differ on what "wrong" means, and an implementer has to know
+which kind each one is:
+
+| Format | Unknown keys | Adding an optional field |
+| --- | --- | --- |
+| brain record front matter | a reader **MUST** ignore them | not a version change |
+| manifest | a reader **MUST** reject the file | a version change |
+| completion record | a reader **MUST** reject the file | a version change |
+
+The manifest and the completion record are **closed** on purpose. A mistyped
+policy key that parses is a rule silently switched off, and a workspace whose
+`fast_forward_only` never took effect because somebody wrote
+`fast_foward_only` is worse off than one that refused to start.
 
 Changes to this document are proposed the way any change to `vat` is: with an
 issue naming a failure that already happened. See `CONTRIBUTING.md`.

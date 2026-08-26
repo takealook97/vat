@@ -20,6 +20,12 @@ import (
 // ErrNotRepository is returned when a directory has no git repository.
 var ErrNotRepository = errors.New("not a git repository")
 
+// ErrRevisionNotFound is returned when a revision a comparison must be made
+// against is not present in the repository. It is separate from a negative
+// answer: "the ref is not here" and "the commit is not on it" are different
+// facts, and a caller that renders them the same way says something false.
+var ErrRevisionNotFound = errors.New("revision not found")
+
 // CommandError carries the failing git invocation and its stderr, so callers
 // can report what git actually said instead of a generic exit status.
 type CommandError struct {
@@ -184,14 +190,22 @@ func AheadBehind(ctx context.Context, dir, local, upstream string) (Divergence, 
 // ancestor of the branch this repository ships from" is the same sentence
 // everywhere git runs, and it is exactly the sentence a changeset is making.
 //
-// A revision that is not present at all is reported as not an ancestor rather
-// than as an error: a rewritten, dropped, or never-pushed commit is precisely
-// the case the caller needs to hear about, and it is not a malfunction.
+// The two arguments are not symmetrical, and conflating them was a defect.
+// An *ancestor* that is not present is a clean negative: a rewritten, dropped,
+// or never-pushed commit is precisely the case the caller needs to hear about,
+// and it is not a malfunction. A *descendant* that is not present means the
+// question cannot be answered at all — a tracking ref that was never fetched,
+// or a default branch this repository does not have — and reporting that as
+// "not an ancestor" tells the caller something false about the branch rather
+// than the truth about the ref.
 func IsAncestor(ctx context.Context, dir, ancestor, descendant string) (bool, error) {
-	if !RevisionExists(ctx, dir, ancestor) || !RevisionExists(ctx, dir, descendant) {
+	if !RevisionExists(ctx, dir, descendant) {
+		return false, fmt.Errorf("%w: %s", ErrRevisionNotFound, descendant)
+	}
+	if !RevisionExists(ctx, dir, ancestor) {
 		return false, nil
 	}
-	if _, err := Run(ctx, dir, "merge-base", "--is-ancestor", ancestor, descendant); err != nil {
+	if _, err := Run(ctx, dir, "merge-base", "--is-ancestor", "--", ancestor, descendant); err != nil {
 		// git exits 1 for "not an ancestor" and prints nothing. Anything
 		// carrying stderr is a real failure and must not be reported as a
 		// clean negative, or a broken repository reads as an unshipped one.
@@ -205,8 +219,14 @@ func IsAncestor(ctx context.Context, dir, ancestor, descendant string) (bool, er
 }
 
 // Fetch updates remote-tracking refs and prunes deleted ones.
+//
+// The remote name goes after `--`. Without it git reads a value beginning with
+// a dash as one of its own options, and `git fetch --upload-pack=<program>`
+// runs that program — so a remote name reaching this from a flag, a manifest,
+// or anything an agent composed would be a way to execute arbitrary commands
+// through a function whose whole job is to be read-only.
 func Fetch(ctx context.Context, dir, remote string) error {
-	_, err := Run(ctx, dir, "fetch", remote, "--prune", "--quiet")
+	_, err := Run(ctx, dir, "fetch", "--prune", "--quiet", "--", remote)
 	return err
 }
 

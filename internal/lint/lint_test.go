@@ -374,3 +374,34 @@ func TestTheAdoptedBrainIsNotReportedAsUnreferenced(t *testing.T) {
 		t.Errorf("the adopted brain was reported as unreachable: %+v", finding)
 	}
 }
+
+// `runtimes:` decides which adapters exist. An unrecognised value — a typo for
+// `claude`, or a runtime vat does not support — silently produces none, and
+// every other rule passes: no adapter means no drift, the description is
+// present so role-metadata passes, and a bare model binds to nothing so
+// model-ambiguous passes too. The definition sits on disk, inert, while the
+// whole report says the harness is healthy.
+func TestARoleTargetingARuntimeThatGeneratesNothingIsReported(t *testing.T) {
+	// Arrange
+	ws := fixture(t)
+	dir := filepath.Join(ws.Root, ".agents", "roles")
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatalf("create: %v", err)
+	}
+	role := "---\nname: planner\ndescription: Plans things.\nruntimes: [claude-code]\nmodel: opus\n---\n\n# Planner\n"
+	if err := os.WriteFile(filepath.Join(dir, "planner.md"), []byte(role), 0o644); err != nil {
+		t.Fatalf("write: %v", err)
+	}
+
+	// Act
+	report := run(t, ws)
+
+	// Assert
+	finding, found := rules(report)["harness/runtime-unknown"]
+	if !found {
+		t.Fatalf("a role that generates no adapter went unreported: %+v", report.Findings)
+	}
+	if !strings.Contains(finding.Message, "claude-code") {
+		t.Errorf("the finding does not name the bad value: %q", finding.Message)
+	}
+}

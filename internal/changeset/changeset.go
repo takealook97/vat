@@ -115,9 +115,17 @@ type Changeset struct {
 	Acceptance   string        `yaml:"integration_acceptance,omitempty" json:"integration_acceptance,omitempty"`
 	Repositories []Participant `yaml:"repositories" json:"repositories"`
 	// Decisions links the changeset to the reasoning that authorised it.
-	Decisions  []string `yaml:"decisions,omitempty" json:"decisions,omitempty"`
-	ApprovedBy string   `yaml:"approved_by,omitempty" json:"approved_by,omitempty"`
-	Notes      string   `yaml:"notes,omitempty" json:"notes,omitempty"`
+	// LandingWaived records that closing went ahead without landing evidence.
+	//
+	// The rule that reports the gap keys on this rather than on absent
+	// landed_on, because absence means two different things: a gate somebody
+	// waived, and a changeset closed by a vat that did not yet record landing
+	// at all. Keying on absence reported every historical changeset in every
+	// workspace, forever, with nothing anyone could do about it.
+	LandingWaived bool     `yaml:"landing_waived,omitempty" json:"landing_waived,omitempty"`
+	Decisions     []string `yaml:"decisions,omitempty" json:"decisions,omitempty"`
+	ApprovedBy    string   `yaml:"approved_by,omitempty" json:"approved_by,omitempty"`
+	Notes         string   `yaml:"notes,omitempty" json:"notes,omitempty"`
 }
 
 // Dir is the workspace directory holding changesets.
@@ -128,11 +136,28 @@ var idPattern = regexp.MustCompile(`^CS-(\d+)$`)
 // ErrNotFound is returned when no changeset exists for an identifier.
 var ErrNotFound = errors.New("no such changeset")
 
+// ErrInvalidID is returned for an identifier that is not of the form CS-0001.
+var ErrInvalidID = errors.New("invalid changeset id")
+
+// ValidID reports whether an identifier is safe to build a path from.
+//
+// The identifier is pasted into a filename and the file is then written whole.
+// An unchecked "../../../x" escapes the workspace entirely — through `Load`
+// from a command-line argument, and through `Save` from the `id:` field of a
+// changeset somebody committed. Writing outside the root is the boundary the
+// whole tool rests on, and the defect that retracted three releases.
+func ValidID(id string) bool { return idPattern.MatchString(id) }
+
 // Path returns the file a changeset lives in, relative to the workspace root.
+// It is meaningful only for an identifier ValidID accepts; callers reach it
+// through Load and Save, which check first.
 func Path(id string) string { return filepath.Join(Dir, id+".yaml") }
 
 // Load reads one changeset from the workspace root.
 func Load(root, id string) (Changeset, error) {
+	if !ValidID(id) {
+		return Changeset{}, fmt.Errorf("%w: %s is not of the form CS-0001", ErrInvalidID, id)
+	}
 	path := filepath.Join(root, Path(id))
 	data, err := os.ReadFile(path)
 	if os.IsNotExist(err) {
@@ -148,6 +173,12 @@ func Load(root, id string) (Changeset, error) {
 	decoder.KnownFields(true)
 	if err := decoder.Decode(&parsed); err != nil {
 		return Changeset{}, fmt.Errorf("parse %s: %w", Path(id), err)
+	}
+	// The identifier decides where the next Save writes. A file whose id
+	// disagrees with its own name would be read as one changeset and written
+	// back as another, silently overwriting it.
+	if parsed.ID != id {
+		return Changeset{}, fmt.Errorf("%w: %s declares id %q", ErrInvalidID, Path(id), parsed.ID)
 	}
 	return parsed, nil
 }
@@ -211,6 +242,12 @@ func NextID(root string) (string, error) {
 func Save(root string, set Changeset) error {
 	if set.ID == "" {
 		return fmt.Errorf("a changeset needs an id")
+	}
+	// The identifier decides where this is written, and it arrives from the
+	// `id:` field of a file on disk. A changeset committed with a traversing id
+	// would otherwise place its next save outside the workspace.
+	if !ValidID(set.ID) {
+		return fmt.Errorf("%w: %s is not of the form CS-0001", ErrInvalidID, set.ID)
 	}
 	encoded, err := yaml.Marshal(set)
 	if err != nil {

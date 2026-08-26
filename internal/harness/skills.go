@@ -77,6 +77,14 @@ func LoadSkills(root string) ([]Skill, error) {
 		}
 		skills = append(skills, skill)
 	}
+	byName := map[string][]string{}
+	for _, skill := range skills {
+		byName[skill.Name] = append(byName[skill.Name],
+			filepath.Join(SkillsDir, skill.Dir, SkillFile))
+	}
+	if err := refuseDuplicateNames(byName); err != nil {
+		return nil, err
+	}
 	sort.Slice(skills, func(i, j int) bool { return skills[i].Name < skills[j].Name })
 	return skills, nil
 }

@@ -649,3 +649,38 @@ func TestAFreshlyScaffoldedBrainDeclaresASchemaThisBuildAccepts(t *testing.T) {
 		}
 	}
 }
+
+// A version this build cannot parse is the strongest available signal that
+// something other than vat wrote the marker — which is the case the field
+// exists for. Falling through to "predates versioning" produced silence.
+func TestAnUnparseableSchemaIsReportedRatherThanReadAsAncient(t *testing.T) {
+	// Arrange
+	root := t.TempDir()
+	if _, err := brain.Init(root, reference); err != nil {
+		t.Fatalf("Init: %v", err)
+	}
+	for _, value := range []string{"2.0", "v2", "two", "-1"} {
+		if err := os.WriteFile(filepath.Join(root, brain.MarkerFile),
+			[]byte("# brain\nschema: "+value+"\n"), 0o644); err != nil {
+			t.Fatalf("write marker: %v", err)
+		}
+		store, err := brain.Load(root)
+		if err != nil {
+			t.Fatalf("Load: %v", err)
+		}
+
+		// Act
+		findings := brain.Check(store, brain.CheckPolicy{}, reference)
+
+		// Assert
+		found := false
+		for _, finding := range findings {
+			if finding.Rule == "brain/schema-newer" {
+				found = true
+			}
+		}
+		if !found {
+			t.Errorf("schema %q was read as a pre-versioning brain and reported clean", value)
+		}
+	}
+}

@@ -163,6 +163,7 @@ The rules, and what each one prevents:
 | `harness/role-metadata` | warn | a role no runtime can advertise |
 | `harness/model-ambiguous` | warn | one model name written into two vendors' adapters, where it resolves in at most one |
 | `harness/skill-metadata` | warn | a skill on disk that no runtime can offer, because it has no description |
+| `harness/runtime-unknown` | warn | a `runtimes:` value that generates no adapter, leaving the definition inert while every other rule passes |
 | `policy/trust-undeclared` | warn | a harness that cannot say which content is data |
 | `brain/not-initialised` | warn | a declared knowledge repository with no records |
 | `brain/unreferenced` | warn | a scaffolded brain the manifest never adopted, which no `vat brain` command can reach |
@@ -170,7 +171,7 @@ The rules, and what each one prevents:
 | `brain/source-revision-drift` | warn | a claim whose evidence moved on months ago |
 | `brain/source-repo-unknown` | warn | a claim pointing at a repository that is not governed |
 | `changeset/invalid` | error | a completion record that cannot be acted on |
-| `changeset/closed-unlanded` | warn | a changeset closed with `--force` whose revisions never reached a default branch |
+| `changeset/closed-unlanded` | warn | a changeset whose closing waived the landing gate, so the waiver stays visible |
 | `changeset/open-too-long` | warn | repositories mid-contract-change with no closing evidence |
 
 `--fix` repairs only what can be repaired without judgement: it regenerates what
@@ -433,14 +434,23 @@ Land the outstanding work, then run this again.
 | Exit | Meaning |
 | --- | --- |
 | 0 | every repository landed |
-| 1 | at least one has not, or the changeset is not verified yet |
+| 1 | at least one has not landed, could not be judged, or the changeset is not verified yet |
 | 2 | no such changeset, none enrolled, or the changeset is already finished |
 
 What was observed is written back to the changeset — `landed_on` and `landed_at`
 per repository — including a partial result, because a half-landed change is the
-state somebody needs to see the next morning. A previous run's answer is cleared
-first: landing is a claim about now, and a stale one on a force-pushed branch is
-the worst thing this record could say.
+state somebody needs to see the next morning.
+
+A previous answer is cleared only by an observation that contradicts it. Failing
+to *look* is not an observation: a run with no network, or one where a repository
+is briefly not cloned, leaves the existing evidence alone. Clearing it there
+would erase the record of a change that really had shipped, and no later run
+could put it back.
+
+"The ref is not here" and "the commit is not on it" are reported differently.
+`<remote>/<branch>` missing from a clone means the question could not be
+answered, not that the work failed to land, and the closing line says which of
+the two it was.
 
 `--offline` judges against refs already fetched, without contacting the remote.
 

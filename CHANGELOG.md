@@ -8,6 +8,11 @@ Notable changes to `vat`. The format follows
 
 ### Added
 
+- `harness/runtime-unknown`, for a `runtimes:` value no adapter is generated
+  for. A typo produced silence: no adapter meant no drift, the description was
+  present so role-metadata passed, and a bare model bound to nothing so
+  model-ambiguous passed. The definition sat on disk, inert, while every
+  diagnostic reported the harness healthy.
 - `docs/SPEC.md`, the file formats stated normatively, so that reading a vat
   workspace does not require being vat. A knowledge layer whose whole claim is
   that it outlives the tool that wrote it has to be implementable by somebody
@@ -161,6 +166,49 @@ Notable changes to `vat`. The format follows
   uncalled exported function has no possible user.
 
 ### Fixed
+
+- **A changeset identifier is validated before it becomes a path.** `Load` took
+  it from a command-line argument and `Save` took it from the `id:` field of a
+  file on disk, and neither checked it: `vat changeset abandon` on a record
+  declaring `id: ../../../escaped` wrote outside the workspace root. That is the
+  defect class three releases were retracted for, still live. Both paths now
+  refuse anything that is not `CS-NNNN`, and a file whose identifier disagrees
+  with its own name is refused too — it would have been read as one changeset
+  and written back over another.
+- **A remote name reaches git as a value, not as an option.** `gitx.Fetch`
+  passed it positionally with no `--`, so `vat ship --remote "--upload-pack=..."`
+  made git run that program. `merge-base` got the same separator.
+- **`vat ship` no longer erases landing evidence when it merely fails to look.**
+  The previous answer was cleared before any observation was attempted, so a run
+  with no network — or one where a repository was briefly not cloned — deleted
+  the record of a change that really had shipped, and no later run could restore
+  it. Only an observation that contradicts the record now clears it.
+- **A missing tracking ref is reported as a missing ref.** `IsAncestor` returned
+  a clean negative when the branch it compares against was absent, so
+  `--remote upstream` in a clone that has only `origin` reported every
+  repository as "verified but not landed" — a claim about the branch, when the
+  truth was about the ref.
+- **`changeset/closed-unlanded` keys on a recorded waiver.** Keying on absent
+  landing evidence reported every changeset closed before landing was recorded
+  at all: the entire history of every upgrading workspace, with a fix line
+  naming `vat ship`, which refuses a closed changeset. A rule nobody can satisfy
+  pointing at a command that will not run is the exact defect this batch fixed
+  elsewhere.
+- **`vat doctor` no longer reads a stash error as "no stashes".** Eleven lines
+  after saying that answer must never be given by accident, it gave it. It also
+  no longer vouches for repositories it never inspected.
+- **Two roles or skills claiming one name are refused.** The name decides the
+  adapter path, so a duplicate rendered one file from two definitions, never
+  converged, and picked its winner unstably.
+- **An unparseable brain schema is reported.** It returned the same value as no
+  schema line at all and was read as a brain predating versioning — silence in
+  the one case the field exists for.
+- **`brain/unreferenced` looks deeper than the workspace root, and says so when
+  it cannot look.** It scanned only immediate children while the command it
+  guards writes wherever it is pointed, and a directory it could not read made
+  the rule vanish from the report.
+- **`vat ship` refuses to write after a cancelled run,** which had been filing
+  the resulting instant failures as findings.
 
 - `vat brain init <directory>` advertised `vat brain new` after scaffolding, and
   that command then answered "this workspace has no brain repository". Every

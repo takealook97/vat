@@ -505,3 +505,52 @@ func TestIsAncestorAnswersTheQuestionTheShippingGateAsks(t *testing.T) {
 		t.Error("a revision that does not exist was reported as landed")
 	}
 }
+
+// The two arguments are not symmetrical. A missing ancestor is a clean
+// negative — never pushed, or rewritten away. A missing descendant means the
+// question cannot be answered at all, and reporting that as "not an ancestor"
+// tells the caller something false about the branch rather than the truth about
+// the ref.
+func TestIsAncestorSeparatesAMissingRefFromANegativeAnswer(t *testing.T) {
+	// Arrange
+	dir := newRepo(t)
+	ctx := context.Background()
+	head, err := gitx.HeadRevision(ctx, dir)
+	if err != nil {
+		t.Fatalf("HeadRevision: %v", err)
+	}
+
+	// Act & Assert: a descendant that is not in this repository is unanswerable.
+	_, err = gitx.IsAncestor(ctx, dir, head, "origin/main")
+	if !errors.Is(err, gitx.ErrRevisionNotFound) {
+		t.Errorf("a missing ref came back as %v, want ErrRevisionNotFound", err)
+	}
+
+	// An ancestor that is not present stays a clean negative.
+	landed, err := gitx.IsAncestor(ctx, dir, "0000000000000000000000000000000000000000", head)
+	if err != nil {
+		t.Fatalf("a missing ancestor must not be an error: %v", err)
+	}
+	if landed {
+		t.Error("a revision that does not exist was reported as landed")
+	}
+}
+
+// A value beginning with a dash must reach git as a value. Without the
+// end-of-options separator `git fetch --upload-pack=<program>` runs that
+// program, which turns a read-only helper into a way to execute anything.
+func TestFetchTreatsARemoteNameAsAValueNotAnOption(t *testing.T) {
+	// Arrange
+	dir := newRepo(t)
+
+	// Act
+	err := gitx.Fetch(context.Background(), dir, "--upload-pack=echo")
+
+	// Assert
+	if err == nil {
+		t.Fatal("a remote name shaped like an option was accepted")
+	}
+	if strings.Contains(err.Error(), "unknown option") {
+		t.Errorf("git parsed the remote name as one of its own options: %v", err)
+	}
+}

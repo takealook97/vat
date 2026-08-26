@@ -315,3 +315,23 @@ func TestDoctorReportsCommitsThatExistOnlyOnThisMachine(t *testing.T) {
 		t.Errorf("work that exists only here went unreported: %+v", report.Findings)
 	}
 }
+
+// Asserting that every repository is safe having inspected none of them is a
+// vacuous truth that reads as an assurance.
+func TestDoctorSaysNothingAboutRecoverabilityWhenNothingIsCloned(t *testing.T) {
+	// Arrange: governed but never cloned.
+	ws := fixture(t)
+	ws.Manifest = manifest.WithRepo(ws.Manifest, manifest.Repo{
+		Name: "ghost", Origin: "https://example.invalid/acme/ghost.git", Role: manifest.RoleProduct,
+	})
+
+	// Act
+	report := doctor.Run(context.Background(), ws, doctor.Options{Now: reference})
+
+	// Assert
+	for _, finding := range report.Findings {
+		if finding.Section == "recovery" && finding.Status == doctor.StatusOK {
+			t.Errorf("doctor vouched for repositories it never looked at: %+v", finding)
+		}
+	}
+}

@@ -1,6 +1,7 @@
 package harness_test
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
@@ -141,5 +142,32 @@ func TestWritingSkillAdaptersTwiceReportsChangeOnlyOnce(t *testing.T) {
 	}
 	if len(drifted) != 0 {
 		t.Errorf("freshly written adapters reported as drifted: %v", drifted)
+	}
+}
+
+// The name decides the adapter path, so two definitions claiming one name
+// render to a single file with different content. Rendering then never
+// converges: `vat lint --fix` rewrites, the loser mismatches again, and which
+// one loses is not even stable between runs.
+func TestTwoSkillsClaimingOneNameAreRefused(t *testing.T) {
+	// Arrange
+	root := t.TempDir()
+	writeSkill(t, root, "deploy-api", "---\nname: deploy\ndescription: One.\n---\n\nSteps.\n")
+	writeSkill(t, root, "deploy-web", "---\nname: deploy\ndescription: Two.\n---\n\nSteps.\n")
+
+	// Act
+	_, err := harness.LoadSkills(root)
+
+	// Assert
+	if err == nil {
+		t.Fatal("two skills claiming one name were accepted")
+	}
+	if !errors.Is(err, harness.ErrDuplicateName) {
+		t.Errorf("err = %v, want ErrDuplicateName", err)
+	}
+	for _, want := range []string{"deploy-api", "deploy-web"} {
+		if !strings.Contains(err.Error(), want) {
+			t.Errorf("the error does not name %s, so it cannot be acted on: %v", want, err)
+		}
 	}
 }

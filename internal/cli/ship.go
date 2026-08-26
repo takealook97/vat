@@ -2,6 +2,7 @@ package cli
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/takealook97/vat/internal/changeset"
@@ -55,6 +56,11 @@ type landing struct {
 	Revision string `json:"revision,omitempty"`
 	Ref      string `json:"ref"`
 	Landed   bool   `json:"landed"`
+	// Observed distinguishes "we looked and it is not there" from "we could not
+	// look". Both fail the gate, and telling somebody to land work that is
+	// already landed — because a ref was missing — sends them at the wrong
+	// problem entirely.
+	Observed bool   `json:"observed"`
 	Detail   string `json:"detail,omitempty"`
 }
 
@@ -116,6 +122,12 @@ func runShip(ctx context.Context, env *Env, args []string) error {
 			report.Landed = false
 		}
 	}
+	// A cancelled run has judged nothing it can stand behind: every git call
+	// after the interrupt fails instantly on the dead context, so writing now
+	// would file those failures as findings.
+	if err := ctx.Err(); err != nil {
+		return err
+	}
 	// The observations are worth keeping even when the answer is no: a partial
 	// landing is exactly the state somebody needs to see the next morning.
 	if err := changeset.Save(ws.Root, current); err != nil {
@@ -140,9 +152,17 @@ func runShip(ctx context.Context, env *Env, args []string) error {
 	}
 	env.Printer.Heading("Result")
 	if unlanded := countUnlanded(report); unlanded > 0 {
-		env.Printer.Status(ui.LevelFail, "ship", fmt.Sprintf("%s of %d not landed",
+		env.Printer.Status(ui.LevelFail, "ship", fmt.Sprintf("%s of %d not confirmed landed",
 			pluralise(unlanded, "repository", "repositories"), len(report.Repos)))
-		return findingsErrorf("Land the outstanding work, then run this again.")
+		// Only tell somebody to land work when something was actually observed
+		// to be unlanded. When nothing could be judged, the work may well have
+		// shipped and the problem is the ref.
+		for _, result := range report.Repos {
+			if !result.Landed && result.Observed {
+				return findingsErrorf("Land the outstanding work, then run this again.")
+			}
+		}
+		return findingsErrorf("Nothing could be judged. Check the remote and the branch each repository ships from.")
 	}
 	env.Printer.Status(ui.LevelOK, "ship", fmt.Sprintf("every repository landed on %s", *remote))
 	env.Printer.Hint("\nNext: vat changeset close %s --acceptance \"...\"", current.ID)
@@ -155,12 +175,13 @@ func judgeLanding(
 	ctx context.Context, env *Env, ws *workspace.Workspace,
 	participant changeset.Participant, remote string, offline bool,
 ) (landing, changeset.Participant) {
+	// The previous answer is kept until something is actually observed. Landing
+	// is a claim about now, so an observation that contradicts it must clear it
+	// — but *failing to look* is not an observation. Clearing up front meant a
+	// run with no network, or one where a repository was briefly not cloned,
+	// erased the evidence of a change that really had shipped, and no later run
+	// could put it back.
 	updated := participant
-	// A previous run's answer must not survive into this one. Landing is a
-	// claim about now, and a stale "landed" on a force-pushed branch is the
-	// worst possible thing for this record to say.
-	updated.LandedOn, updated.LandedAt = "", ""
-
 	result := landing{Repo: participant.Name, Revision: participant.Revision}
 	repo, ok := ws.Manifest.Find(participant.Name)
 	if !ok {
@@ -184,16 +205,23 @@ func judgeLanding(
 		}
 	}
 	landed, err := gitx.IsAncestor(ctx, dir, participant.Revision, result.Ref)
-	if err != nil {
+	switch {
+	case errors.Is(err, gitx.ErrRevisionNotFound):
+		// Saying "not landed" here would be a claim about the branch. The truth
+		// is about the ref: it is not in this clone, so nothing was observed.
+		result.Detail = result.Ref + " is not present in this clone, so landing could not be judged"
+		return result, updated
+	case err != nil:
 		result.Detail = "git could not compare against " + result.Ref + ": " + gitx.Redact(err.Error())
 		return result, updated
-	}
-	if !landed {
+	case !landed:
+		result.Observed = true
 		result.Detail = shortRev(participant.Revision) + " is not on " + result.Ref +
 			"; verified but not landed"
+		updated.LandedOn, updated.LandedAt = "", ""
 		return result, updated
 	}
-	result.Landed = true
+	result.Landed, result.Observed = true, true
 	updated.LandedOn = result.Ref
 	updated.LandedAt = env.Now.Format("2006-01-02")
 	return result, updated

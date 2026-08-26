@@ -579,12 +579,13 @@ func checkNetwork(ctx context.Context) []Finding {
 // states where the answer is no.
 func checkRecoverability(ctx context.Context, ws *workspace.Workspace) []Finding {
 	var findings []Finding
-	exposed := 0
+	exposed, inspected := 0, 0
 	for _, repo := range ws.Manifest.Active() {
 		dir := ws.RepoPath(repo)
 		if !gitx.IsRepository(dir) {
 			continue
 		}
+		inspected++
 		unpushed, err := gitx.UnpushedCommits(ctx, dir)
 		if err != nil {
 			// Saying nothing here would report a repository as recoverable
@@ -599,7 +600,16 @@ func checkRecoverability(ctx context.Context, ws *workspace.Workspace) []Finding
 		}
 		stashes, err := gitx.StashCount(ctx, dir)
 		if err != nil {
-			stashes = 0
+			// Zero here would be indistinguishable from "no stashes", which is
+			// the one answer this check must never give by accident — and a
+			// stash is invisible to git status, so nothing else would mention
+			// it. The line above says exactly this about unpushed commits.
+			findings = append(findings, Finding{
+				Section: sectionRecovery, Subject: repo.Name, Status: StatusWarn,
+				Detail: "git could not say whether any stash exists only here",
+			})
+			exposed++
+			continue
 		}
 		if unpushed == 0 && stashes == 0 {
 			continue
@@ -611,10 +621,15 @@ func checkRecoverability(ctx context.Context, ws *workspace.Workspace) []Finding
 			Fix:    "push the branch, or accept that this machine is the only copy",
 		})
 	}
+	// Asserting that every repository is safe having looked at none of them is
+	// a vacuous truth that reads as an assurance.
+	if inspected == 0 {
+		return findings
+	}
 	if exposed == 0 {
 		findings = append(findings, Finding{
 			Section: sectionRecovery, Subject: "git history", Status: StatusOK,
-			Detail: "every governed repository has its commits on a remote",
+			Detail: fmt.Sprintf("all %d cloned repositories have their commits on a remote", inspected),
 		})
 	}
 	return findings

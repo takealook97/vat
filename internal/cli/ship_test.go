@@ -204,3 +204,115 @@ func TestShipRefusesAChangesetThatIsAlreadyClosed(t *testing.T) {
 		t.Errorf("the closing evidence was erased by a later run:\n%s", record)
 	}
 }
+
+// Landing is a claim about now, so an observation that contradicts it must
+// clear it — but failing to *look* is not an observation. Clearing up front
+// meant a run with no network, or one where a repository was briefly not
+// cloned, erased the evidence of a change that really had shipped, and no
+// later run could put it back.
+func TestShipKeepsLandingEvidenceWhenItCannotObserve(t *testing.T) {
+	// Arrange: landed and recorded, then the remote is made unreachable.
+	h := adoptedFixture(t, "payments")
+	addCheck(t, h, "payments", "true")
+	h.mustRun("changeset", "new", "Move cancellation to v2", "--repos", "payments")
+	h.mustRun("changeset", "verify", "CS-0001")
+	landOnUpstream(t, h, "payments")
+	h.mustRun("ship", "CS-0001", "--offline")
+	if record := readChangeset(t, h, "CS-0001"); !strings.Contains(record, "landed_on") {
+		t.Fatalf("the fixture did not land in the first place:\n%s", record)
+	}
+	git(t, h.path("payments"), "remote", "set-url", "origin", h.path("payments")+"-gone")
+
+	// Act: online, so the fetch is attempted and fails.
+	code, output := h.run("ship", "CS-0001")
+
+	// Assert
+	if code == ExitOK {
+		t.Fatalf("ship claimed success while unable to reach the remote:\n%s", output)
+	}
+	if record := readChangeset(t, h, "CS-0001"); !strings.Contains(record, "landed_on") {
+		t.Errorf("being unable to look erased evidence of a change that did ship:\n%s", record)
+	}
+}
+
+// "The ref is not here" and "the commit is not on it" are different facts.
+// Rendering the first as the second told the user something false about the
+// branch — and `--remote` naming a remote this clone does not have was enough
+// to trigger it for every repository at once.
+func TestShipSaysTheRefIsAbsentRatherThanClaimingItDidNotLand(t *testing.T) {
+	// Arrange
+	h := adoptedFixture(t, "payments")
+	addCheck(t, h, "payments", "true")
+	h.mustRun("changeset", "new", "Move cancellation to v2", "--repos", "payments")
+	h.mustRun("changeset", "verify", "CS-0001")
+	landOnUpstream(t, h, "payments")
+
+	// Act: a remote whose tracking refs do not exist in this clone.
+	code, output := h.run("ship", "CS-0001", "--offline", "--remote", "upstream")
+
+	// Assert
+	if code == ExitOK {
+		t.Fatalf("ship passed against a ref it cannot see:\n%s", output)
+	}
+	if strings.Contains(output, "not landed") {
+		t.Errorf("ship blamed the branch for a ref it never had:\n%s", output)
+	}
+	if !strings.Contains(output, "not present in this clone") {
+		t.Errorf("ship did not say the ref is missing:\n%s", output)
+	}
+}
+
+// A waived gate has to stay visible. Keying the rule on absent evidence instead
+// reported every changeset closed before landing was recorded at all — the
+// whole history of every upgrading workspace, with nothing anyone could do.
+func TestOnlyAWaivedCloseIsReportedAsUnlanded(t *testing.T) {
+	// Arrange: one changeset closed with --force, one closed after landing.
+	h := adoptedFixture(t, "payments")
+	addCheck(t, h, "payments", "true")
+	h.mustRun("changeset", "new", "Waived", "--repos", "payments")
+	h.mustRun("changeset", "verify", "CS-0001")
+	h.mustRun("changeset", "close", "CS-0001", "--acceptance", "checked by hand", "--force")
+
+	// A record from before landing existed: closed, landed, then the evidence
+	// stripped the way an older vat's file would look.
+	h.mustRun("changeset", "new", "Legacy", "--repos", "payments")
+	h.mustRun("changeset", "verify", "CS-0002")
+	landOnUpstream(t, h, "payments")
+	h.mustRun("ship", "CS-0002", "--offline")
+	h.mustRun("changeset", "close", "CS-0002", "--acceptance", "shipped")
+	stripLandingEvidence(t, h, "CS-0002")
+
+	// Act
+	_, output := h.run("lint")
+
+	// Assert
+	if !strings.Contains(output, "CS-0001") {
+		t.Errorf("the waived close was not reported:\n%s", output)
+	}
+	if strings.Contains(output, "CS-0002") {
+		t.Errorf("a changeset closed before landing was recorded was reported as a waiver:\n%s", output)
+	}
+}
+
+// stripLandingEvidence rewrites a record the way one written by a vat that did
+// not yet know about landing would look.
+func stripLandingEvidence(t *testing.T, h *workspaceFixture, id string) {
+	t.Helper()
+	path := filepath.Join(h.root, "changesets", id+".yaml")
+	content, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("read %s: %v", id, err)
+	}
+	var kept []string
+	for _, line := range strings.Split(string(content), "\n") {
+		trimmed := strings.TrimSpace(line)
+		if strings.HasPrefix(trimmed, "landed_on:") || strings.HasPrefix(trimmed, "landed_at:") ||
+			strings.HasPrefix(trimmed, "landing_waived:") {
+			continue
+		}
+		kept = append(kept, line)
+	}
+	if err := os.WriteFile(path, []byte(strings.Join(kept, "\n")), 0o644); err != nil {
+		t.Fatalf("write %s: %v", id, err)
+	}
+}
