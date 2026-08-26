@@ -137,8 +137,10 @@ The rules, and what each one prevents:
 | `workspace/not-a-repository` | warn | an unversioned manifest and harness |
 | `repo/missing` | error / warn | a repository never cloned; error when `required`, warning otherwise — `vat sync` draws the same line |
 | `repo/not-a-repository` | error | a directory shadowing a governed repository |
+| `repo/outside-workspace` | error | a governed directory that resolves, through a symlink, outside the workspace vat may write to |
 | `repo/remote-mismatch` | error | fetching from somewhere the manifest does not name |
 | `repo/remote-missing` | warn | a repository that can never be fetched or pushed |
+| `repo/credential-in-remote` | error | a token left in a clone's `.git/config`, which the remote comparison cannot see because it strips userinfo before comparing |
 | `repo/default-branch-missing` | warn | a `develop` repository skipped by every update, silently |
 | `repo/checks-missing` | warn | a changeset with nothing to verify |
 | `harness/workspace-missing` | error | a workspace with no agent contract |
@@ -159,6 +161,12 @@ The rules, and what each one prevents:
 `--fix` repairs only what can be repaired without judgement: it regenerates what
 is generated and re-excludes what should have been excluded. It never edits a
 fact, a decision, or a working tree.
+
+Neither `repo/outside-workspace` nor `repo/credential-in-remote` is repairable,
+and deliberately so. Moving a repository is a decision about layout, and
+rewriting a remote is the one operation this tool does not perform — stripping a
+credential from `.git/config` would also break the next push for anyone relying
+on it. Both findings report and hand you the command.
 
 `--offline` skips the rules that resolve a git revision.
 

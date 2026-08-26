@@ -44,6 +44,18 @@ it would train you to ignore the check. It applies on Unix only — see
 
 No value, no key name from inside a file, no path outside the workspace.
 
+A credential can also end up somewhere `vat` never put it: a clone's own
+`.git/config`. The manifest has always refused an embedded credential, and every
+command that accepts a URL refuses one, but a remote configured before those
+guards existed still holds the token — and the remote-mismatch rule cannot see
+it, because the comparison strips userinfo before comparing and a token-bearing
+remote therefore matches the plain manifest origin exactly. `vat lint` reports
+that separately as `repo/credential-in-remote`.
+
+It reports existence and nothing else, and it is not repairable: rewriting a
+remote is the one operation this tool does not perform, and stripping the
+credential would break the next push for anyone relying on it.
+
 ### 3. Canon is not retrieval
 
 | Tier | Sources | May do |
@@ -148,6 +160,14 @@ directory additionally require the *resolved* path to sit strictly below the
 workspace root — resolved, because a symlink inside the workspace pointing
 outside it satisfies every textual check, and `vat repo adopt` on one used to
 write a generated contract into a repository outside the root.
+
+A guard at the entry point only protects the next invocation. It does nothing
+for a workspace that is already on disk — one whose layout changed afterwards,
+or one built by a version of `vat` that did not yet ask. So the same question is
+also a lint rule, `repo/outside-workspace`, which resolves every governed
+directory and reports the ones that land outside the root. Both the commands and
+the rule call `workspace.Contains`, so an entry check and an audit cannot
+disagree about what "inside the workspace" means.
 
 `vat` opens no network connection of its own. Network activity is `git` and, for
 `vat repo new`, the GitHub CLI — both invoked as subprocesses using your

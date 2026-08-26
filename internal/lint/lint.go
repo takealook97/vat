@@ -166,8 +166,10 @@ func RuleNames() []string {
 		"workspace/not-a-repository",
 		"repo/missing",
 		"repo/not-a-repository",
+		"repo/outside-workspace",
 		"repo/remote-mismatch",
 		"repo/remote-missing",
+		"repo/credential-in-remote",
 		"repo/default-branch-missing",
 		"repo/checks-missing",
 		"harness/workspace-missing",
@@ -240,6 +242,23 @@ func checkRepositories(ctx context.Context, ws *workspace.Workspace) []Finding {
 			})
 			continue
 		}
+		// The manifest refuses a path that escapes textually and RepoPath
+		// re-roots the join, but neither can see a symlink: a link inside the
+		// workspace pointing out of it satisfies every string comparison while
+		// every write through it lands somewhere vat may not touch. The
+		// commands that create, move, and adopt a directory ask this question
+		// before they act; nothing asked it of a workspace that already exists,
+		// including one built by a version of vat that never asked at all.
+		if !ws.Contains(dir) {
+			findings = append(findings, Finding{
+				Rule: "repo/outside-workspace", Severity: SeverityError, Subject: repo.Name,
+				Message: fmt.Sprintf(
+					"%s resolves outside the workspace, so a rendered contract or a deletion would land there instead",
+					ws.Rel(dir)),
+				Fix: "move the repository inside the workspace, or drop the entry with vat repo remove",
+			})
+			continue
+		}
 		if !gitx.IsRepository(dir) {
 			findings = append(findings, Finding{
 				Rule: "repo/not-a-repository", Severity: SeverityError, Subject: repo.Name,
@@ -257,12 +276,37 @@ func checkRepositories(ctx context.Context, ws *workspace.Workspace) []Finding {
 				Fix: fmt.Sprintf("git -C %s remote add origin %s",
 					repo.Dir(), gitx.Redact(repo.Origin)),
 			})
-		} else if !gitx.SameRemote(actual, repo.Origin) {
-			findings = append(findings, Finding{
-				Rule: "repo/remote-mismatch", Severity: SeverityError, Subject: repo.Name,
-				Message: fmt.Sprintf("origin is %s but the manifest says %s",
-					gitx.Redact(actual), gitx.Redact(repo.Origin)),
-			})
+		} else {
+			// Checked before the mismatch rule rather than as part of it,
+			// because NormaliseURL strips the userinfo it compares: a remote
+			// carrying a token is *equal* to the plain manifest origin and this
+			// loop reported nothing at all. The manifest has refused an
+			// embedded credential since it was first validated, and every
+			// command that takes a URL refuses one now, but a clone made before
+			// those guards existed still has the token sitting in .git/config
+			// where nothing looks.
+			//
+			// Never fixable. Rewriting a remote is the one thing this tool does
+			// not do, and stripping the credential would break the push of
+			// anyone who has no credential helper configured — a judgement
+			// `--fix` promises not to make.
+			if manifest.HasEmbeddedCredential(actual) {
+				findings = append(findings, Finding{
+					Rule: "repo/credential-in-remote", Severity: SeverityError, Subject: repo.Name,
+					// Existence, permissions, and age only: the finding must not
+					// become the one place the secret is disclosed.
+					Message: "origin embeds a credential in its URL, readable by anything that can read .git/config and echoed by git's own errors",
+					Fix: fmt.Sprintf("move it to a credential helper, then: git -C %s remote set-url origin %s",
+						repo.Dir(), gitx.WithoutCredentials(repo.Origin)),
+				})
+			}
+			if !gitx.SameRemote(actual, repo.Origin) {
+				findings = append(findings, Finding{
+					Rule: "repo/remote-mismatch", Severity: SeverityError, Subject: repo.Name,
+					Message: fmt.Sprintf("origin is %s but the manifest says %s",
+						gitx.Redact(actual), gitx.Redact(repo.Origin)),
+				})
+			}
 		}
 		if repo.DefaultBranch == "" && ws.Manifest.Workspace.DefaultBranch != "" {
 			// A repository on master or develop, with the workspace default set
