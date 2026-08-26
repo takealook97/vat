@@ -70,15 +70,6 @@ func OpenAt(root string) (*Workspace, error) {
 	return &Workspace{Root: filepath.Clean(root), Manifest: loaded}, nil
 }
 
-// OpenCurrent loads the workspace containing the process working directory.
-func OpenCurrent() (*Workspace, error) {
-	cwd, err := os.Getwd()
-	if err != nil {
-		return nil, fmt.Errorf("resolve working directory: %w", err)
-	}
-	return Open(cwd)
-}
-
 // ManifestPath returns the absolute path of vat.yaml.
 func (w *Workspace) ManifestPath() string {
 	return filepath.Join(w.Root, manifest.FileName)

@@ -250,23 +250,6 @@ func trailingDigits(id string) string {
 	return digits
 }
 
-// MemoryMonths returns the month directories under memory/, newest first.
-func (s *Store) MemoryMonths() []string {
-	seen := map[string]bool{}
-	for _, record := range s.OfKind(KindMemory) {
-		parts := strings.Split(record.Path, "/")
-		if len(parts) >= 2 {
-			seen[parts[1]] = true
-		}
-	}
-	months := make([]string, 0, len(seen))
-	for month := range seen {
-		months = append(months, month)
-	}
-	sort.Sort(sort.Reverse(sort.StringSlice(months)))
-	return months
-}
-
 // RecentMemories returns the newest dated memory records.
 func (s *Store) RecentMemories(limit int) []Record {
 	memories := s.OfKind(KindMemory)

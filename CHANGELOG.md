@@ -27,10 +27,21 @@ Notable changes to `vat`. The format follows
   to `workspace.Contains`, so an entry-point guard and an audit cannot disagree
   about what "inside the workspace" means.
 
+### Removed
+
+- `workspace.OpenCurrent` and `brain.MemoryMonths`, which nothing called. These
+  are `internal` packages, so no consumer outside this module can exist and an
+  uncalled exported function has no possible user.
+
 ### Fixed
 
-- Two doc comments were separated from the functions they document by a blank
-  line, which hides them from `go doc` entirely.
+- Ten doc comments were separated from the functions they document by a blank
+  line, which hides them from `go doc` and from an editor's hover entirely. The
+  reasoning a comment records is the only thing that earns it a place, and this
+  made it invisible. A test now walks every Go file in the repository and fails
+  on any comment that opens with a function's own name but is not attached to
+  it — neither `gofmt` nor any linter this project runs reports the pattern, so
+  it had recurred three times.
 
 ## [0.1.0] - 2026-08-25
 
