@@ -134,6 +134,15 @@ makes them the work most often destroyed by a cleanup.
 Every write goes through an atomic temp-file-and-rename, so an interrupted run
 cannot leave a half-written manifest, contract, or record.
 
+Every one of those paths is built from a name a user supplied, so the name is
+checked before the path is used rather than when the result is saved. A
+repository name may hold only letters, digits, `.`, `_`, and `-`; a role name
+only letters, digits, `-`, and `_`. Both were previously validated late enough
+that `vat repo new ../escaped` scaffolded a repository outside the workspace
+before failing, and `vat harness role new ../../../pwned` wrote a file outside
+it and reported success. Commands that delete or move a directory additionally
+require the resolved path to sit strictly below the workspace root.
+
 `vat` opens no network connection of its own. Network activity is `git` and, for
 `vat repo new`, the GitHub CLI — both invoked as subprocesses using your
 existing authentication.

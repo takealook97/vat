@@ -109,8 +109,8 @@ func Validate(m Manifest) error {
 		switch {
 		case strings.TrimSpace(repo.Name) == "":
 			problems = append(problems, where+": name is required")
-		case !validRepoName(repo.Name):
-			problems = append(problems, where+": name may contain only letters, digits, '.', '_', and '-'")
+		case ValidateRepoName(repo.Name) != nil:
+			problems = append(problems, where+": "+ValidateRepoName(repo.Name).Error())
 		case seenNames[repo.Name]:
 			problems = append(problems, where+": duplicate name")
 		}
@@ -209,16 +209,29 @@ func countRole(m Manifest, role Role) int {
 	return count
 }
 
-func validRepoName(name string) bool {
+// ValidateRepoName reports whether a name may be used for a repository.
+//
+// It is exported because a command that creates directories has to ask before
+// it touches the disk, not after: `vat repo new ../escaped` used to initialise a
+// repository outside the workspace and only then fail this check on save,
+// leaving the files behind. Callers and the manifest share this one definition
+// so an early check can never disagree with the one that gates the write.
+func ValidateRepoName(name string) error {
+	if strings.TrimSpace(name) == "" {
+		return errors.New("name is required")
+	}
 	for _, r := range name {
 		switch {
 		case r >= 'a' && r <= 'z', r >= 'A' && r <= 'Z', r >= '0' && r <= '9':
 		case r == '-', r == '_', r == '.':
 		default:
-			return false
+			return errors.New("name may contain only letters, digits, '.', '_', and '-'")
 		}
 	}
-	return !strings.HasPrefix(name, ".")
+	if strings.HasPrefix(name, ".") {
+		return errors.New("name may contain only letters, digits, '.', '_', and '-'")
+	}
+	return nil
 }
 
 // Save validates and writes the manifest atomically, with a header comment

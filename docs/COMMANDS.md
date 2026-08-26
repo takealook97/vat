@@ -214,6 +214,10 @@ vat repo rename  <old> <new> [--keep-path]
 Every mutation moves the manifest, the `.gitignore` exclusion, and the generated
 harness together, because changing one without the others is the failure mode.
 
+A repository name may hold only letters, digits, `.`, `_`, and `-`, and `new`
+checks it before it creates anything. The name becomes both a directory and,
+through `remote_template`, part of a URL.
+
 Every flag is validated before anything is created, so a typo cannot leave a
 directory behind that is in neither the manifest nor `.gitignore`.
 
@@ -252,6 +256,10 @@ adapter. Content outside a generated region is never touched.
 defaults to **read-only**: write access is granted by naming the repositories it
 may change, because a role that can edit anything is a role whose boundary
 cannot be reviewed.
+
+A role name may hold only letters, digits, `-`, and `_`. It is pasted into a
+path in `.agents/roles/` and in every runtime's adapter directory, and adapters
+are written whole rather than into a marked region.
 
 ---
 
@@ -305,6 +313,9 @@ vat changeset close     <id> --acceptance "..." [--approved-by <name>] [--force]
 vat changeset abandon   <id> [--reason <text>]
 vat changeset undo-plan <id>
 ```
+
+`new` requires an objective. The objective is the one claim the record makes,
+which is the same reason `--acceptance` may not be empty when closing.
 
 `new` and `add` record where each repository stands before the change begins,
 because after it lands that can no longer be observed. `add` refuses once the

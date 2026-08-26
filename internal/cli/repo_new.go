@@ -60,7 +60,19 @@ func runRepoNew(ctx context.Context, env *Env, args []string) error {
 	if _, exists := ws.Manifest.Find(name); exists {
 		return usageErrorf("%s is already in %s", name, manifest.FileName)
 	}
+	// Asked before the path is built, not after the manifest is saved. The name
+	// becomes a directory and a remote URL, so `vat repo new ../escaped` used to
+	// initialise a repository outside the workspace, scaffold it, commit it, and
+	// only then fail validation -- leaving everything it had written behind.
+	if err := manifest.ValidateRepoName(name); err != nil {
+		return usageErrorf("%v", err)
+	}
 	dir := filepath.Join(ws.Root, name)
+	// Defence in depth: the name check above already rejects a separator, and
+	// this refuses anything that still resolves outside the workspace.
+	if !strictlyBelow(ws.Root, dir) {
+		return usageErrorf("%s would sit outside the workspace", name)
+	}
 	if fsx.Exists(dir) {
 		return usageErrorf("%s already exists; use `vat repo adopt %s` instead", ws.Rel(dir), name)
 	}

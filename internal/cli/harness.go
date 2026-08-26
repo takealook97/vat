@@ -230,6 +230,11 @@ func runHarnessRole(ctx context.Context, env *Env, args []string) error {
 		return usageErrorf("expected: vat harness role new <name>")
 	}
 	name := set.Arg(1)
+	if !harness.ValidRoleName(name) {
+		return usageErrorf(
+			"%q is not a usable role name; use letters, digits, '-', and '_' only.\n"+
+				"  The name becomes a file path in every runtime's adapter directory.", name)
+	}
 
 	ws, err := env.Workspace()
 	if err != nil {

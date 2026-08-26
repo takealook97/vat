@@ -397,3 +397,99 @@ func TestEmptyListingsSaySoRatherThanPrintingNothing(t *testing.T) {
 		})
 	}
 }
+
+func TestRepoNewRefusesANameBeforeItTouchesTheDisk(t *testing.T) {
+	// Arrange: the name becomes a directory and a remote URL. Validating it only
+	// when the manifest is saved meant `vat repo new ../escaped` initialised a
+	// repository outside the workspace, scaffolded it, committed it, and then
+	// failed — leaving everything it had written behind, outside the one
+	// directory this tool is allowed to write to.
+	h := adoptedFixture(t, "payments")
+	outside := filepath.Join(filepath.Dir(h.root), "escaped")
+
+	cases := []string{"../escaped", "nested/name", ".hidden"}
+
+	for _, name := range cases {
+		t.Run(name, func(t *testing.T) {
+			// Act
+			code, output := h.run("repo", "new", name, "--no-remote")
+
+			// Assert
+			if code == ExitOK {
+				t.Errorf("`repo new %s` was accepted:\n%s", name, output)
+			}
+			if _, err := os.Stat(outside); err == nil {
+				t.Errorf("`repo new %s` wrote outside the workspace root:\n%s", name, output)
+			}
+			stray := filepath.Join(h.root, filepath.Base(name))
+			if _, err := os.Stat(stray); err == nil {
+				t.Errorf("`repo new %s` left %s behind after refusing:\n%s", name, stray, output)
+			}
+		})
+	}
+}
+
+func TestHarnessRoleNewRefusesANameThatWouldEscapeItsDirectory(t *testing.T) {
+	// Arrange: the name is pasted into a file path in .agents/roles and in every
+	// runtime's adapter directory. `harness role new ../../../pwned` wrote the
+	// role body outside the workspace entirely and reported success — the check
+	// for this already existed in the harness package and this command was the
+	// one caller that never asked.
+	h := adoptedFixture(t, "payments")
+	outside := filepath.Join(filepath.Dir(h.root), "pwned.md")
+
+	for _, name := range []string{"../../../pwned", "../escape", "nested/role"} {
+		t.Run(name, func(t *testing.T) {
+			// Act
+			code, output := h.run("harness", "role", "new", name, "--description", "x")
+
+			// Assert
+			if code == ExitOK {
+				t.Errorf("`harness role new %s` was accepted:\n%s", name, output)
+			}
+			if _, err := os.Stat(outside); err == nil {
+				t.Errorf("`harness role new %s` wrote outside the workspace:\n%s", name, output)
+			}
+			stray := filepath.Join(h.root, filepath.Base(name)+".md")
+			if _, err := os.Stat(stray); err == nil {
+				t.Errorf("`harness role new %s` wrote %s, which no command reads:\n%s",
+					name, stray, output)
+			}
+		})
+	}
+}
+
+func TestHarnessRoleNewStillAcceptsAnOrdinaryName(t *testing.T) {
+	// Arrange: the guard above must not have closed the door on the normal case.
+	h := adoptedFixture(t, "payments")
+
+	// Act
+	h.mustRun("harness", "role", "new", "planner", "--description", "plans work")
+
+	// Assert
+	if _, err := os.Stat(h.path(".agents", "roles", "planner.md")); err != nil {
+		t.Errorf("an ordinary role name did not produce a role body: %v", err)
+	}
+}
+
+func TestAChangesetRefusesToRecordAnEmptyObjective(t *testing.T) {
+	// Arrange: the objective is the one claim the record makes. A blank one
+	// reads as a verified bundle of revisions for no stated reason, which is
+	// exactly why --acceptance may not be empty when closing.
+	h := adoptedFixture(t, "payments")
+
+	// Act
+	code, output := h.run("changeset", "new", "", "--repos", "payments")
+
+	// Assert
+	if code == ExitOK {
+		t.Errorf("a changeset was opened with no objective:\n%s", output)
+	}
+	var sets []struct {
+		ID string `json:"id"`
+	}
+	h.runJSON(&sets, "changeset", "list")
+	if len(sets) != 0 {
+		t.Errorf("the refused changeset was written anyway: %+v", sets)
+	}
+}

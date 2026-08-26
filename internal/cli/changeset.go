@@ -71,7 +71,13 @@ func runChangesetNew(ctx context.Context, env *Env, args []string) error {
 	if set.NArg() == 0 {
 		return usageErrorf("expected an objective")
 	}
-	objective := strings.Join(set.Args(), " ")
+	// `changeset new ""` passed the count check and produced a record whose one
+	// claim -- what was changed across these repositories -- was blank. It is
+	// the same reason --acceptance may not be empty when closing one.
+	objective := strings.TrimSpace(strings.Join(set.Args(), " "))
+	if objective == "" {
+		return usageErrorf("an objective is required; a record that does not say what the change was cannot be read later")
+	}
 
 	ws, err := env.Workspace()
 	if err != nil {
