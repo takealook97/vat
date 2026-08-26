@@ -109,7 +109,6 @@ func runBrainNew(ctx context.Context, env *Env, args []string) error {
 // sourceReferenceFor pins a claim to the owning repository's exact revision.
 // A branch name would keep moving and silently change what the claim was
 // evidence for.
-
 func sourceReferenceFor(ctx context.Context, ws *workspace.Workspace, owner string) (string, error) {
 	repo, ok := ws.Manifest.Find(owner)
 	if !ok {

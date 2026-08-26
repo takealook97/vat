@@ -103,7 +103,6 @@ func runRepoAdopt(ctx context.Context, env *Env, args []string) error {
 }
 
 // describeRepo reads a directory's git identity into a manifest entry.
-
 func describeRepo(ctx context.Context, root, name string) (manifest.Repo, bool) {
 	dir := filepath.Join(root, name)
 	if !gitx.IsRepository(dir) {

@@ -126,7 +126,6 @@ func runRepoRemove(ctx context.Context, env *Env, args []string) error {
 // a dubious-ownership refusal, a corrupt repository — is reported as a risk
 // rather than as an absence of one, because the alternative is deleting a tree
 // whose contents could not be inspected.
-
 func unsavedWork(ctx context.Context, dir string) []string {
 	var risks []string
 	dirty, err := gitx.IsDirty(ctx, dir)

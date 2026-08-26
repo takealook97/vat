@@ -182,7 +182,6 @@ func runRepoRename(ctx context.Context, env *Env, args []string) error {
 
 // commitManifest writes the manifest and keeps .gitignore in step, so the two
 // can never disagree about what the workspace governs.
-
 func commitManifest(env *Env, ws *workspace.Workspace, next manifest.Manifest) error {
 	if err := ws.SaveManifest(next); err != nil {
 		return err
@@ -198,7 +197,6 @@ func commitManifest(env *Env, ws *workspace.Workspace, next manifest.Manifest) e
 }
 
 // renderAfterChange regenerates the harness from the new manifest.
-
 func renderAfterChange(env *Env, root string) error {
 	ws, err := workspace.OpenAt(root)
 	if err != nil {

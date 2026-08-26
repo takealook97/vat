@@ -118,7 +118,6 @@ func runChangesetNew(ctx context.Context, env *Env, args []string) error {
 
 // enrol records where a repository stands before the change begins. Captured
 // now because after the change lands it can no longer be observed.
-
 func enrol(ctx context.Context, ws *workspace.Workspace, name string) (changeset.Participant, error) {
 	repo, ok := ws.Manifest.Find(name)
 	if !ok {

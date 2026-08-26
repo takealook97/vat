@@ -46,7 +46,6 @@ becoming a confident liar over a few years.`,
 }
 
 // openBrain resolves the brain repository the workspace has adopted.
-
 func openBrain(env *Env) (*workspace.Workspace, *brain.Store, error) {
 	ws, err := env.Workspace()
 	if err != nil {

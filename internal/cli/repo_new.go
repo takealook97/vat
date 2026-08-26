@@ -157,7 +157,6 @@ func expandRemoteTemplate(template, name string) string {
 // createRemote uses the GitHub CLI when it is available. vat shells out rather
 // than embedding an API client so the user's existing authentication, host
 // configuration, and enterprise settings apply unchanged.
-
 func createRemote(ctx context.Context, dir, name, originURL string, private bool) (string, error) {
 	if originURL != "" {
 		if err := gitx.AddRemote(ctx, dir, "origin", originURL); err != nil {
