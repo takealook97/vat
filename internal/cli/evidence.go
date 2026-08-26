@@ -68,6 +68,9 @@ func runEvidenceNew(ctx context.Context, env *Env, args []string) error {
 		return usageErrorf("expected an identifier and an objective")
 	}
 	id := set.Arg(0)
+	if err := evidence.ValidateID(id); err != nil {
+		return usageErrorf("%v", err)
+	}
 	objective := strings.Join(set.Args()[1:], " ")
 
 	ws, err := env.Workspace()

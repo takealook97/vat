@@ -72,6 +72,8 @@ func runBrainNew(ctx context.Context, env *Env, args []string) error {
 	}
 	if input.ID == "" {
 		input.ID = store.NextID(kind)
+	} else if err := brain.ValidateID(input.ID); err != nil {
+		return usageErrorf("%v", err)
 	}
 	if *claim != "" {
 		kind := brain.ClaimKind(*claim)

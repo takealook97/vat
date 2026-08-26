@@ -477,3 +477,29 @@ func TestEvidenceCheckFailsOnAnIdentifierThatDoesNotExist(t *testing.T) {
 		t.Errorf("checking a packet that does exist exited %d:\n%s", code, output)
 	}
 }
+
+func TestAMalformedIdentifierIsReportedAsCallingTheCommandWrong(t *testing.T) {
+	// Arrange: the exit code is part of the interface — CI branches on it. `1`
+	// means findings were reported and `2` means the command was called wrong,
+	// and a name that cannot become a file is the second.
+	h := brainFixture(t, "payments")
+
+	cases := [][]string{
+		{"brain", "new", "decision", "--title", "x", "--id", "../../../pwned"},
+		{"evidence", "new", "../../../pwned", "objective",
+			"--repos", "payments", "--acceptance", "something end to end"},
+	}
+
+	for _, args := range cases {
+		t.Run(args[0], func(t *testing.T) {
+			// Act
+			code, output := h.run(args...)
+
+			// Assert
+			if code != ExitUsage {
+				t.Errorf("`vat %s` exited %d, want %d:\n%s",
+					strings.Join(args, " "), code, ExitUsage, output)
+			}
+		})
+	}
+}
