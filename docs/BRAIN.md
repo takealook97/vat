@@ -26,6 +26,42 @@ Four mechanisms make that structurally impossible:
 
 ---
 
+## What `memory` is, and what it is not
+
+Three different things get called memory, and this layer owns exactly one of
+them. Conflating them is how a knowledge repository fills up with an agent's
+session log and stops being quotable.
+
+| Content | Owner |
+| --- | --- |
+| where the last session got to, and what to pick up | the agent runtime, or a retrieval layer |
+| how a particular agent prefers to work | that agent's own repository |
+| **a verification trap this repository keeps springing** | **brain — a reviewed observation** |
+| **what is running now, and the revision that proves it** | **brain — a current-state claim** |
+| **a judgement the organisation adopted, and why** | **brain — a decision** |
+
+A `memory` record here is a **reviewed, reusable observation**: something worth
+reaching for again, not something that happened. If it will not be useful the
+second time, it is a session note and belongs where session notes go.
+
+That is why `vat brain new memory` opens with these headings:
+
+```markdown
+## Trigger          what situation should bring this back
+## Lesson           what to do differently, in one sentence
+## Evidence         the run that failed, the file, the exact revision
+## Scope            `workspace`, or the one repository it applies to
+## Reuse condition  what has to stay true for it to still apply
+```
+
+They are a convention, not a schema. Nothing checks them yet, deliberately: a
+field becomes part of the record schema here only once there is a rule worth
+enforcing on it, and that is decided by use rather than in advance. A lesson
+scoped to a branch is not recorded at all — it expires before anyone re-reads
+it.
+
+---
+
 ## Layout
 
 ```text
@@ -46,7 +82,7 @@ brain/
 ├── decisions/D-0001-....md
 ├── memory/2026-08/M-0001-....md
 ├── history/
-└── archive/
+└── archive/decisions/D-0002-....md   records that reached an end state
 ```
 
 `CURRENT.md` and `graph.json` are **generated**. Editing them by hand is drift,
@@ -258,18 +294,6 @@ replacement `provisional` instead of promoting it on the way past.
 
 One-off lookups. Ideas with no evidence. Conversation summaries.
 
-### What is worth promoting
-
-- a conclusion drawn across two or more repositories
-- a comparison or audit that is expensive to redo
-- anything that changes a goal judgement, a gap, an execution order, or an
-  approval boundary
-- a current-state analysis likely to be asked about repeatedly
-
-### What is not
-
-One-off lookups. Ideas with no evidence. Conversation summaries.
-
 ---
 
 ## Supersession
@@ -313,6 +337,46 @@ gap that has been closed, so only a gap can take it.
 
 ---
 
+## The archive
+
+```console
+$ vat brain archive
+WARN  D-0031    revoked → archive/decisions/D-0031-pricing.md
+
+$ vat brain archive --apply
+OK    D-0031    revoked → archive/decisions/D-0031-pricing.md
+```
+
+Terminal records leave the working directories. Nothing is deleted, and an
+archived record is still loaded — its supersession chain is still checked from
+both ends — but it is out of the entry point, out of the default search surface,
+and in one directory an external index can exclude wholesale.
+
+Relative links inside a moved record are repointed so they still resolve.
+
+---
+
+## What the index refuses to become
+
+`CURRENT.md` is an entry point, which means it has a size. Each section lists at
+most fifteen records and then says how many are left and where they are:
+
+```markdown
+| `D-0031` | active | Pricing is per seat | [D-0031-pricing.md](decisions/D-0031-pricing.md) |
+
+12 more in [DECISIONS.md](DECISIONS.md).
+```
+
+The fifteen kept are the ones the rest of the repository cites most, the same
+measure the review queue uses. Truncating by identifier would keep whatever was
+written first and hide everything current.
+
+An index that has to be read in full to be used is the summary file this layer
+was built to replace, arriving late — once the repository is finally large
+enough to be worth having.
+
+---
+
 ## Two rules about the records themselves
 
 **A file that cannot be read is a finding, not a crash.** One record with a
@@ -345,6 +409,11 @@ assembled from it is worse than no answer.
 `--all` widens the search to history, archives, and terminal records — for
 auditing why something was decided, rather than asking what is true now.
 
+Ranking discounts length. Counting raw occurrences instead is arithmetic, not
+relevance: a long record repeating one query word beats a short record that
+answers all three, and the long record is usually the sprawling one nobody has
+split up yet. Matching every term is worth more than any amount of repetition.
+
 The reading contract:
 
 1. Find identifiers in `CURRENT.md`.
@@ -352,6 +421,51 @@ The reading contract:
 3. Re-verify any claim about the present against the repository that owns it. A
    record states when it was last observed, not that it is still true.
 4. Open `history/` and `archive/` only when asked for past reasoning.
+
+---
+
+## Pointing a search index at the brain
+
+Semantic search is a real need and it is not this layer's job. vat has one
+third-party dependency and opens no network connection, and both are security
+properties rather than accidents; an embedding model inside the binary would
+cost both. There is also a plainer reason: `policy.trust.untrusted` already
+classes embeddings with scraped pages and model output. A vector is not
+evidence, and this layer deals in evidence.
+
+So retrieval goes outside, and the boundary is a contract rather than an
+integration. **vat will never grow a command named after a search product.** A
+vendor adapter in the core turns the tool into that vendor's document generator
+and ties its release cycle to someone else's.
+
+What vat offers an index is what it already writes:
+
+| Surface | What an index gets from it |
+| --- | --- |
+| `goals/`, `gaps/`, `decisions/`, `memory/` | atomic records, one fact each, with provenance in the header |
+| `CURRENT.md` and the root projections | vat's own summary layer, already written |
+| `graph.json` | every record's id, kind, **status**, path, owner, and `source_ref` |
+| `archive/`, `history/` | everything finished with, in directories of their own |
+
+Four rules make that safe to index:
+
+1. **Exclude `archive/` and `history/`.** They hold exactly the withdrawn and
+   replaced claims that must not surface as answers. This is why the archive
+   command exists — a directory-level exclusion is the cheapest filter any index
+   has, and it only works if terminal records are actually in a directory.
+2. **Do not let the index summarise.** vat already has a summary layer, and it
+   is checked for drift against the records. A second, unchecked summary
+   competing with it is the failure this layer was built to prevent. Index
+   embeddings, not generated prose.
+3. **Nothing flows back.** No output of a retrieval layer is written into a vat
+   record. A search result is a place to look, and it holds no authority over a
+   record's status or over what a person asked for.
+4. **Keep the trail.** A result should be traceable to the atomic record and its
+   `source_ref`, so a reader can check the claim's status rather than trusting
+   the snippet.
+
+Nothing about this needs vat to know the index exists. If it disappears, every
+`vat` command behaves identically — vat never called it.
 
 ---
 

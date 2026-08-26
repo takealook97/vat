@@ -90,6 +90,29 @@ three-year-old chunk. The brain marks that chunk `stale` and refuses to cite it.
 
 They compose well: point your retrieval layer at the brain, and let the brain
 decide what is canonical. Retrieval stays derived, and never outranks the canon.
+The contract for doing that is four rules — exclude `archive/` and `history/`,
+do not let the index write its own summaries, never write anything back into a
+record, keep the trail to the atomic record and its `source_ref` — and it is
+written down in [BRAIN.md](BRAIN.md) rather than built into a command. `vat`
+will never grow a subcommand named after a search product: a vendor adapter in
+the core turns the tool into that vendor's document generator.
+
+### Should I use one of the agent-memory tools instead?
+
+For session memory, probably yes — and alongside, not instead. They answer a
+different question.
+
+Those tools capture what happened in a session and make it findable again. The
+brain holds what the organisation reviewed and decided, and tracks whether it is
+still safe to quote. A `memory` record here is not a session handoff and not an
+agent's journal; it is a **reviewed, reusable observation** — recorded with the
+situation that should bring it back and the condition under which it stops
+applying. If it will not be useful a second time, it does not belong here.
+
+The one thing that does not work is letting a session log become canon
+automatically. Automatic capture is fine; automatic promotion is not, which is
+why anything entering this layer enters as `provisional` and a claim about the
+present cannot be re-dated without someone re-reading its source.
 
 ### What if my team will not maintain it?
 

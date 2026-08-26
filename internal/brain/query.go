@@ -54,40 +54,56 @@ func Query(store *Store, terms []string, opts QueryOptions) []Hit {
 		contextLines = 2
 	}
 
-	hits := []Hit{}
+	type candidate struct {
+		hit      Hit
+		haystack string
+		body     string
+		length   int
+	}
+	candidates := []candidate{}
+	total := 0
+	add := func(hit Hit, haystack, body string) {
+		length := len(strings.Fields(haystack))
+		total += length
+		candidates = append(candidates, candidate{hit: hit, haystack: haystack, body: body, length: length})
+	}
+
 	for _, record := range store.Records {
 		if record.Status.Terminal() && !opts.IncludeTerminal {
 			continue
 		}
-		haystack := strings.ToLower(record.Title + "\n" + record.Body + "\n" + record.ID)
-		score, excerpt := scoreText(haystack, record.Body, needles, contextLines)
-		if score == 0 {
-			continue
-		}
-		if record.Status.Answerable() {
-			// Prefer a reviewed record over an unreviewed one at the same
-			// textual relevance.
-			score += 2
-		}
-		hits = append(hits, Hit{
-			Path: record.Path, ID: record.ID, Status: record.Status,
-			Title: record.Title, Score: score, Excerpt: excerpt,
-		})
+		add(Hit{Path: record.Path, ID: record.ID, Status: record.Status, Title: record.Title},
+			strings.ToLower(record.Title+"\n"+record.Body+"\n"+record.ID), record.Body)
 	}
-
 	for _, path := range surfaceFiles(store.Root, opts.IncludeHistory) {
 		data, err := os.ReadFile(path)
 		if err != nil {
 			continue
 		}
-		body := string(data)
-		score, excerpt := scoreText(strings.ToLower(body), body, needles, contextLines)
+		add(Hit{Path: filepath.ToSlash(mustRel(store.Root, path))},
+			strings.ToLower(string(data)), string(data))
+	}
+
+	average := 1.0
+	if len(candidates) > 0 && total > 0 {
+		average = float64(total) / float64(len(candidates))
+	}
+
+	hits := []Hit{}
+	for _, entry := range candidates {
+		score, excerpt := scoreText(entry.haystack, entry.body, needles, contextLines,
+			float64(entry.length)/average)
 		if score == 0 {
 			continue
 		}
-		hits = append(hits, Hit{
-			Path: filepath.ToSlash(mustRel(store.Root, path)), Score: score, Excerpt: excerpt,
-		})
+		if entry.hit.Status.Answerable() {
+			// Prefer a reviewed record over an unreviewed one at the same
+			// textual relevance.
+			score += 5
+		}
+		entry.hit.Score = score
+		entry.hit.Excerpt = excerpt
+		hits = append(hits, entry.hit)
 	}
 
 	sort.SliceStable(hits, func(i, j int) bool {
@@ -102,25 +118,43 @@ func Query(store *Store, terms []string, opts QueryOptions) []Hit {
 	return hits
 }
 
-func scoreText(lowered, original string, needles []string, contextLines int) (int, []string) {
-	score := 0
+// Term-frequency saturation and length normalisation, the two constants of the
+// BM25 family. k1 decides how quickly repeating a word stops helping; b decides
+// how much a long document is discounted for being long.
+const (
+	termSaturation   = 1.2
+	lengthNormalised = 0.75
+	// coverageWeight makes answering every term worth more than any amount of
+	// repetition, which is the whole point: someone searching three words wants
+	// the record about all three.
+	coverageWeight = 30
+	densityWeight  = 10
+)
+
+// scoreText ranks one document against the query terms, discounting length.
+//
+// Counting raw occurrences instead is arithmetic, not relevance: a long record
+// repeating one query word out-scores a short record that answers all three.
+// The long record is usually the sprawling one nobody has split up yet, so the
+// naive ranking prefers precisely the least useful document in the repository.
+//
+// relativeLength is the document's length over the average across the surface.
+func scoreText(lowered, original string, needles []string, contextLines int, relativeLength float64) (int, []string) {
+	density := 0.0
 	matched := 0
 	for _, needle := range needles {
-		count := strings.Count(lowered, needle)
-		if count > 0 {
-			matched++
-			score += count
+		count := float64(strings.Count(lowered, needle))
+		if count == 0 {
+			continue
 		}
+		matched++
+		density += count * (termSaturation + 1) /
+			(count + termSaturation*(1-lengthNormalised+lengthNormalised*relativeLength))
 	}
 	if matched == 0 {
 		return 0, nil
 	}
-	// A record containing every term is a better answer than one containing a
-	// single term many times.
-	score += matched * 5
-	if matched < len(needles) {
-		score -= (len(needles) - matched) * 2
-	}
+	score := matched*coverageWeight + int(density*densityWeight)
 	if score < 1 {
 		score = 1
 	}
@@ -167,7 +201,9 @@ func surfaceFiles(root string, includeHistory bool) []string {
 	if !includeHistory {
 		return paths
 	}
-	for _, dir := range []string{"history", "archive", "analysis", "docs"} {
+	// archive/ is deliberately absent: its records are loaded as records, and
+	// walking it here would rank each archived record twice.
+	for _, dir := range []string{"history", "analysis", "docs"} {
 		full := filepath.Join(root, dir)
 		_ = filepath.Walk(full, func(path string, info os.FileInfo, err error) error {
 			if err != nil || info == nil || info.IsDir() {

@@ -293,6 +293,7 @@ vat brain supersede <old-id> <new-id>
 vat brain quarantine <id> --reason "..."
 vat brain revoke    <id> --reason "..."
 vat brain resolve   <id> [--reason "..."]
+vat brain archive   [--apply]
 vat brain adopt     <repository-name>
 ```
 
@@ -323,6 +324,11 @@ gate rather than becoming canonical on its way past.
 quarantine or a revocation must state a reason: a withdrawal nobody explained
 cannot be reviewed later. An end state is one-way — none of these commands, and
 not `promote`, will reopen one.
+
+`archive` moves superseded, revoked, and resolved records into `archive/`,
+repointing the relative links inside them. Nothing is deleted and an archived
+record is still loaded, so its supersession chain is still checked from both
+ends; `--apply` writes the moves.
 
 `check` reports `brain/record-malformed` for a file it cannot read as a record
 and keeps loading the rest, and `brain/record-secret-suspected` for a record

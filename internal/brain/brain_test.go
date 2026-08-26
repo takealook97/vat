@@ -1,6 +1,7 @@
 package brain_test
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -549,5 +550,34 @@ func TestCreateWritesAProvisionalRecordWithRevalidationMetadata(t *testing.T) {
 	}
 	if record.RevalidateOn == "" || record.ObservedAt == "" {
 		t.Errorf("a current-state claim was created without revalidation metadata: %+v", record.Metadata)
+	}
+}
+
+// CURRENT.md is documented as a fixed-size entry point and was nothing of the
+// kind: it grew one row per record, forever. An entry point that has to be read
+// in full to be used is the summary file this whole layer was built to replace
+// — and the failure arrives late, when the repository is finally big enough to
+// be worth having.
+func TestTheIndexStaysBoundedAsRecordsAccumulate(t *testing.T) {
+	// Arrange
+	root, _ := newStore(t)
+	for i := 1; i <= 60; i++ {
+		id := fmt.Sprintf("D-%04d", i)
+		writeRecord(t, root, fmt.Sprintf("decisions/%s-x.md", id),
+			fmt.Sprintf("id: %s\nstatus: active\nclaim_kind: intent\n", id),
+			fmt.Sprintf("# %s — Decision %d", id, i))
+	}
+	store := reload(t, root)
+
+	// Act
+	index := brain.RenderCurrent(store, reference)
+
+	// Assert
+	rows := strings.Count(index, "| `D-")
+	if rows > 30 {
+		t.Errorf("the index listed %d of 60 records; it is not an entry point, it is the repository", rows)
+	}
+	if !strings.Contains(index, "more") {
+		t.Errorf("the index truncated without saying so:\n%s", index)
 	}
 }

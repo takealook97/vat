@@ -224,7 +224,21 @@ list, the ordering, and the links — nothing else.
 Every "AI memory" system fails the same way: detail is appended to a summary
 file, the file passes three hundred lines, nobody reads it, and an agent quotes
 its stale opening as current fact. Separating the two makes that impossible, and
-makes the generated half checkable for drift.
+makes the generated half checkable for drift. The entry point is bounded for the
+same reason: a section that lists every record is a summary file again.
+
+`memory/` is the part of this most often misread. It does not hold session
+handoffs or an agent's journal — those belong to the runtime and to the agent's
+own repository. It holds a **reviewed, reusable observation**: something worth
+reaching for the next time the same situation appears, recorded with the
+circumstance that should bring it back and the condition under which it stops
+applying. If it will not be useful a second time, it is not a record here.
+
+This is also where the boundary with retrieval sits. Semantic search over the
+knowledge layer is useful and belongs outside the tool: an index reads the
+Markdown and `graph.json`, excludes the archived and historical directories, and
+writes nothing back. A search result is a place to look. The layer decides what
+may be cited, and no index outranks it.
 
 ### 6.2 A claim about the present carries its evidence
 

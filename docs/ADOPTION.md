@@ -197,6 +197,7 @@ The repository is created with ignore rules that refuse plaintext by default.
 ```bash
 vat brain sweep --apply
 vat brain review --overdue
+vat brain archive --apply
 vat changeset list --open
 vat metrics --record
 ```

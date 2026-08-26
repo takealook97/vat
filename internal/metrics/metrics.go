@@ -94,7 +94,7 @@ func Collect(ctx context.Context, ws *workspace.Workspace, now time.Time) (Snaps
 			StaleAfterDays: ws.Manifest.Policy.Brain.StaleAfterDays,
 			ReviewSLADays:  ws.Manifest.Policy.Brain.ReviewSLADays,
 		}
-		snapshot.BrainRecords = len(store.Records)
+		snapshot.BrainRecords = len(store.WorkingSet())
 		snapshot.BrainCitable = len(store.Answerable())
 		for _, item := range brain.ReviewQueue(store, policy, now) {
 			snapshot.ReviewQueue++

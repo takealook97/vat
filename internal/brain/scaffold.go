@@ -91,6 +91,10 @@ decided, and how far the present is from the goal.
   not deleted and it is not still true — it is unverified.
 - A decision is never edited to say something new. A new decision supersedes it,
   and both ends of the link are checked.
+- An end state is one-way. A revoked or superseded record is never promoted back;
+  record a new claim instead.
+- A record carries no credential. A line that looks like one is reported by
+  identifier and line number, never quoted back.
 - Generated files are rebuilt, never hand-edited.
 
 Run ` + "`vat brain check`" + ` to see which of these currently hold.
@@ -101,6 +105,8 @@ Run ` + "`vat brain check`" + ` to see which of these currently hold.
 vat brain query <terms>    # find the records that matter
 vat brain review           # what needs re-checking, most costly first
 vat brain new gap --title "..."
+vat brain promote <id> --reviewer <name>
+vat brain archive --apply  # move finished records out of the working set
 vat brain build && vat brain check
 ` + "```" + `
 
@@ -346,7 +352,32 @@ What would have to become true for this to be revisited. If it is revisited,
 this file is not edited — a new decision supersedes it.
 `
 	default:
-		return heading + `What happened, what it means, and what the next session should do with it.
+		// A reviewed observation is written to be reached for again, which is
+		// what separates it from a session log. Trigger comes first because a
+		// lesson nobody can retrieve at the right moment is a lesson nobody
+		// applies; scope is here rather than in the front matter because the
+		// convention has to prove itself before it becomes a checked field.
+		return heading + `## Trigger
+
+What situation should bring this back? Write the circumstance, not the date.
+
+## Lesson
+
+What to do differently next time, in one sentence.
+
+## Evidence
+
+What supports this: the run that failed, the file, the exact revision.
+
+## Scope
+
+` + "`workspace`" + ` or the one repository it applies to. A lesson that only holds on a
+branch belongs in the session, not here — it expires before anyone re-reads it.
+
+## Reuse condition
+
+What has to stay true for this to still apply. When that stops holding, the
+record is stale, not wrong.
 `
 	}
 }

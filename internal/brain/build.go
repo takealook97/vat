@@ -99,13 +99,13 @@ func RenderCurrent(store *Store, now time.Time) string {
 
 	b.WriteString(renderCounts(store))
 	b.WriteString("\n")
-	b.WriteString(renderSection(store, KindGoal, "Goals", func(r Record) bool {
+	b.WriteString(renderSection(store, KindGoal, "Goals", "GOAL.md", func(r Record) bool {
 		return !r.Status.Terminal()
 	}))
-	b.WriteString(renderSection(store, KindGap, "Open gaps", func(r Record) bool {
+	b.WriteString(renderSection(store, KindGap, "Open gaps", "GAP_ANALYSIS.md", func(r Record) bool {
 		return !r.Status.Terminal()
 	}))
-	b.WriteString(renderSection(store, KindDecision, "Active decisions", func(r Record) bool {
+	b.WriteString(renderSection(store, KindDecision, "Active decisions", "DECISIONS.md", func(r Record) bool {
 		return r.Status == StatusActive || r.Status == StatusProvisional
 	}))
 
@@ -165,26 +165,64 @@ func statusMeaning(status Status) string {
 	}
 }
 
-func renderSection(store *Store, kind Kind, heading string, include func(Record) bool) string {
+// sectionLimit is how many records one section of the index may list.
+//
+// The index is documented as a fixed-size entry point and was not one: it grew
+// a row per record forever, until reading it cost more than reading the records
+// it points at. That is the summary file this whole layer exists to replace,
+// arriving late — once the repository is finally big enough to be worth having.
+const sectionLimit = 15
+
+func renderSection(store *Store, kind Kind, heading, projection string, include func(Record) bool) string {
 	records := make([]Record, 0)
 	for _, record := range store.OfKind(kind) {
-		if include(record) {
+		if include(record) && !record.Archived {
 			records = append(records, record)
 		}
 	}
 	if len(records) == 0 {
 		return ""
 	}
+	shown, remaining := mostDependedOn(store, records, sectionLimit)
+
 	var b strings.Builder
 	b.WriteString("\n## " + heading + "\n\n")
 	b.WriteString("| ID | Status | Title | Record |\n")
 	b.WriteString("| --- | --- | --- | --- |\n")
-	for _, record := range records {
+	for _, record := range shown {
 		fmt.Fprintf(&b, "| `%s` | %s | %s | [%s](%s) |\n",
 			record.ID, record.Status, escapePipes(record.Title),
 			filepath.Base(record.Path), record.Path)
 	}
+	if remaining > 0 {
+		fmt.Fprintf(&b, "\n%d more in [%s](%s).\n", remaining, projection, projection)
+	}
 	return b.String()
+}
+
+// mostDependedOn keeps the records the rest of the repository leans on hardest
+// and reports how many were left out.
+//
+// Truncating by identifier instead would always keep the oldest records, which
+// is the worst possible cut: the entry point would fill with the first things
+// ever written and hide everything current. Citation count is the same measure
+// the review queue already uses to decide what costs most to ignore. The kept
+// records are then re-sorted by identifier, so the table itself does not
+// reshuffle every time a reference is added.
+func mostDependedOn(store *Store, records []Record, limit int) ([]Record, int) {
+	if len(records) <= limit {
+		return records, 0
+	}
+	references := store.ReferenceCounts()
+	ranked := append([]Record{}, records...)
+	sort.SliceStable(ranked, func(i, j int) bool {
+		left, right := references[ranked[i].ID], references[ranked[j].ID]
+		if left != right {
+			return left > right
+		}
+		return ranked[i].ID > ranked[j].ID
+	})
+	return SortRecords(ranked[:limit]), len(records) - limit
 }
 
 func renderAttention(store *Store, now time.Time) string {
@@ -193,7 +231,7 @@ func renderAttention(store *Store, now time.Time) string {
 		age    int
 	}
 	var items []item
-	for _, record := range store.Records {
+	for _, record := range store.WorkingSet() {
 		switch record.Status {
 		case StatusStale, StatusQuarantined, StatusProvisional:
 			age, _ := record.AgeDays(now)
@@ -204,6 +242,11 @@ func renderAttention(store *Store, now time.Time) string {
 		return ""
 	}
 	sort.SliceStable(items, func(i, j int) bool { return items[i].age > items[j].age })
+	remaining := 0
+	if len(items) > sectionLimit {
+		remaining = len(items) - sectionLimit
+		items = items[:sectionLimit]
+	}
 
 	var b strings.Builder
 	b.WriteString("\n## Needs attention\n\n")
@@ -219,6 +262,9 @@ func renderAttention(store *Store, now time.Time) string {
 			entry.record.ID, entry.record.Status, age,
 			filepath.Base(entry.record.Path), entry.record.Path)
 	}
+	if remaining > 0 {
+		fmt.Fprintf(&b, "\n%d more waiting on review. The full queue: `vat brain review`.\n", remaining)
+	}
 	return b.String()
 }
 
@@ -228,7 +274,7 @@ func renderRecentMemory(store *Store) string {
 		return ""
 	}
 	var b strings.Builder
-	b.WriteString("\n## Recent memory\n\n")
+	b.WriteString("\n## Recent observations\n\n")
 	for _, record := range memories {
 		fmt.Fprintf(&b, "- [%s](%s)\n", escapePipes(record.Title), record.Path)
 	}

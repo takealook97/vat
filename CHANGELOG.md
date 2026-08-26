@@ -8,17 +8,26 @@ Notable changes to `vat`. The format follows
 
 ### Added
 
-- `brain/record-malformed`, reported for a file that cannot be read as a record.
-  Previously one unparseable header — a merge conflict marker is the common
-  case — aborted the whole load and took `check`, `query`, `sweep`, `build`,
-  `doctor`, and `lint` down together, so the layer said nothing at all about the
-  records that were fine.
 - `vat brain quarantine`, `revoke`, and `resolve`. These three states carried
   check rules and review-queue weights from the first release and had no
   command, so reaching one meant hand-editing the YAML of the record whose
   trustworthiness was already in doubt. A quarantine or a revocation must state
   a reason; `resolved` is refused for anything that is not a gap; and an end
   state is never reopened, by these commands or by `promote`.
+- `vat brain archive`, which moves superseded, revoked, and resolved records
+  into `archive/`. `history/` and `archive/` were created by `init` and written
+  to by nothing, so terminal records stayed in the working directories forever.
+  Two things depended on that separation: an entry point cannot be a fixed-size
+  place to start while it lists every record ever written, and an external search
+  index cannot cheaply exclude withdrawn claims that sit in the same directory as
+  the current ones. Nothing is deleted, an archived record is still loaded so its
+  supersession chain is still checked from both ends, and the relative links
+  inside a moved record are repointed.
+- `brain/record-malformed`, reported for a file that cannot be read as a record.
+  Previously one unparseable header — a merge conflict marker is the common
+  case — aborted the whole load and took `check`, `query`, `sweep`, `build`,
+  `doctor`, and `lint` down together, so the layer said nothing at all about the
+  records that were fine.
 - `brain/record-secret-suspected`, reported for a record that appears to carry a
   credential. "A record holds no secret" was the one rule in this layer with
   nothing checking it, which by this project's first rule makes it not a rule.
@@ -53,6 +62,21 @@ Notable changes to `vat`. The format follows
   `policy.brain.require_promotion_gate` is set. Promoting it on the way past was
   the one path by which a record became canonical without anyone reviewing it —
   the gate the policy declared, unenforced.
+- `CURRENT.md` lists at most fifteen records per section and then says how many
+  remain and where they are. It was documented as a fixed-size entry point and
+  grew a row per record forever; the fifteen kept are the ones most cited, the
+  same measure the review queue uses to decide what costs most to ignore.
+  Truncating by identifier would have kept whatever was written first.
+- `vat brain query` discounts document length when ranking. Counting raw
+  occurrences is arithmetic rather than relevance: a long record repeating one
+  query word out-scored a short record that answered all three, and the long
+  record is usually the sprawling one nobody has split up yet.
+- `vat brain new memory` opens with the headings a reusable observation needs —
+  trigger, lesson, evidence, scope, reuse condition — instead of a blank prompt
+  that invited a session summary. They are a convention, not a schema: a field
+  becomes checked here only once there is a rule worth enforcing on it.
+- `vat doctor` and `vat metrics` count the working set rather than every record
+  that has ever existed, and `doctor` reports records it could not read.
 - The containment check both the commands and the new lint rule depend on moved
   to `workspace.Contains`, so an entry-point guard and an audit cannot disagree
   about what "inside the workspace" means.

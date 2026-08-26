@@ -2,6 +2,7 @@ package cli
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/takealook97/vat/internal/brain"
 	"github.com/takealook97/vat/internal/ui"
@@ -9,7 +10,8 @@ import (
 
 // The half of the lifecycle that had states, check rules, and review-queue
 // weights, but no command — so reaching a quarantine meant hand-editing the
-// YAML of the record whose trustworthiness was already in doubt.
+// YAML of the record whose trustworthiness was already in doubt. Plus the
+// archive, which is what keeps the entry point a fixed-size place to start.
 
 func brainQuarantineCommand() *Command {
 	return &Command{
@@ -88,5 +90,61 @@ func retireRun(status brain.Status, reasonRequired bool) func(context.Context, *
 		env.Printer.Status(ui.LevelOK, record.ID, string(status))
 		env.Printer.Hint("Run `vat brain build` to refresh the index.")
 		return nil
+	}
+}
+
+func brainArchiveCommand() *Command {
+	return &Command{
+		Name:    "archive",
+		Summary: "Move records that reached an end state out of the working set",
+		Usage:   "vat brain archive [--apply]",
+		Long: `Move superseded, revoked, and resolved records into archive/.
+
+Without --apply nothing is written; the moves are only listed.
+
+Nothing is deleted, and an archived record is still loaded — the supersession
+chain it belongs to is still checked from both ends. What changes is where it
+lives, and two things depend on that. The index is meant to be a fixed-size
+place to start a question, which it cannot be while every record ever written
+stays in the working directories. And an external search index can only exclude
+withdrawn and replaced claims cheaply — by directory — if they are in one.
+
+The relative links inside a moved record are repointed so they still resolve.`,
+		Run: func(ctx context.Context, env *Env, args []string) error {
+			set := newFlagSet("brain archive")
+			apply := set.Bool("apply", false, "write the moves")
+			if err := parseFlags(set, args); err != nil {
+				return err
+			}
+			_, store, err := openBrain(env)
+			if err != nil {
+				return err
+			}
+			moves, err := brain.Archive(store, *apply)
+			if err != nil {
+				return err
+			}
+			if env.JSON {
+				return emitJSON(env, moves)
+			}
+			if len(moves) == 0 {
+				env.Printer.Status(ui.LevelOK, "archive", "the working set holds no finished records")
+				return nil
+			}
+			for _, move := range moves {
+				level := ui.LevelWarn
+				if move.Applied {
+					level = ui.LevelOK
+				}
+				env.Printer.Status(level, move.ID, fmt.Sprintf("%s → %s", move.Status, move.To))
+			}
+			if !*apply {
+				env.Printer.Hint("\nNothing written. Re-run with --apply to move these.")
+				return nil
+			}
+			env.Printer.Hint("\n%s archived. Run `vat brain build` to refresh the index.",
+				pluralise(len(moves), "record", "records"))
+			return nil
+		},
 	}
 }

@@ -107,3 +107,30 @@ func TestClaimKindValidityIsClosedAndItsErrorTextListsEveryKind(t *testing.T) {
 		}
 	}
 }
+
+// Scoring by raw occurrence count is arithmetic, not relevance: a long record
+// that repeats one query word beats a short record that answers all three. The
+// long record is usually the sprawling one nobody has split up yet, so the
+// ranking actively prefers the least useful document in the repository.
+func TestQueryRanksAllTermsMatchedAboveOneTermRepeated(t *testing.T) {
+	// Arrange
+	root, _ := newStore(t)
+	writeRecord(t, root, "memory/2026-05/M-0001-long.md",
+		"id: M-0001\nstatus: active\nclaim_kind: historical\n",
+		"# M-0001 — The long one\n\n"+strings.Repeat("Retries and more retries. ", 40))
+	writeRecord(t, root, "memory/2026-05/M-0002-short.md",
+		"id: M-0002\nstatus: active\nclaim_kind: historical\n",
+		"# M-0002 — The short one\n\nRetries break idempotency for payments.")
+	store := reload(t, root)
+
+	// Act
+	hits := brain.Query(store, []string{"retries", "idempotency", "payments"}, brain.QueryOptions{})
+
+	// Assert
+	if len(hits) < 2 {
+		t.Fatalf("both records should match: %+v", hits)
+	}
+	if hits[0].ID != "M-0002" {
+		t.Errorf("the record answering every term ranked below one repeating a single term: %+v", hits)
+	}
+}
