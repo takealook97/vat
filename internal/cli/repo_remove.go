@@ -5,13 +5,13 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"path/filepath"
 	"strings"
 
 	"github.com/takealook97/vat/internal/fsx"
 	"github.com/takealook97/vat/internal/gitx"
 	"github.com/takealook97/vat/internal/manifest"
 	"github.com/takealook97/vat/internal/ui"
+	"github.com/takealook97/vat/internal/workspace"
 )
 
 // Removing a repository, and the guards standing between that and losing
@@ -82,7 +82,7 @@ func runRepoRemove(ctx context.Context, env *Env, args []string) error {
 	if *deleteFiles && fsx.Exists(dir) {
 		// This is the one call in vat that deletes a tree, so it checks
 		// containment itself rather than trusting validation upstream.
-		if !strictlyBelow(ws.Root, dir) {
+		if !workspace.Contains(ws.Root, dir) {
 			return findingsErrorf(
 				"Refusing to delete %s: it is the workspace root, or outside it.", dir)
 		}
@@ -153,54 +153,6 @@ func unsavedWork(ctx context.Context, dir string) []string {
 		risks = append(risks, pluralise(stashes, "stash entry", "stash entries"))
 	}
 	return risks
-}
-
-// strictlyBelow reports whether target sits inside root and is not root
-// itself.
-//
-// Both sides are resolved through symlinks first, so a link pointing out of the
-// workspace is caught. The target usually exists, but the answer has to be
-// correct for a path that does not, so resolution falls back to the nearest
-// existing ancestor and re-appends the remainder.
-
-func strictlyBelow(root, target string) bool {
-	resolvedRoot, err := filepath.EvalSymlinks(root)
-	if err != nil {
-		return false
-	}
-	resolvedTarget := resolveExisting(target)
-	relative, err := filepath.Rel(resolvedRoot, resolvedTarget)
-	if err != nil {
-		return false
-	}
-	if relative == "." || relative == "" {
-		return false
-	}
-	return relative != ".." && !strings.HasPrefix(relative, ".."+string(filepath.Separator))
-}
-
-// resolveExisting resolves the longest existing prefix of a path and rejoins
-// whatever remains, so a not-yet-created directory still resolves through any
-// symlinked ancestor.
-
-func resolveExisting(target string) string {
-	absolute, err := filepath.Abs(target)
-	if err != nil {
-		return filepath.Clean(target)
-	}
-	remainder := ""
-	current := absolute
-	for {
-		if resolved, err := filepath.EvalSymlinks(current); err == nil {
-			return filepath.Join(resolved, remainder)
-		}
-		parent := filepath.Dir(current)
-		if parent == current {
-			return absolute
-		}
-		remainder = filepath.Join(filepath.Base(current), remainder)
-		current = parent
-	}
 }
 
 func confirm(env *Env, question string) bool {

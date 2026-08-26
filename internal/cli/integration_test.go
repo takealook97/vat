@@ -558,37 +558,6 @@ func TestARepositoryPathCannotBeTheWorkspaceRoot(t *testing.T) {
 	}
 }
 
-func TestStrictlyBelowRefusesTheRootAndAnythingOutsideIt(t *testing.T) {
-	// Arrange: this is the guard standing between `repo remove --delete` and
-	// os.RemoveAll, so it is asserted directly rather than only through the
-	// manifest that normally prevents reaching it.
-	root := t.TempDir()
-	inside := filepath.Join(root, "payments")
-	if err := os.MkdirAll(inside, 0o755); err != nil {
-		t.Fatalf("create: %v", err)
-	}
-	outside := t.TempDir()
-
-	cases := []struct {
-		path  string
-		below bool
-	}{
-		{inside, true},
-		{filepath.Join(inside, "nested"), true},
-		{root, false},
-		{outside, false},
-		{filepath.Dir(root), false},
-	}
-
-	for _, testCase := range cases {
-		// Act & Assert
-		if got := strictlyBelow(root, testCase.path); got != testCase.below {
-			t.Errorf("strictlyBelow(%q, %q) = %v, want %v",
-				root, testCase.path, got, testCase.below)
-		}
-	}
-}
-
 func TestAGroupThatMatchesNothingIsAnErrorNotAnEmptyRun(t *testing.T) {
 	// Arrange: `vat exec --group backedn -- make test` used to print "Nothing
 	// to run." and exit 0, which in CI is a green build that tested nothing.

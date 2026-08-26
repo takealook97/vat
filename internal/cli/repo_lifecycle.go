@@ -133,7 +133,7 @@ func runRepoRename(ctx context.Context, env *Env, args []string) error {
 	moved := false
 	newDir := ws.RepoPath(updated)
 	if !*keepPath {
-		if !strictlyBelow(ws.Root, newDir) {
+		if !workspace.Contains(ws.Root, newDir) {
 			return usageErrorf("%s would sit outside the workspace", newName)
 		}
 		if fsx.Exists(oldDir) {

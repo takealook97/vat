@@ -8,6 +8,7 @@ import (
 	"github.com/takealook97/vat/internal/brain"
 	"github.com/takealook97/vat/internal/manifest"
 	"github.com/takealook97/vat/internal/ui"
+	"github.com/takealook97/vat/internal/workspace"
 )
 
 // Standing up a knowledge repository and keeping its generated projections
@@ -39,7 +40,7 @@ that already holds records.`,
 				// directory of documents at it. Without this, `brain init
 				// ../../outside` built a brain repository outside the
 				// workspace, which is the boundary the whole tool rests on.
-				if !strictlyBelow(ws.Root, root) {
+				if !workspace.Contains(ws.Root, root) {
 					return usageErrorf("%s is outside the workspace", set.Arg(0))
 				}
 			default:

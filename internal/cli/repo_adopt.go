@@ -10,6 +10,7 @@ import (
 	"github.com/takealook97/vat/internal/gitx"
 	"github.com/takealook97/vat/internal/manifest"
 	"github.com/takealook97/vat/internal/ui"
+	"github.com/takealook97/vat/internal/workspace"
 )
 
 // Taking a repository already sitting in the workspace under the manifest,
@@ -52,7 +53,7 @@ func runRepoAdopt(ctx context.Context, env *Env, args []string) error {
 	// link inside the workspace pointing at a repository outside it passed
 	// every check and then had contracts written into it, outside the one
 	// directory vat is allowed to write to.
-	if !strictlyBelow(ws.Root, filepath.Join(ws.Root, name)) {
+	if !workspace.Contains(ws.Root, filepath.Join(ws.Root, name)) {
 		return usageErrorf("%s resolves outside the workspace; adopt the directory where it actually is", name)
 	}
 	discovered, ok := describeRepo(ctx, ws.Root, name)

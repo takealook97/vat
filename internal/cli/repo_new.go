@@ -11,6 +11,7 @@ import (
 	"github.com/takealook97/vat/internal/gitx"
 	"github.com/takealook97/vat/internal/manifest"
 	"github.com/takealook97/vat/internal/ui"
+	"github.com/takealook97/vat/internal/workspace"
 )
 
 // Creating a repository that does not exist yet, scaffolding it, and
@@ -70,7 +71,7 @@ func runRepoNew(ctx context.Context, env *Env, args []string) error {
 	dir := filepath.Join(ws.Root, name)
 	// Defence in depth: the name check above already rejects a separator, and
 	// this refuses anything that still resolves outside the workspace.
-	if !strictlyBelow(ws.Root, dir) {
+	if !workspace.Contains(ws.Root, dir) {
 		return usageErrorf("%s would sit outside the workspace", name)
 	}
 	if fsx.Exists(dir) {
