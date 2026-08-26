@@ -330,3 +330,71 @@ func TestTheBrainReferenceListsExactlyTheRulesThatExist(t *testing.T) {
 		}
 	}
 }
+
+// The README tells a reader to verify a download with `gh attestation verify`,
+// and the security model promises an SBOM for the platform they downloaded.
+// Both are claims about a workflow that only ever runs on a tag push: if the
+// steps behind them are dropped, the first person to find out is holding a
+// public artefact that cannot be re-signed under a tag that cannot be moved.
+// So the claims are read here, against the workflow that has to honour them.
+func TestTheReleaseWorkflowProducesWhatTheDocsPromise(t *testing.T) {
+	// Arrange
+	read := func(path string) string {
+		t.Helper()
+		content, err := os.ReadFile(path)
+		if err != nil {
+			t.Fatalf("read %s: %v", path, err)
+		}
+		return string(content)
+	}
+	workflow := read("../../.github/workflows/release.yml")
+
+	// A promise nobody makes any more needs no guard, and a guard that checks
+	// an absent promise is worse than none: it reports success for silence.
+	promises := []struct {
+		path  string
+		claim string
+	}{
+		{"../../README.md", "gh attestation verify"},
+		{"../../docs/SECURITY_MODEL.md", "gh attestation verify"},
+		{"../../docs/SECURITY_MODEL.md", "CycloneDX SBOM per platform"},
+	}
+	for _, promise := range promises {
+		if !strings.Contains(read(promise.path), promise.claim) {
+			t.Fatalf("%s no longer promises %q; this test has stopped checking anything",
+				promise.path, promise.claim)
+		}
+	}
+
+	// Act & Assert
+	required := []struct {
+		fragment string
+		because  string
+	}{
+		{"actions/attest-build-provenance",
+			"the documented `gh attestation verify` has nothing to verify against"},
+		{"id-token: write",
+			"the attestation step cannot obtain the identity it signs with"},
+		{"attestations: write",
+			"the attestation is generated and then cannot be stored"},
+		{"cyclonedx-gomod",
+			"no SBOM is produced for the platforms the security model says are described"},
+	}
+	for _, requirement := range required {
+		if !strings.Contains(workflow, requirement.fragment) {
+			t.Errorf("the release workflow no longer contains %q, so %s",
+				requirement.fragment, requirement.because)
+		}
+	}
+
+	// Binaries and SBOMs are produced by two separate loops. They are only
+	// guaranteed to cover the same platforms while both walk the same list, and
+	// a second hardcoded list is exactly how a target acquires a binary with no
+	// SBOM — or an SBOM describing something nobody shipped.
+	if declarations := strings.Count(workflow, "TARGETS:"); declarations != 1 {
+		t.Errorf("the release workflow declares the target list %d times; it must be declared once", declarations)
+	}
+	if walks := strings.Count(workflow, "for target in $TARGETS"); walks != 3 {
+		t.Errorf("%d loops walk $TARGETS; build, SBOM, and packaging must each walk it", walks)
+	}
+}

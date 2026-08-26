@@ -149,8 +149,17 @@ go install github.com/takealook97/vat/cmd/vat@latest
 
 Or download an archive for macOS, Linux, or Windows from
 [Releases](https://github.com/takealook97/vat/releases). Each one unpacks to a
-`vat` binary with the licence and shell completions beside it, and every release
-publishes SHA-256 checksums.
+`vat` binary with the licence and shell completions beside it. Every release
+also publishes SHA-256 checksums, a CycloneDX SBOM per platform, and a signed
+build-provenance attestation:
+
+```bash
+gh attestation verify vat_darwin_arm64.tar.gz --repo takealook97/vat
+```
+
+A checksum says an archive matches a list published beside it by whoever
+published the archive. The attestation is a signed statement of which commit and
+which workflow run built it, and the signature is not the publisher's to forge.
 
 One binary. One dependency (`gopkg.in/yaml.v3`). No runtime, no daemon, no
 config server. `vat` shells out to your `git`, so your credential helpers,

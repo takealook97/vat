@@ -4,13 +4,26 @@ on:
   push:
     tags: ["v*"]
 
+# `id-token` and `attestations` are what let this workflow sign a statement
+# about what it built. Without them a release is still checksummed, and a
+# checksum file published beside the artefacts it describes proves only that
+# the two were published together.
 permissions:
   contents: write
+  id-token: write
+  attestations: write
 
 jobs:
   build:
     name: build and publish
     runs-on: ubuntu-latest
+
+    # The target list is declared once. Three steps walk it — build, describe,
+    # package — and a platform added to only two of them would ship a binary
+    # with no SBOM, or an SBOM with no binary.
+    env:
+      TARGETS: darwin/amd64 darwin/arm64 linux/amd64 linux/arm64 windows/amd64
+
     steps:
       - uses: actions/checkout@v4
         with:
@@ -33,11 +46,34 @@ jobs:
             -X ${MODULE}/internal/version.Version=${VERSION} \
             -X ${MODULE}/internal/version.Commit=${COMMIT} \
             -X ${MODULE}/internal/version.Date=${BUILD_DATE}"
-          for target in darwin/amd64 darwin/arm64 linux/amd64 linux/arm64 windows/amd64; do
+          for target in $TARGETS; do
             os="${target%/*}"; arch="${target#*/}"; ext=""
             [ "$os" = windows ] && ext=".exe"
             GOOS="$os" GOARCH="$arch" go build -trimpath -ldflags "$LDFLAGS" \
               -o "dist/vat_${os}_${arch}${ext}" ./cmd/vat
+          done
+
+      # One SBOM per target, because the generator stamps goos and goarch into
+      # every purl it writes: a single SBOM shipped against all five archives
+      # would name a platform four of them are not.
+      #
+      # The generator is installed, not added to go.mod. It is a build tool, and
+      # the dependency count in go.mod is a property this project publishes — an
+      # SBOM that inflated that count in order to be produced would be evidence
+      # against the thing it exists to attest. It is built natively and told the
+      # target only at run time; `go run` with GOOS set cross-compiles the
+      # generator itself and then cannot execute it.
+      - name: Describe every target in an SBOM
+        env:
+          SBOM_TOOL: github.com/CycloneDX/cyclonedx-gomod/cmd/cyclonedx-gomod@v1.12.0
+        run: |
+          go install "$SBOM_TOOL"
+          generator="$(go env GOPATH)/bin/cyclonedx-gomod"
+          for target in $TARGETS; do
+            os="${target%/*}"; arch="${target#*/}"
+            GOOS="$os" GOARCH="$arch" "$generator" app \
+              -main ./cmd/vat -licenses -json \
+              -output "dist/vat_${os}_${arch}.cdx.json" .
           done
 
       # Completions are generated once with a natively runnable build. The
@@ -56,26 +92,39 @@ jobs:
       - name: Package and checksum
         working-directory: dist
         run: |
-          for file in vat_*; do
-            [ -f "$file" ] || continue
-            name="${file%.exe}"
-            binary="vat"
-            [ "$file" != "$name" ] && binary="vat.exe"
+          for target in $TARGETS; do
+            os="${target%/*}"; arch="${target#*/}"
+            name="vat_${os}_${arch}"
+            binary="vat"; ext=""
+            if [ "$os" = windows ]; then binary="vat.exe"; ext=".exe"; fi
             # Staged under a separate root: for the non-Windows targets $name
             # is also the binary's own filename, so building the layout in
             # place would try to create a directory over the file.
             mkdir -p "stage/$name"
-            mv "$file" "stage/$name/$binary"
+            mv "${name}${ext}" "stage/$name/$binary"
             cp ../LICENSE ../README.md "stage/$name/"
             cp -r ../completions "stage/$name/completions"
-            case "$binary" in
-              vat.exe) (cd stage && zip -qr "../${name}.zip" "$name") ;;
+            case "$os" in
+              windows) (cd stage && zip -qr "../${name}.zip" "$name") ;;
               *) tar -czf "${name}.tar.gz" -C stage "$name" ;;
             esac
             rm -rf stage
           done
-          sha256sum *.tar.gz *.zip > checksums.txt
+          sha256sum *.tar.gz *.zip *.cdx.json > checksums.txt
           cat checksums.txt
+
+      # Signed before publication, so nothing reaches the release page without a
+      # statement of where it came from. The checksum file is a subject too: it
+      # is the one artefact whose job is to describe the others, which makes an
+      # unattested one worth forging.
+      - name: Attest what built these artefacts
+        uses: actions/attest-build-provenance@v4
+        with:
+          subject-path: |
+            dist/*.tar.gz
+            dist/*.zip
+            dist/*.cdx.json
+            dist/checksums.txt
 
       - uses: softprops/action-gh-release@v2
         with:

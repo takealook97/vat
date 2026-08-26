@@ -180,6 +180,13 @@ existing authentication.
 - **One direct dependency**, `gopkg.in/yaml.v3`, pinned in `go.sum`.
 - Reproducible builds via `-trimpath` and stamped version metadata.
 - Release artefacts carry SHA-256 checksums.
+- Every release artefact — archives, SBOMs, and the checksum file itself —
+  carries a signed build-provenance attestation, verifiable from a download
+  alone with `gh attestation verify <file> --repo takealook97/vat`. A checksum
+  file attests to nothing on its own: it is published by the same hand as the
+  files it describes.
+- Every release publishes a CycloneDX SBOM per platform, generated per target
+  because the dependency graph is recorded against a specific `goos`/`goarch`.
 - CI verifies that `go mod tidy` produces no diff.
 
 Keeping the dependency count near zero is a security property, not an aesthetic
