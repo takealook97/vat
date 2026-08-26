@@ -94,10 +94,10 @@ jobs:
           git config --global user.email "ci@example.com"
           git config --global init.defaultBranch main
 
+      # make cover, not a bare go test: the threshold lives in one place so a
+      # local run and CI cannot disagree about whether a change passes.
       - name: Measure coverage
-        run: |
-          go test -coverprofile=coverage.out ./...
-          go tool cover -func=coverage.out | tail -1
+        run: make cover
 
       - uses: actions/upload-artifact@v4
         with:
