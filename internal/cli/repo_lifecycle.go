@@ -129,8 +129,9 @@ func runRepoRename(ctx context.Context, env *Env, args []string) error {
 		return usageErrorf("%v", err)
 	}
 
+	moved := false
+	newDir := ws.RepoPath(updated)
 	if !*keepPath {
-		newDir := ws.RepoPath(updated)
 		if !strictlyBelow(ws.Root, newDir) {
 			return usageErrorf("%s would sit outside the workspace", newName)
 		}
@@ -141,10 +142,27 @@ func runRepoRename(ctx context.Context, env *Env, args []string) error {
 			if err := os.Rename(oldDir, newDir); err != nil {
 				return fmt.Errorf("rename %s: %w", ws.Rel(oldDir), err)
 			}
+			moved = true
 		}
 	}
 
+	// The directory has to move before the manifest is written, or a crash
+	// between the two leaves a manifest naming a directory that is not there.
+	// Moving first has the opposite risk, so a failed write is put back: the
+	// alternative is a workspace whose manifest and disk disagree, which every
+	// later command then reports as a different problem than the one that
+	// happened.
 	if err := commitManifest(env, ws, next); err != nil {
+		if moved {
+			if back := os.Rename(newDir, oldDir); back != nil {
+				// Both failures matter: the first is why nothing was
+				// recorded, the second is what the reader has to repair.
+				return fmt.Errorf(
+					"%w\n  the directory was renamed to %s and could not be put back: %w\n  rename it to %s by hand before running vat again",
+					err, ws.Rel(newDir), back, ws.Rel(oldDir))
+			}
+			env.Printer.Status(ui.LevelInfo, oldName, "directory put back; nothing was changed")
+		}
 		return err
 	}
 	env.Printer.Status(ui.LevelOK, newName, "renamed from "+oldName)

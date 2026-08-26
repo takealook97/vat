@@ -598,3 +598,83 @@ func TestStatusSuggestsSyncWhenARepositoryIsNotClonedYet(t *testing.T) {
 		t.Errorf("sync was not suggested for a repository that is not on disk:\n%s", output)
 	}
 }
+
+func TestBrainInitRefusesADirectoryOutsideTheWorkspace(t *testing.T) {
+	// Arrange: the argument is a path and this scaffolds a directory of
+	// documents at it, so `brain init ../../outside` built a whole brain
+	// repository outside the one directory vat may write to.
+	h := adoptedFixture(t, "payments")
+	outside := filepath.Join(filepath.Dir(h.root), "escaped-brain")
+
+	// Act
+	code, output := h.run("brain", "init", "../../escaped-brain")
+
+	// Assert
+	if code == ExitOK {
+		t.Errorf("`brain init ../../escaped-brain` was accepted:\n%s", output)
+	}
+	if _, err := os.Stat(outside); err == nil {
+		t.Errorf("a brain repository was scaffolded outside the workspace:\n%s", output)
+	}
+}
+
+func TestAnOriginCarryingACredentialIsRefused(t *testing.T) {
+	// Arrange: vat.yaml is committed. A token pasted into an origin would be
+	// published by the next push of the workspace root, and the only place vat
+	// could report it is a message it must not print.
+	h := adoptedFixture(t, "payments")
+
+	// Act
+	code, output := h.run("repo", "add", "console",
+		"--origin", "https://user:ghp_EXAMPLETOKEN@example.invalid/acme/console.git", "--no-clone")
+
+	// Assert
+	if code == ExitOK {
+		t.Errorf("an origin carrying a credential was accepted:\n%s", output)
+	}
+	written, err := os.ReadFile(h.path("vat.yaml"))
+	if err != nil {
+		t.Fatalf("read: %v", err)
+	}
+	if strings.Contains(string(written), "ghp_EXAMPLETOKEN") {
+		t.Error("the credential was written into the manifest")
+	}
+	if strings.Contains(output, "ghp_EXAMPLETOKEN") {
+		t.Errorf("the refusal quoted the credential back:\n%s", output)
+	}
+}
+
+func TestAdoptRecordsARemoteWithoutItsCredential(t *testing.T) {
+	// Arrange: adoption records what it found rather than what someone typed,
+	// so a remote that already carries a token must still be adoptable — with
+	// the token left in git's credential helper, where it belongs.
+	h := adoptedFixture(t, "payments")
+	notes := h.path("notes")
+	if err := os.MkdirAll(notes, 0o755); err != nil {
+		t.Fatalf("create: %v", err)
+	}
+	git(t, notes, "init", "--quiet", "--initial-branch", "main", ".")
+	git(t, notes, "remote", "add", "origin",
+		"https://user:ghp_EXAMPLETOKEN@example.invalid/acme/notes.git")
+
+	// Act
+	code, output := h.run("repo", "adopt", "notes")
+
+	// Assert
+	if code != ExitOK {
+		t.Fatalf("a repository with a credential-bearing remote could not be adopted:\n%s", output)
+	}
+	written, err := os.ReadFile(h.path("vat.yaml"))
+	if err != nil {
+		t.Fatalf("read: %v", err)
+	}
+	if strings.Contains(string(written), "ghp_EXAMPLETOKEN") {
+		t.Error("the credential was recorded in the manifest")
+	}
+	if !strings.Contains(string(written), "example.invalid/acme/notes.git") {
+		t.Errorf("stripping the credential also lost the repository identity:\n%s", written)
+	}
+	if strings.Contains(output, "ghp_EXAMPLETOKEN") {
+		t.Errorf("the credential was printed:\n%s", output)
+	}
+}

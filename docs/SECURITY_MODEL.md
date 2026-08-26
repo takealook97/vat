@@ -174,6 +174,13 @@ on Unix that mode holds. Windows has no POSIX permission bits — Go's `os.Chmod
 there only toggles the read-only attribute — so a file `vat` intends to create
 as `0600` is created with whatever the directory's ACL grants.
 
+An origin that carries a credential never reaches `vat.yaml`: the manifest
+rejects one that was typed and strips one that was discovered on an existing
+remote. Everything that prints a URL — a remote mismatch, a failed clone, git's
+own stderr, and the arguments of a failed git command — goes through `Redact`
+first, which masks the userinfo of every URL in the string rather than the first
+one it finds.
+
 Nothing `vat` writes contains a secret, so this is not a disclosure path in
 itself. It does mean that on Windows the mode reported by `vat doctor` for a
 credential file describes an attribute, not an access control, and should not be

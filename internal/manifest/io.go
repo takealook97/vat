@@ -55,6 +55,9 @@ func withDefaults(m Manifest) Manifest {
 	if out.Workspace.DefaultBranch == "" {
 		out.Workspace.DefaultBranch = "main"
 	}
+	if out.Policy.Sync.FastForwardOnly == nil {
+		out.Policy.Sync.FastForwardOnly = boolPtr(true)
+	}
 	if out.Policy.Sync.Parallelism <= 0 {
 		out.Policy.Sync.Parallelism = 8
 	}
@@ -132,6 +135,12 @@ func Validate(m Manifest) error {
 
 		if strings.TrimSpace(repo.Origin) == "" {
 			problems = append(problems, where+": origin is required")
+		} else if hasEmbeddedCredential(repo.Origin) {
+			// vat.yaml is committed. A token pasted into an origin would be
+			// published by the next `git push` of the workspace root, and the
+			// only place vat could report it is a message it must not print.
+			problems = append(problems, where+
+				": origin embeds a credential; store it in your git credential helper and record the plain URL")
 		}
 		if !repo.Role.Valid() {
 			problems = append(problems, fmt.Sprintf("%s: unknown role %q (valid: %s)",
@@ -160,6 +169,20 @@ func Validate(m Manifest) error {
 		if repo.Access != "" && repo.Access != "public" && repo.Access != "private" {
 			problems = append(problems, where+`: access must be "public" or "private"`)
 		}
+	}
+	// These three are stated as guarantees in the methodology and the sync
+	// implementation provides them unconditionally: it never merges, never
+	// stashes, and never pushes. Nothing read the fields, so a workspace could
+	// declare the opposite and be told it was fine -- a rule this tool states
+	// and does not check is the exact failure it exists to prevent.
+	if m.Policy.Sync.FastForwardOnly != nil && !*m.Policy.Sync.FastForwardOnly {
+		problems = append(problems, "policy.sync.fast_forward_only must be true; sync never creates a merge commit")
+	}
+	if m.Policy.Sync.AllowAutostash {
+		problems = append(problems, "policy.sync.allow_autostash must be false; sync never touches a dirty working tree")
+	}
+	if m.Policy.Sync.AllowAutoPush {
+		problems = append(problems, "policy.sync.allow_auto_push must be false; publishing a local-ahead branch is a human decision")
 	}
 	if count := countRole(m, RoleBrain); count > 1 {
 		problems = append(problems, "at most one repository may have role \"brain\"")
@@ -232,6 +255,20 @@ func countRole(m Manifest, role Role) int {
 		}
 	}
 	return count
+}
+
+// hasEmbeddedCredential reports whether a URL carries userinfo.
+//
+// "https://user:token@host/repo.git" is a working remote and a leaked secret
+// the moment the manifest is committed. git keeps credentials in a helper for
+// exactly this reason, and the manifest records identity, not access.
+func hasEmbeddedCredential(url string) bool {
+	_, rest, ok := strings.Cut(strings.TrimSpace(url), "://")
+	if !ok {
+		return false
+	}
+	authority, _, _ := strings.Cut(rest, "/")
+	return strings.Contains(authority, "@")
 }
 
 // ValidateRepoName reports whether a name may be used for a repository.

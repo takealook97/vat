@@ -35,6 +35,13 @@ that already holds records.`,
 			switch {
 			case set.NArg() == 1:
 				root = filepath.Join(ws.Root, set.Arg(0))
+				// The argument is a user-supplied path and this scaffolds a
+				// directory of documents at it. Without this, `brain init
+				// ../../outside` built a brain repository outside the
+				// workspace, which is the boundary the whole tool rests on.
+				if !strictlyBelow(ws.Root, root) {
+					return usageErrorf("%s is outside the workspace", set.Arg(0))
+				}
 			default:
 				resolved, ok := ws.BrainPath()
 				if !ok {

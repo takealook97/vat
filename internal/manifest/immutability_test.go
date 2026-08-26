@@ -381,3 +381,70 @@ func TestTwoRepositoriesMayShareAnUpstreamOnDifferentBranches(t *testing.T) {
 		t.Errorf("two repositories on different branches of one upstream were rejected: %v", err)
 	}
 }
+
+func TestTheSafetyPolicyIsCheckedRatherThanMerelyDeclared(t *testing.T) {
+	// Arrange: sync never merges, never stashes, and never pushes. Nothing read
+	// these fields, so a workspace could declare the opposite and be told it was
+	// fine — a rule this tool states and does not check is the exact failure it
+	// exists to prevent.
+	cases := []struct {
+		name  string
+		apply func(*Manifest)
+	}{
+		{"fast_forward_only: false", func(m *Manifest) { m.Policy.Sync.FastForwardOnly = boolPtr(false) }},
+		{"allow_autostash: true", func(m *Manifest) { m.Policy.Sync.AllowAutostash = true }},
+		{"allow_auto_push: true", func(m *Manifest) { m.Policy.Sync.AllowAutoPush = true }},
+	}
+
+	for _, testCase := range cases {
+		t.Run(testCase.name, func(t *testing.T) {
+			// Arrange
+			m := sampleManifest()
+			testCase.apply(&m)
+
+			// Act & Assert
+			if err := Validate(m); err == nil {
+				t.Errorf("a manifest declaring %s was accepted", testCase.name)
+			}
+		})
+	}
+}
+
+func TestOmittingTheSyncPolicyTakesTheSafeDefault(t *testing.T) {
+	// Arrange: most manifests never mention these keys. An omitted
+	// fast_forward_only must read as true, not as an explicit false — which is
+	// why the field is a pointer.
+	source := []byte("version: 1\nworkspace:\n  name: acme\nrepos:\n" +
+		"  - name: payments\n    origin: https://example.invalid/acme/payments.git\n")
+
+	// Act
+	parsed, err := Parse(source)
+
+	// Assert
+	if err != nil {
+		t.Fatalf("a manifest with no policy block was rejected: %v", err)
+	}
+	if parsed.Policy.Sync.FastForwardOnly == nil || !*parsed.Policy.Sync.FastForwardOnly {
+		t.Error("an omitted fast_forward_only did not take the safe default")
+	}
+}
+
+func TestAnOriginCarryingACredentialIsRejected(t *testing.T) {
+	// Arrange: the manifest is committed, so it records identity and never
+	// access.
+	m := WithRepo(sampleManifest(), Repo{
+		Name: "console", Role: RoleProduct,
+		Origin: "https://user:ghp_EXAMPLETOKEN@example.invalid/acme/console.git",
+	})
+
+	// Act
+	err := Validate(m)
+
+	// Assert
+	if err == nil {
+		t.Fatal("an origin carrying a credential was accepted into the manifest")
+	}
+	if strings.Contains(err.Error(), "ghp_EXAMPLETOKEN") {
+		t.Errorf("the refusal quoted the credential back: %v", err)
+	}
+}

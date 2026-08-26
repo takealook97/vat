@@ -308,3 +308,59 @@ func TestAnArchivedRepositoryIsExcludedFromUpdates(t *testing.T) {
 		t.Errorf("an archived repository counted as a failure")
 	}
 }
+
+// missingRepoReport runs sync against a manifest entry that has no clone on
+// disk, which is the normal state of a fresh machine.
+func missingRepoReport(t *testing.T, required bool) syncx.Report {
+	t.Helper()
+	root := t.TempDir()
+	repo := manifest.Repo{
+		Name: "absent", Origin: "https://example.invalid/acme/absent.git",
+		Role: manifest.RoleProduct, Required: required,
+	}
+	built := manifest.WithRepo(manifest.Default("test"), repo)
+	if err := manifest.Save(filepath.Join(root, manifest.FileName), built); err != nil {
+		t.Fatalf("Save: %v", err)
+	}
+	ws, err := workspace.OpenAt(root)
+	if err != nil {
+		t.Fatalf("OpenAt: %v", err)
+	}
+	return syncx.Run(t.Context(), ws, []manifest.Repo{repo},
+		syncx.Options{Offline: true, Remote: "origin"})
+}
+
+func TestAnOptionalRepositoryThatIsNotClonedDoesNotFailTheRun(t *testing.T) {
+	// Arrange: the manifest documents `required: false` as "a missing clone is a
+	// warning rather than a failure", and lint has always drawn that
+	// distinction. sync never read the field, so an optional repository broke
+	// every run it was absent from -- --offline most of all, where it can never
+	// be cloned.
+
+	// Act
+	report := missingRepoReport(t, false)
+
+	// Assert
+	if len(report.Results) != 1 {
+		t.Fatalf("expected one result, got %+v", report.Results)
+	}
+	if report.Results[0].State != syncx.StateMissing {
+		t.Errorf("an uncloned repository is %q, want MISSING", report.Results[0].State)
+	}
+	if report.Failures != 0 {
+		t.Errorf("an optional repository nobody promised would be here failed the run: %+v",
+			report.Results)
+	}
+}
+
+func TestARequiredRepositoryThatIsNotClonedStillFailsTheRun(t *testing.T) {
+	// Arrange: the distinction only means something if the other side holds.
+
+	// Act
+	report := missingRepoReport(t, true)
+
+	// Assert
+	if report.Failures == 0 {
+		t.Errorf("a required repository that is not on disk passed the run: %+v", report.Results)
+	}
+}

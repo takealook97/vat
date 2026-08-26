@@ -90,10 +90,16 @@ type Policy struct {
 	Gates     GatePolicy      `yaml:"gates" json:"gates"`
 }
 
+// boolPtr is how a tri-state policy field distinguishes "unset" from "false".
+func boolPtr(value bool) *bool { return &value }
+
 // SyncPolicy bounds what `vat sync` may do to a working tree.
 type SyncPolicy struct {
-	// FastForwardOnly keeps sync from ever creating a merge commit.
-	FastForwardOnly bool `yaml:"fast_forward_only" json:"fast_forward_only"`
+	// FastForwardOnly keeps sync from ever creating a merge commit. It is a
+	// pointer so an omitted key and an explicit `false` can be told apart: the
+	// first takes the safe default, the second is a workspace declaring
+	// something sync will not do, and validation rejects it.
+	FastForwardOnly *bool `yaml:"fast_forward_only" json:"fast_forward_only"`
 	// AllowAutostash must stay false for the methodology's guarantee that a
 	// sync never discards local work to hold.
 	AllowAutostash bool `yaml:"allow_autostash" json:"allow_autostash"`
@@ -219,7 +225,7 @@ func Default(name string) Manifest {
 		},
 		Policy: Policy{
 			Sync: SyncPolicy{
-				FastForwardOnly: true,
+				FastForwardOnly: boolPtr(true),
 				AllowAutostash:  false,
 				AllowAutoPush:   false,
 				Parallelism:     8,

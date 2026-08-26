@@ -83,6 +83,22 @@ type Result struct {
 	Ahead    int    `json:"ahead,omitempty"`
 	Behind   int    `json:"behind,omitempty"`
 	Detail   string `json:"detail,omitempty"`
+	// Optional records that the manifest declared this repository
+	// `required: false`, which downgrades a missing clone from a failure to a
+	// note. lint has always drawn that distinction; sync did not, so an
+	// optional repository broke every run it was absent from.
+	Optional bool `json:"optional,omitempty"`
+}
+
+// Failed reports whether one result should count against the run.
+//
+// Missing is the only state whose severity depends on the manifest: a
+// repository nobody promised would be here is not a broken workspace.
+func (r Result) Failed() bool {
+	if r.State == StateMissing && r.Optional {
+		return false
+	}
+	return r.State.Failure()
 }
 
 // Options configure a sync run.
@@ -134,7 +150,7 @@ func Run(ctx context.Context, ws *workspace.Workspace, repos []manifest.Repo, op
 
 	failures := 0
 	for _, result := range results {
-		if result.State.Failure() {
+		if result.Failed() {
 			failures++
 		}
 	}
@@ -156,14 +172,16 @@ func syncOne(ctx context.Context, ws *workspace.Workspace, repo manifest.Repo, r
 				Detail: fmt.Sprintf("%s exists but is not a git repository", ws.Rel(dir))}
 		}
 		if opts.Offline {
-			return Result{Repo: name, State: StateMissing, Detail: "offline, clone skipped"}
+			return Result{Repo: name, State: StateMissing, Optional: !repo.Required,
+				Detail: "offline, clone skipped"}
 		}
 		if opts.DryRun {
 			return Result{Repo: name, State: StatePlanned,
 				Detail: fmt.Sprintf("clone %s", gitx.Redact(repo.Origin))}
 		}
 		if err := gitx.Clone(ctx, repo.Origin, dir); err != nil {
-			return Result{Repo: name, State: StateMissing, Detail: gitErrorDetail(err)}
+			return Result{Repo: name, State: StateMissing, Optional: !repo.Required,
+				Detail: gitErrorDetail(err)}
 		}
 		revision, _ := gitx.ShortRevision(ctx, dir, "HEAD")
 		return Result{Repo: name, State: StateCloned, Branch: branch, Revision: revision}
@@ -256,16 +274,18 @@ func displayBranch(branch string) string {
 	return branch
 }
 
+// gitErrorDetail returns the first meaningful line of a git failure, redacted:
+// git quotes the remote it could not reach, and that line is printed as-is.
 func gitErrorDetail(err error) string {
 	var cmdErr *gitx.CommandError
 	if errors.As(err, &cmdErr) {
 		for _, line := range strings.Split(cmdErr.Stderr, "\n") {
 			if trimmed := strings.TrimSpace(line); trimmed != "" {
-				return trimmed
+				return gitx.Redact(trimmed)
 			}
 		}
 	}
-	return err.Error()
+	return gitx.Redact(err.Error())
 }
 
 // SortResults orders results by manifest position for stable output, since the

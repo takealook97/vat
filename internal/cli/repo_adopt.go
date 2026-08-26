@@ -112,6 +112,10 @@ func describeRepo(ctx context.Context, root, name string) (manifest.Repo, bool) 
 	if err != nil {
 		origin = "local:" + name
 	}
+	// The manifest is committed, so it records identity and never access. A
+	// remote configured with a token still works after this: git reads the
+	// credential from its helper, not from vat.yaml.
+	origin = gitx.WithoutCredentials(origin)
 	// A branch that cannot be read leaves default_branch unset, and an
 	// undeclared default is what makes sync skip a repository forever with a
 	// note nobody reads. `vat lint` reports that case as repo/default-branch-missing.

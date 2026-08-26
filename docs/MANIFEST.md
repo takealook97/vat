@@ -169,7 +169,7 @@ Rendered into the workspace contract so an agent can read its own boundary.
 | `path` | no | directory under the workspace root; defaults to `name` |
 | `group` | no | lets commands operate on a slice of the workspace |
 | `default_branch` | no | overrides the workspace default |
-| `required` | no | a missing clone is a failure rather than a warning |
+| `required` | no | a missing clone fails `sync` and `lint` rather than warning |
 | `access` | no | `public` or `private` |
 | `checks` | no | the canonical commands that prove this repository is healthy |
 | `archived` | no | kept in the record, excluded from daily commands |
@@ -192,6 +192,22 @@ A repository on `master` in a workspace defaulting to `main` is skipped by every
 update forever, reported as "on another branch" — a note nobody reads. Declaring
 it turns a silent skip into a real update. `vat lint` reports the mismatch, and
 `vat init --adopt` records it for you.
+
+### `origin` records identity, never access
+
+An origin carrying a credential — `https://user:token@host/repo.git` — is
+rejected. `vat.yaml` is committed, so a token pasted into it is published by the
+next push of the workspace root. Keep it in your git credential helper; the
+remote still works. `vat repo adopt` and `vat init --adopt` read a remote that
+already has one and record it stripped rather than refusing, because they record
+what they found rather than what you typed.
+
+### The sync policy is checked, not merely declared
+
+`fast_forward_only` must be `true`, and `allow_autostash` and `allow_auto_push`
+must be `false`. `vat sync` provides all three unconditionally, so a manifest
+declaring otherwise is stating something that will not happen; validation
+rejects it. Omitting the keys takes the safe values.
 
 ### Two repositories may share an upstream, but not a branch of one
 

@@ -213,3 +213,61 @@ func TestToplevelOfFailsOutsideARepository(t *testing.T) {
 		t.Error("a directory that is not in a repository reported a toplevel")
 	}
 }
+
+func TestRedactWorksOnAMessageWithAURLInsideIt(t *testing.T) {
+	// Arrange: the strings that leak are not bare URLs. git's stderr quotes the
+	// remote it failed to reach, and that line is printed as-is by sync.
+	const stderr = "fatal: unable to access " +
+		"'https://x-token:ghp_SUPERSECRET@example.com/acme/payments.git/': Could not resolve host"
+
+	// Act
+	got := gitx.Redact(stderr)
+
+	// Assert
+	if strings.Contains(got, "ghp_SUPERSECRET") {
+		t.Fatalf("Redact left the token in a message: %q", got)
+	}
+	for _, want := range []string{"unable to access", "example.com", "acme/payments", "Could not resolve"} {
+		if !strings.Contains(got, want) {
+			t.Errorf("Redact removed %q, which the reader needs: %q", want, got)
+		}
+	}
+}
+
+func TestRedactClearsEveryCredentialInAMessageNotJustTheFirst(t *testing.T) {
+	// Arrange: a remote mismatch is reported by naming both URLs in one line.
+	// Scanning only as far as the first one left the second token in place.
+	const mismatch = "remote https://u:ghp_FIRSTSECRET@example.com/acme/a.git " +
+		"does not match https://v:ghp_SECONDSECRET@example.com/acme/b.git"
+
+	// Act
+	got := gitx.Redact(mismatch)
+
+	// Assert
+	for _, leaked := range []string{"ghp_FIRSTSECRET", "ghp_SECONDSECRET"} {
+		if strings.Contains(got, leaked) {
+			t.Errorf("Redact left %s in the message: %q", leaked, got)
+		}
+	}
+	if !strings.Contains(got, "acme/a.git") || !strings.Contains(got, "acme/b.git") {
+		t.Errorf("Redact lost the repositories the reader is comparing: %q", got)
+	}
+}
+
+func TestWithoutCredentialsRemovesRatherThanMasks(t *testing.T) {
+	// Arrange: recording is not printing. The manifest holds a URL that has to
+	// still work when git reads it, so the userinfo is dropped, not starred out.
+	const withToken = "https://user:ghp_SUPERSECRET@example.com/acme/payments.git"
+
+	// Act
+	got := gitx.WithoutCredentials(withToken)
+
+	// Assert
+	if got != "https://example.com/acme/payments.git" {
+		t.Errorf("WithoutCredentials(%q) = %q", withToken, got)
+	}
+	const clean = "https://example.com/acme/payments.git"
+	if got := gitx.WithoutCredentials(clean); got != clean {
+		t.Errorf("a URL with no credential was changed to %q", got)
+	}
+}

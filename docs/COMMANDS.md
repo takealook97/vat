@@ -135,7 +135,7 @@ The rules, and what each one prevents:
 | --- | --- | --- |
 | `workspace/gitignore-drift` | error | a root commit swallowing an entire nested clone |
 | `workspace/not-a-repository` | warn | an unversioned manifest and harness |
-| `repo/missing` | error / warn | a required repository never cloned |
+| `repo/missing` | error / warn | a repository never cloned; error when `required`, warning otherwise — `vat sync` draws the same line |
 | `repo/not-a-repository` | error | a directory shadowing a governed repository |
 | `repo/remote-mismatch` | error | fetching from somewhere the manifest does not name |
 | `repo/remote-missing` | warn | a repository that can never be fetched or pushed |

@@ -12,6 +12,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"strconv"
 	"strings"
 )
@@ -28,12 +29,19 @@ type CommandError struct {
 	Err    error
 }
 
+// Error redacts before it formats. A failing `git push` puts the remote URL in
+// both the arguments and git's own stderr, and this string is printed by every
+// command that surfaces a git failure.
 func (e *CommandError) Error() string {
-	detail := strings.TrimSpace(e.Stderr)
+	detail := Redact(strings.TrimSpace(e.Stderr))
 	if detail == "" {
-		detail = e.Err.Error()
+		detail = Redact(e.Err.Error())
 	}
-	return fmt.Sprintf("git %s (in %s): %s", strings.Join(e.Args, " "), e.Dir, detail)
+	args := make([]string, len(e.Args))
+	for i, arg := range e.Args {
+		args[i] = Redact(arg)
+	}
+	return fmt.Sprintf("git %s (in %s): %s", strings.Join(args, " "), e.Dir, detail)
 }
 
 func (e *CommandError) Unwrap() error { return e.Err }
@@ -318,28 +326,27 @@ func stripUserinfo(url string) string {
 	return scheme + "://" + authority
 }
 
-// Redact removes credentials from a URL so it can be printed.
+// credentialInURL matches the userinfo of any URL, wherever it appears in a
+// larger string. An scp-style address ("git@host:path") is deliberately not
+// matched: it carries a user name and never a secret.
+var credentialInURL = regexp.MustCompile(`([a-zA-Z][a-zA-Z0-9+.-]*://)[^/@\s]*@`)
+
+// Redact removes credentials from anything that may contain a URL.
 //
 // A remote can carry a token in its authority ("https://x-token:ghp_...@host").
-// vat reports a remote mismatch by showing both URLs, and that report must not
-// become the one place a credential is disclosed.
-func Redact(url string) string {
-	scheme, rest, ok := strings.Cut(strings.TrimSpace(url), "://")
-	if !ok {
-		// An scp-style address ("git@host:path") carries a user name but never
-		// a secret, so it is safe as written.
-		return url
-	}
-	authority, remainder, hasPath := strings.Cut(rest, "/")
-	at := strings.LastIndex(authority, "@")
-	if at < 0 {
-		return url
-	}
-	redacted := scheme + "://" + "***@" + authority[at+1:]
-	if hasPath {
-		return redacted + "/" + remainder
-	}
-	return redacted
+// vat reports a remote mismatch by showing both URLs, and git's own stderr
+// quotes the remote it failed to reach — neither may become the one place a
+// credential is disclosed. It takes any string, not only a bare URL, because
+// the strings that leak are error messages with a URL somewhere inside them.
+func Redact(text string) string {
+	return credentialInURL.ReplaceAllString(text, "${1}***@")
+}
+
+// WithoutCredentials returns a URL with any userinfo removed rather than
+// masked, for recording rather than printing. The manifest is committed, so it
+// holds identity and never access.
+func WithoutCredentials(url string) string {
+	return stripUserinfo(strings.TrimSpace(url))
 }
 
 // SameRemote reports whether two URLs designate the same repository.

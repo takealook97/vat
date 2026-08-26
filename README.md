@@ -603,7 +603,7 @@ the commit convention (`{category}: {description}`), the review checklist, and
 how to run the suite.
 
 ```bash
-make check     # build, vet, lint, test
+make check     # format, vet, race-enabled tests, build
 ```
 
 ## License

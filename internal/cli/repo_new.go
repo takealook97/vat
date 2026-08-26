@@ -156,7 +156,7 @@ func createRemote(ctx context.Context, dir, name, originURL string, private bool
 			return "", err
 		}
 		if _, err := gitx.Run(ctx, dir, "push", "-u", "origin", "HEAD"); err != nil {
-			return "", fmt.Errorf("push failed; does %s exist? %w", originURL, err)
+			return "", fmt.Errorf("push failed; does %s exist? %w", gitx.Redact(originURL), err)
 		}
 		return originURL, nil
 	}
