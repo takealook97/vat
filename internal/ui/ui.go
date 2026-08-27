@@ -8,7 +8,7 @@ import (
 	"io"
 	"os"
 	"strings"
-	"unicode/utf8"
+	"unicode"
 )
 
 // Level classifies a single reported observation.
@@ -179,12 +179,12 @@ func (p *Printer) Table(headers []string, rows [][]string) {
 	}
 	widths := make([]int, len(headers))
 	for i, header := range headers {
-		widths[i] = utf8.RuneCountInString(header)
+		widths[i] = displayWidth(header)
 	}
 	for _, row := range rows {
 		for i, cell := range row {
-			if i < len(widths) && utf8.RuneCountInString(cell) > widths[i] {
-				widths[i] = utf8.RuneCountInString(cell)
+			if i < len(widths) && displayWidth(cell) > widths[i] {
+				widths[i] = displayWidth(cell)
 			}
 		}
 	}
@@ -213,11 +213,69 @@ func (p *Printer) Table(headers []string, rows [][]string) {
 }
 
 func pad(text string, width int) string {
-	gap := width - utf8.RuneCountInString(text)
+	gap := width - displayWidth(text)
 	if gap <= 0 {
 		return text
 	}
 	return text + strings.Repeat(" ", gap)
+}
+
+// displayWidth is how many terminal cells a string occupies.
+//
+// Padding by rune count shifted every column after a Korean group name or a
+// Japanese description, in the output this tool prints most. A wide character
+// takes two cells and a combining mark takes none, and counting each as one put
+// the branch column eight cells out.
+//
+// The ranges are the East Asian Wide and Fullwidth blocks. This is deliberately
+// a table here rather than a dependency: the count is one, and that is a
+// security property. It is approximate at the edges — an emoji built from a
+// zero-width joiner is measured as its parts — and approximate is what a
+// terminal does with those anyway.
+func displayWidth(text string) int {
+	cells := 0
+	for _, r := range text {
+		switch {
+		case r == 0:
+		case unicode.In(r, unicode.Mn, unicode.Me, unicode.Cf):
+			// Combining marks and format characters occupy no cell of their own.
+		case isWide(r):
+			cells += 2
+		default:
+			cells++
+		}
+	}
+	return cells
+}
+
+// wideRanges are the code points a terminal renders two cells across: the East
+// Asian Wide and Fullwidth categories, plus the emoji blocks that follow the
+// same convention.
+var wideRanges = [...][2]rune{
+	{0x1100, 0x115F},   // Hangul Jamo initial consonants
+	{0x2E80, 0x303E},   // CJK radicals, Kangxi, CJK symbols and punctuation
+	{0x3041, 0x33FF},   // Hiragana, Katakana, Bopomofo, Hangul compatibility, CJK compatibility
+	{0x3400, 0x4DBF},   // CJK unified ideographs extension A
+	{0x4E00, 0x9FFF},   // CJK unified ideographs
+	{0xA000, 0xA4CF},   // Yi
+	{0xAC00, 0xD7A3},   // Hangul syllables
+	{0xF900, 0xFAFF},   // CJK compatibility ideographs
+	{0xFE10, 0xFE19},   // Vertical forms
+	{0xFE30, 0xFE6F},   // CJK compatibility forms, small form variants
+	{0xFF00, 0xFF60},   // Fullwidth forms
+	{0xFFE0, 0xFFE6},   // Fullwidth signs
+	{0x1F300, 0x1F64F}, // Miscellaneous symbols and pictographs, emoticons
+	{0x1F900, 0x1F9FF}, // Supplemental symbols and pictographs
+	{0x20000, 0x3FFFD}, // CJK unified ideographs extensions B and beyond
+}
+
+func isWide(r rune) bool {
+	for _, span := range wideRanges {
+		if r >= span[0] && r <= span[1] {
+			return true
+		}
+	}
+	return false
 }
 
 func colorEnabled() bool {

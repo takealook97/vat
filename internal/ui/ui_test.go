@@ -165,3 +165,65 @@ func TestColourIsOmittedWhenDisabled(t *testing.T) {
 		t.Errorf("escape codes were emitted with colour disabled: %q", out.String())
 	}
 }
+
+// Columns were padded by counting runes. A wide character occupies two terminal
+// cells, so a Korean group name or a Japanese description shifted every column
+// after it — in the output this tool prints most: `vat repo list`, `vat status`,
+// `vat harness skills`.
+func TestATableAlignsColumnsByWhatTheTerminalShows(t *testing.T) {
+	// Arrange
+	printer, out, _ := newPrinter()
+
+	// Act
+	printer.Table(
+		[]string{"NAME", "GROUP", "BRANCH"},
+		[][]string{
+			{"orders", "ops", "main"},
+			{"payments", "결제팀", "main"},
+			{"console", "プラットフォーム", "main"},
+		},
+	)
+
+	// Assert: every row's last column starts in the same terminal cell.
+	lines := strings.Split(strings.TrimRight(out.String(), "\n"), "\n")
+	if len(lines) != 4 {
+		t.Fatalf("expected a header and three rows, got %d lines:\n%s", len(lines), out.String())
+	}
+	want := -1
+	for _, line := range lines {
+		at := displayIndexOf(line, "main")
+		if at < 0 {
+			continue
+		}
+		if want < 0 {
+			want = at
+			continue
+		}
+		if at != want {
+			t.Errorf("the branch column starts at cell %d on one row and %d on another:\n%s",
+				want, at, out.String())
+		}
+	}
+	if want < 0 {
+		t.Fatalf("no row carried the branch column:\n%s", out.String())
+	}
+}
+
+// displayIndexOf returns the terminal cell a substring begins at, counting a
+// wide character as the two cells it occupies.
+func displayIndexOf(line, want string) int {
+	at := strings.Index(line, want)
+	if at < 0 {
+		return -1
+	}
+	cells := 0
+	for _, r := range line[:at] {
+		cells++
+		if r >= 0x1100 && (r <= 0x115F || (r >= 0x2E80 && r <= 0xA4CF) ||
+			(r >= 0xAC00 && r <= 0xD7A3) || (r >= 0xF900 && r <= 0xFAFF) ||
+			(r >= 0xFF00 && r <= 0xFF60) || (r >= 0xFFE0 && r <= 0xFFE6)) {
+			cells++
+		}
+	}
+	return cells
+}

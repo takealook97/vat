@@ -434,6 +434,13 @@ Notable changes to `vat`. The format follows
   none. That text is committed into the repository of everybody adopting the
   harness on its own, where it reads as a defect in the generated file rather
   than as the state it describes.
+- Tables align by what the terminal shows rather than by rune count. A wide
+  character occupies two cells, so a Korean group name or a Japanese description
+  shifted every column after it by one cell per character — in the output this
+  tool prints most: `vat repo list`, `vat status`, `vat harness skills`,
+  `vat changeset list`. The width table is written out here rather than taken
+  from a dependency, because the dependency count is one and that is a security
+  property.
 - Every command shown in the documentation is checked against the command tree.
   The reference was already held to it; every other document showing one was
   not, so a renamed or removed command could sit in the README indefinitely with
