@@ -459,6 +459,14 @@ Notable changes to `vat`. The format follows
   plainly carried a description was then reported as having none, sending
   somebody to fix a file that was already right. Roles, skills, and brain
   records all arrive through the one function that now strips it.
+- `repo/nested`, for a governed repository inside another that does not exclude
+  it. That is the harm `workspace/gitignore-drift` names, one level down: a
+  commit in the outer repository swallows the inner one's whole tree and
+  duplicates its history, and the outer one reads as permanently dirty until it
+  does. The rule guarded the workspace root and nothing guarded this. Reported
+  only when the outer repository does not already exclude it — asked of git
+  rather than by reading a file, because the answer depends on every ignore file
+  above it and on the user's own configuration.
 - `harness/region-duplicated`, for a contract carrying more than one generated
   region. vat maintains the first and never looks at the rest: they keep
   whatever they hold, marked as generated, and every session loads them as

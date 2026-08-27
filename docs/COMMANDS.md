@@ -186,6 +186,7 @@ The rules, and what each one prevents:
 | `repo/missing` | error / warn | a repository never cloned; error when `required`, warning otherwise — `vat sync` draws the same line |
 | `repo/not-a-repository` | error | a directory shadowing a governed repository |
 | `repo/outside-workspace` | error | a governed directory that resolves, through a symlink, outside the workspace vat may write to |
+| `repo/nested` | error | a governed repository inside another that does not exclude it, where a commit would swallow its whole tree |
 | `repo/remote-mismatch` | error | fetching from somewhere the manifest does not name |
 | `repo/remote-missing` | warn | a repository that can never be fetched or pushed |
 | `repo/credential-in-remote` | error | a token left in a clone's `.git/config`, which the remote comparison cannot see because it strips userinfo before comparing |

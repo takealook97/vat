@@ -12,6 +12,7 @@ import (
 	"context"
 	"fmt"
 	"io/fs"
+	"path"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -168,6 +169,7 @@ func RuleNames() []string {
 		"repo/missing",
 		"repo/not-a-repository",
 		"repo/outside-workspace",
+		"repo/nested",
 		"repo/remote-mismatch",
 		"repo/remote-missing",
 		"repo/credential-in-remote",
@@ -268,6 +270,23 @@ func checkRepositories(ctx context.Context, ws *workspace.Workspace) []Finding {
 				Fix: "move the repository inside the workspace, or drop the entry with vat repo remove",
 			})
 			continue
+		}
+		// A governed repository inside another governed repository is the harm
+		// workspace/gitignore-drift names, one level down: a commit in the
+		// outer one swallows the inner one's whole tree and duplicates its
+		// history, and the outer one reads as permanently dirty until it does.
+		// Reported only when the outer repository does not already exclude it,
+		// because somebody who has excluded it has thought about this and a
+		// rule that fires on a correct workspace gets turned off.
+		if outer, nested := enclosingRepo(ws, repo); nested && !gitx.Ignores(ctx, ws.RepoPath(outer), nestedRelative(outer, repo)) {
+			findings = append(findings, Finding{
+				Rule: "repo/nested", Severity: SeverityError, Subject: repo.Name,
+				Message: fmt.Sprintf(
+					"sits inside %s, which does not exclude it: a commit there would swallow this repository's whole tree",
+					outer.Name),
+				Fix: fmt.Sprintf("echo %s/ >> %s/.gitignore, or move the repository beside the others",
+					nestedRelative(outer, repo), outer.Dir()),
+			})
 		}
 		if !gitx.IsRepository(dir) {
 			findings = append(findings, Finding{
@@ -648,4 +667,27 @@ func plural(count int, singular, many string) string {
 		return singular
 	}
 	return many
+}
+
+// enclosingRepo returns the governed repository whose directory contains this
+// one, if any.
+func enclosingRepo(ws *workspace.Workspace, inner manifest.Repo) (manifest.Repo, bool) {
+	innerDir := path.Clean(filepath.ToSlash(inner.Dir()))
+	for _, outer := range ws.Manifest.Repos {
+		outerDir := path.Clean(filepath.ToSlash(outer.Dir()))
+		if outerDir == innerDir {
+			continue
+		}
+		if strings.HasPrefix(innerDir, outerDir+"/") {
+			return outer, true
+		}
+	}
+	return manifest.Repo{}, false
+}
+
+// nestedRelative is the inner repository's path as the outer one sees it.
+func nestedRelative(outer, inner manifest.Repo) string {
+	outerDir := path.Clean(filepath.ToSlash(outer.Dir()))
+	innerDir := path.Clean(filepath.ToSlash(inner.Dir()))
+	return strings.TrimPrefix(innerDir, outerDir+"/")
 }

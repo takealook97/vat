@@ -2,6 +2,7 @@ package cli
 
 import (
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -445,6 +446,73 @@ func TestASecondGeneratedRegionInARepositoryContractIsReported(t *testing.T) {
 	for _, finding := range report.Findings {
 		if finding.Rule == "harness/region-duplicated" && !strings.Contains(finding.Subject, "payments") {
 			t.Errorf("the finding does not name the repository: %q", finding.Subject)
+		}
+	}
+}
+
+// A governed repository inside another governed repository is the harm
+// `workspace/gitignore-drift` names, one level down: a commit in the outer one
+// swallows the inner one's entire tree and duplicates its history, and the
+// outer repository shows as permanently dirty in the meantime. The rule guards
+// the workspace root and nothing guarded this.
+func TestAGovernedRepositoryInsideAnotherIsReported(t *testing.T) {
+	// Arrange
+	h := adoptedFixture(t, "payments")
+	nested := h.path("payments", "inner")
+	if err := os.MkdirAll(nested, 0o755); err != nil {
+		t.Fatalf("mkdir: %v", err)
+	}
+	initRepoAt(t, nested)
+	h.mustRun("repo", "add", "inner",
+		"--origin", "https://example.invalid/acme/inner.git", "--path", "payments/inner", "--no-clone")
+
+	// Act
+	report := h.lint(t, "--offline")
+
+	// Assert
+	if !report.reports("repo/nested") {
+		t.Errorf("a repository inside another went unreported; lint said %v", report.rules())
+	}
+}
+
+// A nested directory the outer repository already ignores is somebody who has
+// thought about it, and a rule that fires on a correct workspace gets disabled.
+func TestANestedRepositoryTheOuterOneIgnoresIsNotReported(t *testing.T) {
+	// Arrange
+	h := adoptedFixture(t, "payments")
+	nested := h.path("payments", "inner")
+	if err := os.MkdirAll(nested, 0o755); err != nil {
+		t.Fatalf("mkdir: %v", err)
+	}
+	initRepoAt(t, nested)
+	if err := os.WriteFile(h.path("payments", ".gitignore"), []byte("inner/\n"), 0o644); err != nil {
+		t.Fatalf("write: %v", err)
+	}
+	h.mustRun("repo", "add", "inner",
+		"--origin", "https://example.invalid/acme/inner.git", "--path", "payments/inner", "--no-clone")
+
+	// Act
+	report := h.lint(t, "--offline")
+
+	// Assert
+	if report.reports("repo/nested") {
+		t.Errorf("a nested repository the outer one ignores was reported: %+v", report.Findings)
+	}
+}
+
+func initRepoAt(t *testing.T, dir string) {
+	t.Helper()
+	for _, args := range [][]string{
+		{"init", "--quiet", "--initial-branch", "main", "."},
+		{"add", "-A"},
+	} {
+		cmd := exec.Command("git", args...)
+		cmd.Dir = dir
+		cmd.Env = append(os.Environ(),
+			"GIT_AUTHOR_NAME=t", "GIT_AUTHOR_EMAIL=t@example.com",
+			"GIT_COMMITTER_NAME=t", "GIT_COMMITTER_EMAIL=t@example.com")
+		if out, err := cmd.CombinedOutput(); err != nil {
+			t.Fatalf("git %v: %v\n%s", args, err, out)
 		}
 	}
 }

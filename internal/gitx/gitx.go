@@ -433,3 +433,14 @@ func InterruptedOperation(dir string) string {
 	}
 	return ""
 }
+
+// Ignores reports whether git in dir would exclude the given relative path.
+//
+// Asked of git rather than by reading .gitignore, because the answer depends on
+// every ignore file above it, the repository's own exclude file, and the user's
+// global configuration — and this tool reports what is true rather than what a
+// single file appears to say.
+func Ignores(ctx context.Context, dir, relative string) bool {
+	_, err := Run(ctx, dir, "check-ignore", "--quiet", "--", relative)
+	return err == nil
+}
