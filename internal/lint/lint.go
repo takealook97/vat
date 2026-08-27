@@ -187,6 +187,7 @@ func RuleNames() []string {
 		"harness/adapter-orphaned",
 		"policy/trust-undeclared",
 		"brain/not-initialised",
+		"brain/schema-newer",
 		ruleUnreferencedBrain,
 		"brain/generated-drift",
 		"brain/source-revision-drift",
@@ -486,6 +487,21 @@ func checkBrain(ctx context.Context, ws *workspace.Workspace, opts Options, now 
 			Fix:     "vat brain init",
 		}}, nil
 	}
+	// A brain written against a newer schema is one this build cannot judge.
+	// `vat brain check` refuses to for the reason its own comment gives —
+	// reporting on fields it cannot see would make the records look clean
+	// because half of what governs them was invisible — and lint read it
+	// silently and certified it, in the command this project puts in CI.
+	if declared, ok := brain.DeclaredSchema(root); ok && declared > brain.SchemaVersion {
+		return []Finding{{
+			Rule: "brain/schema-newer", Severity: SeverityError, Subject: ws.Rel(root),
+			Message: fmt.Sprintf(
+				"written against schema %d; this build understands %d, so these checks cannot say whether it is sound",
+				declared, brain.SchemaVersion),
+			Fix: "upgrade vat, or run these checks with the build that wrote it",
+		}}, nil
+	}
+
 	store, err := brain.Load(root)
 	if err != nil {
 		return nil, err

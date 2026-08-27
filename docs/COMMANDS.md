@@ -205,6 +205,7 @@ The rules, and what each one prevents:
 | `harness/runtime-unknown` | warn | a `runtimes:` value that generates no adapter, leaving the definition inert while every other rule passes |
 | `policy/trust-undeclared` | warn | a harness that cannot say which content is data |
 | `brain/not-initialised` | warn | a declared knowledge repository with no records |
+| `brain/schema-newer` | error | a knowledge layer written against a schema this build cannot read, which these checks would otherwise certify |
 | `brain/unreferenced` | warn | a scaffolded brain the manifest never adopted, which no `vat brain` command can reach |
 | `brain/generated-drift` | error | a hand-edited projection contradicting the records |
 | `brain/source-revision-drift` | warn | a claim whose evidence moved on months ago |

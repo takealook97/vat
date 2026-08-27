@@ -351,3 +351,31 @@ func TestASelectorThatMatchesAFamilyOfRulesStillRuns(t *testing.T) {
 		}
 	}
 }
+
+// `vat brain check` refuses to judge a brain written against a newer schema,
+// because "reading it silently and reporting on fields it cannot see would be
+// the worst outcome: the records would look clean because half of what governs
+// them was invisible". `vat lint` read it silently and reported clean — and
+// `vat lint` is the command this project's own adoption guide puts in CI.
+func TestLintDoesNotCertifyABrainWrittenAgainstANewerSchema(t *testing.T) {
+	// Arrange
+	h := adoptedFixture(t, "payments", "brain")
+	h.mustRun("brain", "init")
+	marker := h.path("brain", ".brain")
+	content := readFile(t, marker)
+	if err := os.WriteFile(marker,
+		[]byte(strings.Replace(content, "schema: 1", "schema: 99", 1)), 0o644); err != nil {
+		t.Fatalf("write marker: %v", err)
+	}
+
+	// Act
+	report := h.lint(t, "--offline")
+
+	// Assert
+	if !report.reports("brain/schema-newer") {
+		t.Errorf("lint certified a knowledge layer it cannot read; it reported %v", report.rules())
+	}
+	if report.reports("brain/generated-drift") {
+		t.Error("lint judged the projections of a brain whose format it does not understand")
+	}
+}

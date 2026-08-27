@@ -436,6 +436,12 @@ Notable changes to `vat`. The format follows
   none. That text is committed into the repository of everybody adopting the
   harness on its own, where it reads as a defect in the generated file rather
   than as the state it describes.
+- `brain/schema-newer` is reported by `vat lint` and not only by `vat brain
+  check`. The knowledge layer refuses to judge a brain written against a newer
+  schema, for the reason its own comment gives — "the records would look clean
+  because half of what governs them was invisible" — and lint read exactly that
+  brain silently and certified it, in the command this project's adoption guide
+  puts in CI.
 - An evidence packet listed the same canonical check once per repository that
   declares it, so a briefing for two repositories running `make check` said
   "make check" twice and told a worker nothing the scope line above had not. The
