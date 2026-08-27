@@ -131,10 +131,10 @@ func runExec(ctx context.Context, env *Env, args []string) error {
 		}
 	}
 	if failures > 0 {
-		if env.JSON {
-			return findingsErrorf("")
-		}
-		return findingsErrorf("%d of %d commands failed.", failures, len(results))
+		// The rows above name every failure and the summary counts them, so a
+		// second line restating the count inversely is noise in the command
+		// people run most. The exit code carries the verdict.
+		return findingsErrorf("")
 	}
 	return nil
 }

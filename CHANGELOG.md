@@ -256,6 +256,15 @@ Notable changes to `vat`. The format follows
   shows, and nothing checked that — in the one asset a reader takes as evidence
   the tool does what the page claims. A contract test now holds it to naming
   every file `vat init` writes unconditionally, the seeded procedures included.
+- The summary under `vat sync` counted what advanced, what was left alone, and
+  what needed attention, and nothing else — so a workspace where every
+  repository was already current printed three zeros under a table of rows. A
+  summary whose numbers do not add up to the table it sits under is the state
+  this tool reports in other people's workspaces, and it read that way exactly
+  when the run had gone perfectly.
+- `vat exec` stated the outcome twice, as a summary and as an error line
+  restating it inversely, both on the same stream. The rows above already name
+  every failure and the exit code carries the verdict.
 - `vat lint --only <typo>` and `vat brain check --only <typo>` reported "0 rules
   checked, nothing to report" and exited 0. `vat lint --only harness` in CI is
   what this project's own adoption guide recommends, so a mistyped selector

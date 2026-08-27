@@ -93,11 +93,13 @@ func renderSyncReport(env *Env, report syncx.Report) {
 	}
 	env.Printer.Table([]string{"REPOSITORY", "STATE", "BRANCH", "REV", "DETAIL"}, rows)
 
-	updated, skipped := 0, 0
+	updated, skipped, current := 0, 0, 0
 	for _, result := range report.Results {
 		switch result.State {
 		case syncx.StateUpdated, syncx.StateCloned:
 			updated++
+		case syncx.StateCurrent, syncx.StateArchived, syncx.StatePlanned:
+			current++
 		case syncx.StateDirty, syncx.StateBranch, syncx.StateAhead, syncx.StateDetached,
 			syncx.StateNoRemote:
 			skipped++
@@ -107,8 +109,11 @@ func renderSyncReport(env *Env, report syncx.Report) {
 	if report.Failures == 1 {
 		needs = "needs attention"
 	}
-	env.Printer.Hint("\n%d advanced · %d left alone on purpose · %d %s",
-		updated, skipped, report.Failures, needs)
+	// Every row above is accounted for. A summary whose numbers do not add up to
+	// the table it sits under is the state this tool reports in other people's
+	// workspaces, and it read as three zeros exactly when the run went well.
+	env.Printer.Hint("\n%d advanced · %d already current · %d left alone on purpose · %d %s",
+		updated, current, skipped, report.Failures, needs)
 	if report.Failures > 0 {
 		env.Printer.Status(ui.LevelFail, "result",
 			fmt.Sprintf("%s could not be brought to a known-good state",

@@ -801,3 +801,43 @@ func TestChangesetVerifyCountsARepositoryItCouldNotEnterAsUnverified(t *testing.
 		t.Errorf("the summary does not say the repository could not be verified:\n%s", output)
 	}
 }
+
+// The summary under `vat sync` counted what advanced, what was left alone, and
+// what needed attention — and nothing else. A workspace where every repository
+// was already current printed three zeros under a table of rows, so the numbers
+// did not add up to what was above them, exactly when the run had gone
+// perfectly.
+func TestTheSyncSummaryAccountsForEveryRepositoryInTheTable(t *testing.T) {
+	// Arrange
+	h := adoptedFixture(t, "payments")
+
+	// Act
+	output := h.mustRun("sync", "--offline")
+
+	// Assert
+	if strings.Contains(output, "0 advanced · 0 left alone on purpose · 0 need attention") {
+		t.Errorf("the summary accounts for no repository at all:\n%s", output)
+	}
+	if !strings.Contains(output, "current") {
+		t.Errorf("a repository that needed nothing is not accounted for:\n%s", output)
+	}
+}
+
+// `vat exec` printed the same fact twice: a summary line and an error line
+// restating it inversely, both on stdout. The rows above already name each
+// failure.
+func TestExecStatesTheOutcomeOnceRatherThanTwice(t *testing.T) {
+	// Arrange
+	h := adoptedFixture(t, "payments")
+
+	// Act
+	code, output := h.run("exec", "--", "false")
+
+	// Assert
+	if code == ExitOK {
+		t.Fatalf("a failing command exited zero:\n%s", output)
+	}
+	if strings.Contains(output, "commands failed") && strings.Contains(output, "succeeded") {
+		t.Errorf("the outcome is stated twice:\n%s", output)
+	}
+}
