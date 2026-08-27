@@ -21,12 +21,18 @@ func harnessCommand() *Command {
 
 The workspace AGENTS.md and each repository's AGENTS.md carry a generated
 region rendered from vat.yaml; everything outside that region is yours and is
-never touched. Agent roles are defined once, in runtime-neutral form under
-.agents/roles/, and each runtime adapter is generated from that definition.
+never touched.
 
-That single-source rule is the point. A role body copied into a Claude agent
-file and a Codex configuration diverges within weeks, and the same role then
-behaves differently depending on which tool opened the session.`,
+Two kinds of definition sit beside it, each written once in runtime-neutral
+form, with every runtime adapter generated from it. A role is who is running,
+under .agents/roles/. A skill is a procedure loaded on demand, under
+.agents/skills/.
+
+That single-source rule is the point. A body copied into a Claude file and a
+Codex configuration diverges within weeks, and the same role or procedure then
+behaves differently depending on which tool opened the session. Copying is not
+prevented here, it is reported — which is the only version of this that survives
+contact with a repository people are working in.`,
 		Subcommands: []*Command{
 			harnessRenderCommand(),
 			harnessCheckCommand(),
