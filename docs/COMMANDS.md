@@ -200,6 +200,7 @@ The rules, and what each one prevents:
 | `workspace/not-a-repository` | warn | an unversioned manifest and harness |
 | `repo/missing` | error / warn | a repository never cloned; error when `required`, warning otherwise — `vat sync` draws the same line |
 | `repo/not-a-repository` | error | a directory shadowing a governed repository |
+| `repo/submodule-uninitialised` | warn | a build failing on an empty directory in a repository vat reports as clean |
 | `repo/outside-workspace` | error | a governed directory that resolves, through a symlink, outside the workspace vat may write to |
 | `repo/nested` | error | a governed repository inside another that does not exclude it, where a commit would swallow its whole tree |
 | `repo/remote-mismatch` | error | fetching from somewhere the manifest does not name |

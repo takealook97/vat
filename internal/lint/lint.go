@@ -169,6 +169,7 @@ func RuleNames() []string {
 		"workspace/not-a-repository",
 		"repo/missing",
 		"repo/not-a-repository",
+		"repo/submodule-uninitialised",
 		"repo/outside-workspace",
 		"repo/nested",
 		"repo/remote-mismatch",
@@ -298,6 +299,21 @@ func checkRepositories(ctx context.Context, ws *workspace.Workspace) []Finding {
 				Message: fmt.Sprintf("%s exists but holds no git repository", ws.Rel(dir)),
 			})
 			continue
+		}
+		// A submodule the clone never checked out is an empty directory that
+		// every build reads as a missing dependency, and vat's clone does not
+		// recurse. Without this, sync reports CURRENT, status reports clean,
+		// and the canonical checks fail for a reason nothing in the tool names.
+		//
+		// Not repairable: checking out a submodule writes into a working tree
+		// this tool does not own, and `--fix` repairs only what vat generated.
+		if pending, err := gitx.UninitialisedSubmodules(ctx, dir); err == nil && len(pending) > 0 {
+			findings = append(findings, Finding{
+				Rule: "repo/submodule-uninitialised", Severity: SeverityWarn, Subject: repo.Name,
+				Message: fmt.Sprintf("declares %s never checked out: %s",
+					countOf(len(pending), "submodule", "submodules"), strings.Join(pending, ", ")),
+				Fix: fmt.Sprintf("git -C %s submodule update --init --recursive", repo.Dir()),
+			})
 		}
 		actual, err := gitx.RemoteURL(ctx, dir, "origin")
 		if err != nil {
@@ -720,4 +736,13 @@ func checkGitignoreRegionCount(ws *workspace.Workspace) []Finding {
 			"and the last matching pattern in a .gitignore is the one that decides",
 		Fix: "delete the regions vat does not maintain, keeping any rules of your own inside them",
 	}}
+}
+
+// countOf renders a count with the right noun, so a finding reads as a sentence
+// rather than as a number followed by a plural that does not agree with it.
+func countOf(n int, singular, plural string) string {
+	if n == 1 {
+		return "1 " + singular
+	}
+	return fmt.Sprintf("%d %s", n, plural)
 }

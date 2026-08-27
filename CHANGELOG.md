@@ -359,6 +359,11 @@ Notable changes to `vat`. The format follows
   shows, and nothing checked that — in the one asset a reader takes as evidence
   the tool does what the page claims. A contract test now holds it to naming
   every file `vat init` writes unconditionally, the seeded procedures included.
+- `vat lint` reports a submodule a repository declares but has never checked out
+  (`repo/submodule-uninitialised`). vat clones without recursing, so the
+  directory is empty, every build reads it as a missing dependency, and until now
+  `vat sync` reported `CURRENT` and `vat status` reported clean while the
+  canonical checks failed for a reason nothing in the tool named.
 - The commands that render a repository's `AGENTS.md` say to commit it, once,
   and stop once it is. The per-repository contract is the working permit for a
   session opened inside that repository alone, so it only works once it travels

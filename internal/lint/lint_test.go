@@ -53,6 +53,17 @@ func fixture(t *testing.T, repos ...manifest.Repo) *workspace.Workspace {
 	return ws
 }
 
+// commitFile writes a file into a repository and commits it, so a test can
+// build a repository with real history rather than an empty one.
+func commitFile(t *testing.T, dir, name, content string) {
+	t.Helper()
+	if err := os.WriteFile(filepath.Join(dir, name), []byte(content), 0o644); err != nil {
+		t.Fatalf("write: %v", err)
+	}
+	git(t, dir, "add", "-A")
+	git(t, dir, "commit", "--quiet", "-m", "commit "+name)
+}
+
 func run(t *testing.T, ws *workspace.Workspace) lint.Report {
 	t.Helper()
 	report, err := lint.Run(context.Background(), ws, lint.Options{Now: reference, Offline: true})
@@ -681,5 +692,53 @@ func TestRenderHarnessWritesNothingThroughALinkOutOfTheWorkspace(t *testing.T) {
 	}
 	if len(entries) != 0 {
 		t.Errorf("the render wrote outside the workspace: %v", entries)
+	}
+}
+
+// A repository whose submodule was never checked out is an empty directory that
+// every build reads as a missing dependency. vat clones without recursing, so
+// this is the state it leaves behind — and sync reports CURRENT, status reports
+// clean, and the canonical checks fail for a reason nothing in the tool names.
+func TestARepositoryWithAnUninitialisedSubmoduleIsReported(t *testing.T) {
+	// Arrange
+	ws := fixture(t, manifest.Repo{Name: "payments", Origin: "https://example.invalid/acme/payments.git", Role: manifest.RoleProduct})
+	dir := filepath.Join(ws.Root, "payments")
+	commitFile(t, dir, "README.md", "one\n")
+	nested := t.TempDir()
+	git(t, nested, "init", "--quiet", "--initial-branch", "main", ".")
+	commitFile(t, nested, "lib.go", "package lib\n")
+	git(t, dir, "-c", "protocol.file.allow=always", "submodule", "add", "--quiet", nested, "vendor/lib")
+	git(t, dir, "commit", "--quiet", "-m", "vendor lib")
+	git(t, dir, "-c", "protocol.file.allow=always", "submodule", "deinit", "--force", "vendor/lib")
+
+	// Act
+	report := run(t, ws)
+
+	// Assert
+	finding, found := rules(report)["repo/submodule-uninitialised"]
+	if !found {
+		t.Fatalf("an uninitialised submodule went unreported: %+v", report.Findings)
+	}
+	if !strings.Contains(finding.Message, "vendor/lib") {
+		t.Errorf("the finding does not name the submodule: %q", finding.Message)
+	}
+	if finding.Fixable {
+		t.Error("checking out a submodule is the repository's business, not something --fix does")
+	}
+}
+
+// The check runs against every repository, so a repository with no submodules
+// at all must not be reported — and must not cost a git call that fails.
+func TestARepositoryWithNoSubmodulesIsNotReported(t *testing.T) {
+	// Arrange
+	ws := fixture(t, manifest.Repo{Name: "payments", Origin: "https://example.invalid/acme/payments.git", Role: manifest.RoleProduct})
+	commitFile(t, filepath.Join(ws.Root, "payments"), "README.md", "one\n")
+
+	// Act
+	report := run(t, ws)
+
+	// Assert
+	if _, found := rules(report)["repo/submodule-uninitialised"]; found {
+		t.Errorf("a repository with no submodules was reported: %+v", report.Findings)
 	}
 }

@@ -201,6 +201,35 @@ func IsTracked(ctx context.Context, dir, path string) (bool, error) {
 	return strings.TrimSpace(out) != "", nil
 }
 
+// UninitialisedSubmodules returns the submodule paths a repository declares but
+// has never checked out. Each one is an empty directory that every build reads
+// as a missing dependency, and the clone vat performs does not recurse.
+//
+// No network: the answer comes from the index and the .git directory.
+func UninitialisedSubmodules(ctx context.Context, dir string) ([]string, error) {
+	out, err := Run(ctx, dir, "submodule", "status")
+	if err != nil {
+		return nil, err
+	}
+	var pending []string
+	for _, line := range strings.Split(out, "\n") {
+		// A leading "-" is git's own marker for "not initialised". A trimmed
+		// line cannot carry it, so the raw line is what gets tested — and Run
+		// trims the output, which strips it from the first line. Restore the
+		// distinction by testing the trimmed line for the marker instead.
+		trimmed := strings.TrimLeft(line, " \t")
+		if !strings.HasPrefix(trimmed, "-") {
+			continue
+		}
+		fields := strings.Fields(strings.TrimPrefix(trimmed, "-"))
+		if len(fields) < 2 {
+			continue
+		}
+		pending = append(pending, fields[1])
+	}
+	return pending, nil
+}
+
 // HasRef reports whether a ref such as refs/remotes/origin/main resolves.
 func HasRef(ctx context.Context, dir, ref string) bool {
 	_, err := Run(ctx, dir, "show-ref", "--verify", "--quiet", ref)
