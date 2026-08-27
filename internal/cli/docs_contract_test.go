@@ -796,3 +796,50 @@ func TestEveryCommandShownInTheDocsExists(t *testing.T) {
 		}
 	}
 }
+
+// The promotion gate is the brain's whole argument: a record nobody reviewed
+// does not count as a fact. The README said so in prose and then showed the
+// record it had just created as "active" in the transcript directly below —
+// the walkthrough contradicting the discipline it exists to demonstrate, in the
+// section a reader uses to decide whether any of this is real. Superseding said
+// it too, advertising the behaviour the code went out of its way to remove.
+func TestTheReadmeWalkthroughDoesNotShowARecordPromotedByNobody(t *testing.T) {
+	// Arrange
+	content, err := os.ReadFile("../../README.md")
+	if err != nil {
+		t.Fatalf("read README: %v", err)
+	}
+	text := string(content)
+	created := strings.Index(text, "$ vat brain new ")
+	if created < 0 {
+		t.Skip("the README no longer shows a record being created")
+	}
+	// Only the record this walkthrough creates. Other ids in these transcripts
+	// are pre-existing claims, and one of them is demoted from active on
+	// purpose — reading every id as this one made the guard fire on a correct
+	// example, which is how a guard gets deleted.
+	rest := text[created:]
+	subject := newRecordID.FindStringSubmatch(rest)
+	if subject == nil {
+		t.Skip("the README no longer shows the id of the record it creates")
+	}
+	id := subject[1]
+
+	// Act: everything shown after it is created, up to the first promotion.
+	if promoted := strings.Index(rest, "$ vat brain promote"); promoted >= 0 {
+		rest = rest[:promoted]
+	}
+
+	// Assert
+	for _, line := range strings.Split(rest, "\n") {
+		if !strings.Contains(line, id) || !strings.Contains(line, "active") {
+			continue
+		}
+		if strings.HasPrefix(line, "INFO") || strings.HasPrefix(line, "OK") {
+			t.Errorf("the README shows %s as active before showing anything promote it:\n  %s", id, line)
+		}
+	}
+}
+
+// newRecordID picks the identifier out of the line `vat brain new` prints.
+var newRecordID = regexp.MustCompile(`OK  +((?:D|G|GO|M)-\d+) `)

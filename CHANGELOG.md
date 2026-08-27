@@ -359,6 +359,13 @@ Notable changes to `vat`. The format follows
   shows, and nothing checked that — in the one asset a reader takes as evidence
   the tool does what the page claims. A contract test now holds it to naming
   every file `vat init` writes unconditionally, the seeded procedures included.
+- The README's brain walkthrough showed a record it had just created as
+  `active`, and showed superseding leaving its replacement `active`. Both
+  contradict the promotion gate the surrounding prose is written to explain, and
+  the second advertises the behaviour `Supersede` went out of its way to remove:
+  the one path to a citable record nobody reviewed. A guard now reads the id the
+  walkthrough creates and refuses to see it called active before the walkthrough
+  shows something promote it.
 - `vat metrics` prints `—` for a measurement with nothing to measure. A median
   over no claims read as "0 days since the typical claim was verified" and a
   rate over no checks read as "0% failed" — the most flattering possible reading

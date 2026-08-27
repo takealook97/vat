@@ -379,8 +379,9 @@ a fact simply because it exists.
 
 ```console
 $ vat brain query cancellation
-INFO  D-0042  Cancellation is a v2-only operation  active
+INFO  D-0042  Cancellation is a v2-only operation  provisional
       decisions/D-0042-cancellation-is-a-v2-only-operation.md
+      │ # D-0042 — Cancellation is a v2-only operation
 
 1 result. Open the records themselves; this is an index, not an answer.
 ```
@@ -490,11 +491,15 @@ new destroys the only account of why it once made sense:
 ```console
 $ vat brain supersede D-0031 D-0042
 OK    D-0031    superseded by D-0042
-OK    D-0042    active, supersedes D-0031
+OK    D-0042    provisional, supersedes D-0031
+
+The replacement is not citable until: vat brain promote D-0042
 ```
 
 Both files are updated so the chain reads correctly from either end, and
-`vat brain check` fails if a link points only one way.
+`vat brain check` fails if a link points only one way. Replacing a decision does
+not promote its replacement: that would be the one path to a citable record
+nobody reviewed, which is what the gate exists to close.
 
 **Six states, and only one of them is an answer.**
 
