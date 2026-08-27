@@ -64,7 +64,7 @@ func harnessRenderCommand() *Command {
 			for _, file := range changed {
 				env.Printer.Status(ui.LevelOK, file, "written")
 			}
-			env.Printer.Hint("\n%d files updated.", len(changed))
+			env.Printer.Hint("\n%s updated.", pluralise(len(changed), "file", "files"))
 			return nil
 		},
 	}

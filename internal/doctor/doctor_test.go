@@ -336,27 +336,31 @@ func TestDoctorSaysNothingAboutRecoverabilityWhenNothingIsCloned(t *testing.T) {
 	}
 }
 
-// doctor is the command whose entire job is careful reporting, and three of its
-// details read "1 file(s) look like unencrypted secrets" and "1 commits exist
-// only on this machine". The second sits in the recovery section, which is the
-// most alarming thing this tool prints. This repository has fixed the same
-// class before, in `vat status`.
-func TestDoctorCountsReadCorrectlyForOne(t *testing.T) {
-	// Arrange & Act & Assert
-	cases := []struct {
-		count int
-		one   string
-		many  string
-		want  string
-	}{
-		{1, "file", "files", "1 file"},
-		{2, "file", "files", "2 files"},
-		{1, "commit exists", "commits exist", "1 commit exists"},
-		{3, "commit exists", "commits exist", "3 commits exist"},
-	}
-	for _, testCase := range cases {
-		if got := doctor.Plural(testCase.count, testCase.one, testCase.many); got != testCase.want {
-			t.Errorf("Plural(%d) = %q, want %q", testCase.count, got, testCase.want)
+// doctor is the command whose entire job is careful reporting, and its details
+// read "1 file(s) look like unencrypted secrets", "1 repositories, 0 archived",
+// and "1 commits exist only on this machine". The last sits in the recovery
+// section, which is the most alarming thing this tool prints. A report that
+// cannot count to one is a report people stop reading closely, and this
+// repository has fixed the same class in `vat status` before.
+//
+// Driven through a real report rather than through the helper, because what has
+// to be right is the sentence somebody reads.
+func TestDoctorCountsToOneInEveryDetailItPrints(t *testing.T) {
+	// Arrange: one repository, so every count this workspace produces is one.
+	ws := fixture(t, productRepo())
+
+	// Act
+	report := judge(t, ws)
+
+	// Assert
+	for _, finding := range report.Findings {
+		for _, wrong := range []string{
+			"1 repositories", "1 files", "1 commits", "1 stashes", "1 items",
+			"1 warnings", "file(s)",
+		} {
+			if strings.Contains(finding.Detail, wrong) {
+				t.Errorf("%s/%s reads %q", finding.Section, finding.Subject, finding.Detail)
+			}
 		}
 	}
 }

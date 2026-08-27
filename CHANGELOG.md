@@ -316,10 +316,13 @@ Notable changes to `vat`. The format follows
   is not a wording problem. A check that ran and failed is counted apart from a
   repository nothing could be run in; the specific reason stays beside each one.
 - `vat changeset show` reported "1 checks passed".
-- `vat doctor` reported "1 file(s) look like unencrypted secrets" and "1 commits
-  exist only on this machine". The second sits in the recovery section, which is
-  the most alarming thing this tool prints, and a report that cannot count to
-  one is a report people stop reading closely.
+- Every count this tool prints reads correctly at one. `vat doctor` said "1
+  file(s) look like unencrypted secrets", "1 repositories, 0 archived", and "1
+  commits exist only on this machine" — the last in the recovery section, which
+  is the most alarming thing it prints; `vat harness render` said "1 files
+  updated"; `vat brain adopt` said "1 records need attention". A report that
+  cannot count to one is a report people stop reading closely, and the whole
+  value of these sections is that somebody reads them closely enough to act.
 - `vat doctor` could be made to certify a knowledge layer that does not exist,
   by following its own advice. On a repository declared as the brain and never
   initialised — the state every workspace with a directory called `brain` starts

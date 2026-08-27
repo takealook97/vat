@@ -78,10 +78,10 @@ func renderDoctorReport(env *Env, report doctor.Report) {
 	switch {
 	case report.Failures > 0:
 		printer.Status(ui.LevelFail, "environment",
-			fmt.Sprintf("%d failing, %d warnings", report.Failures, report.Warnings))
+			fmt.Sprintf("%s, %s", pluralise(report.Failures, "failing", "failing"), pluralise(report.Warnings, "warning", "warnings")))
 	case report.Warnings > 0:
 		printer.Status(ui.LevelWarn, "environment",
-			fmt.Sprintf("usable, %d warnings", report.Warnings))
+			fmt.Sprintf("usable, %s", pluralise(report.Warnings, "warning", "warnings")))
 	default:
 		printer.Status(ui.LevelOK, "environment", "everything checked is in order")
 	}

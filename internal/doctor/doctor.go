@@ -151,8 +151,9 @@ func checkTools(ctx context.Context) []Finding {
 func checkWorkspace(ws *workspace.Workspace) []Finding {
 	findings := []Finding{
 		{Section: sectionWorkspace, Subject: manifest.FileName, Status: StatusOK,
-			Detail: fmt.Sprintf("%d repositories, %d archived",
-				len(ws.Manifest.Active()), len(ws.Manifest.Repos)-len(ws.Manifest.Active()))},
+			Detail: fmt.Sprintf("%s, %d archived",
+				plural(len(ws.Manifest.Active()), "repository", "repositories"),
+				len(ws.Manifest.Repos)-len(ws.Manifest.Active()))},
 	}
 	if !gitx.IsRepository(ws.Root) {
 		findings = append(findings, Finding{
@@ -301,7 +302,7 @@ func checkSecrets(ws *workspace.Workspace, now time.Time, maxAgeDays int) []Find
 		findings = append(findings, Finding{
 			Section: sectionCredentials, Subject: credential.Name, Status: StatusFail,
 			Detail: fmt.Sprintf("%s like unencrypted secrets: %s",
-				Plural(len(plaintext), "file looks", "files look"), strings.Join(shown, ", ")),
+				plural(len(plaintext), "file looks", "files look"), strings.Join(shown, ", ")),
 			Fix: "encrypt before committing; a private repository is not encryption",
 		})
 	}
@@ -384,7 +385,7 @@ func checkCredentialPermissions(dir, name string) []Finding {
 	return []Finding{{
 		Section: sectionCredentials, Subject: "permissions", Status: StatusFail,
 		Detail: fmt.Sprintf("%s readable by other users: %s",
-			Plural(len(exposed), "file is", "files are"), strings.Join(shown, ", ")),
+			plural(len(exposed), "file is", "files are"), strings.Join(shown, ", ")),
 		Fix: fmt.Sprintf("chmod 600 what is listed above, inside %s", name),
 	}}
 }
@@ -522,7 +523,7 @@ func checkBrain(ws *workspace.Workspace, now time.Time) []Finding {
 	case len(queue) > 0:
 		findings = append(findings, Finding{
 			Section: sectionBrain, Subject: "review queue", Status: StatusOK,
-			Detail: fmt.Sprintf("%d items, none overdue", len(queue)),
+			Detail: fmt.Sprintf("%s, none overdue", plural(len(queue), "item", "items")),
 		})
 	default:
 		findings = append(findings, Finding{
@@ -668,23 +669,23 @@ func checkRecoverability(ctx context.Context, ws *workspace.Workspace) []Finding
 func describeExposure(unpushed, stashes int) string {
 	switch {
 	case unpushed > 0 && stashes > 0:
-		return fmt.Sprintf("%d commits and %d stashes exist only on this machine",
-			unpushed, stashes)
+		return fmt.Sprintf("%s and %s exist only on this machine",
+			plural(unpushed, "commit", "commits"), plural(stashes, "stash", "stashes"))
 	case unpushed > 0:
-		return Plural(unpushed, "commit exists", "commits exist") + " only on this machine"
+		return plural(unpushed, "commit exists", "commits exist") + " only on this machine"
 	default:
-		return fmt.Sprintf("%d stashes exist only on this machine", stashes)
+		return plural(stashes, "stash exists", "stashes exist") + " only on this machine"
 	}
 }
 
-// Plural renders a count with the right noun form.
+// plural renders a count with the right noun form.
 //
 // doctor is the command whose entire job is careful reporting, and it read
 // "1 file(s) look like unencrypted secrets" and "1 commits exist only on this
 // machine" — the second in the recovery section, which is the most alarming
 // thing this tool prints. A report that cannot count to one is a report people
 // stop reading closely.
-func Plural(count int, singular, many string) string {
+func plural(count int, singular, many string) string {
 	if count == 1 {
 		return fmt.Sprintf("%d %s", count, singular)
 	}

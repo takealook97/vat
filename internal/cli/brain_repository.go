@@ -290,8 +290,8 @@ rules gradually rather than converted in one pass.`,
 				env.Printer.Status(ui.LevelOK, "schema", "every record already conforms")
 			} else {
 				env.Printer.Status(ui.LevelWarn, "schema",
-					fmt.Sprintf("%d records need attention; run `vat brain check` for the list",
-						brain.Errors(findings)))
+					fmt.Sprintf("%s attention; run `vat brain check` for the list",
+						pluralise(brain.Errors(findings), "record needs", "records need")))
 				env.Printer.Hint("      → Nothing was rewritten. Bring them up one at a time.")
 			}
 			return renderAfterChange(env, ws.Root)
