@@ -240,7 +240,10 @@ func checkRepos(ctx context.Context, ws *workspace.Workspace) []Finding {
 			})
 			continue
 		}
-		dirty, err := gitx.IsDirty(ctx, dir)
+		// Tracked modifications only. vat renders a contract into every
+		// repository, so warning on untracked files warned about the file vat
+		// itself had just written, in every repository of a new workspace.
+		dirty, err := gitx.HasLocalModifications(ctx, dir)
 		if err != nil {
 			findings = append(findings, Finding{
 				Section: sectionRepositories, Subject: repo.Name, Status: StatusFail,

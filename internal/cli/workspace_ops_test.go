@@ -34,8 +34,9 @@ func TestStatusDistinguishesEveryStateARepositoryCanBeIn(t *testing.T) {
 	// Arrange
 	h := adoptedFixture(t, "payments", "console", "docs")
 
-	// A repository with uncommitted work.
-	if err := os.WriteFile(h.path("console", "scratch.txt"), []byte("wip\n"), 0o644); err != nil {
+	// A repository with uncommitted work in a tracked file, which is the state
+	// that stops a fast-forward. An untracked file is reported separately.
+	if err := os.WriteFile(h.path("console", "README.md"), []byte("wip\n"), 0o644); err != nil {
 		t.Fatalf("write: %v", err)
 	}
 	// A repository with a commit its remote has never seen.
@@ -56,6 +57,9 @@ func TestStatusDistinguishesEveryStateARepositoryCanBeIn(t *testing.T) {
 	}
 	if !byName["console"].Dirty {
 		t.Errorf("a repository with uncommitted work is not reported dirty: %+v", byName["console"])
+	}
+	if byName["console"].Untracked {
+		t.Errorf("a modified tracked file was reported as untracked: %+v", byName["console"])
 	}
 	if byName["docs"].Ahead == 0 {
 		t.Errorf("a repository holding an unpushed commit reports no divergence: %+v", byName["docs"])
@@ -130,11 +134,13 @@ func TestStatusDirtyNarrowsToWhatHasUncommittedWork(t *testing.T) {
 	for _, status := range dirty {
 		if status.Name == "console" {
 			found = true
-			if !status.Dirty {
-				t.Errorf("console holds uncommitted work but is not marked dirty: %+v", status)
+			// Untracked, so it is not Dirty — but it exists nowhere else,
+			// which is what --dirty is for.
+			if !status.Dirty && !status.Untracked {
+				t.Errorf("console holds work that exists only here: %+v", status)
 			}
 		}
-		if !status.Dirty && status.Ahead == 0 && status.Stashes == 0 {
+		if !status.Dirty && !status.Untracked && status.Ahead == 0 && status.Stashes == 0 {
 			t.Errorf("--dirty listed %s, which holds nothing that exists only here: %+v",
 				status.Name, status)
 		}
@@ -1138,5 +1144,65 @@ func TestRepoAddRefusesADirectoryThatResolvesOutsideTheWorkspace(t *testing.T) {
 	}
 	if len(entries) != 0 {
 		t.Errorf("vat wrote into a directory outside the workspace: %v", entries)
+	}
+}
+
+// vat renders a contract into every repository, which leaves an untracked
+// AGENTS.md behind. Three commands read the same tree, so three commands must
+// agree about it: sync calls it CURRENT, and status and doctor said "dirty" and
+// "uncommitted changes" — about the file vat had just written.
+func TestSyncStatusAndDoctorAgreeAboutATreeWithOnlyUntrackedFiles(t *testing.T) {
+	// Arrange
+	h := newFixture(t, "payments")
+	h.mustRun("init", "--name", "acme")
+	h.mustRun("repo", "add", "payments", "--origin", h.upstream("payments"))
+	if err := os.WriteFile(h.path("payments", "notes.txt"), []byte("scratch\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	// Act
+	sync := h.mustRun("sync")
+	status := h.mustRun("status")
+	_, doctor := h.run("doctor")
+
+	// Assert
+	if strings.Contains(sync, "DIRTY") {
+		t.Errorf("sync called an untracked-only tree dirty:\n%s", sync)
+	}
+	if strings.Contains(status, "  dirty") {
+		t.Errorf("status called an untracked-only tree dirty:\n%s", status)
+	}
+	if strings.Contains(doctor, "uncommitted changes") {
+		t.Errorf("doctor warned about uncommitted changes in an untracked-only tree:\n%s", doctor)
+	}
+	if !strings.Contains(status, "untracked") {
+		t.Errorf("status did not say the tree holds untracked files:\n%s", status)
+	}
+}
+
+// And they must still agree when the tree holds work that is actually at risk.
+func TestSyncStatusAndDoctorAgreeAboutAModifiedTrackedFile(t *testing.T) {
+	// Arrange
+	h := newFixture(t, "payments")
+	h.mustRun("init", "--name", "acme")
+	h.mustRun("repo", "add", "payments", "--origin", h.upstream("payments"))
+	if err := os.WriteFile(h.path("payments", "README.md"), []byte("mine\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	// Act
+	sync := h.mustRun("sync")
+	status := h.mustRun("status")
+	_, doctor := h.run("doctor")
+
+	// Assert
+	if !strings.Contains(sync, "DIRTY") {
+		t.Errorf("sync advanced past a modified tracked file:\n%s", sync)
+	}
+	if !strings.Contains(status, "dirty") {
+		t.Errorf("status did not report the modification:\n%s", status)
+	}
+	if !strings.Contains(doctor, "uncommitted changes") {
+		t.Errorf("doctor did not report the modification:\n%s", doctor)
 	}
 }

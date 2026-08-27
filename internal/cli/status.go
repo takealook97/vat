@@ -38,10 +38,16 @@ type repoStatus struct {
 	Present  bool   `json:"present"`
 	Branch   string `json:"branch,omitempty"`
 	Revision string `json:"revision,omitempty"`
-	Dirty    bool   `json:"dirty"`
-	Ahead    int    `json:"ahead"`
-	Behind   int    `json:"behind"`
-	Stashes  int    `json:"stashes,omitempty"`
+	// Dirty means tracked files differ from HEAD or the index — work that is
+	// at risk. Untracked is reported separately because vat renders a contract
+	// into every repository, so an untracked file is the normal state of a
+	// freshly enrolled one and folding the two together said every repository
+	// in a new workspace held uncommitted work.
+	Dirty     bool `json:"dirty"`
+	Untracked bool `json:"untracked"`
+	Ahead     int  `json:"ahead"`
+	Behind    int  `json:"behind"`
+	Stashes   int  `json:"stashes,omitempty"`
 	// Interrupted names a git operation the repository stopped part of the way
 	// through. Reported as data rather than only in the note, because a job
 	// deciding whether a workspace is safe to act on needs to branch on it.
@@ -74,7 +80,7 @@ func runStatus(ctx context.Context, env *Env, args []string) error {
 	if *dirtyOnly {
 		filtered := statuses[:0]
 		for _, status := range statuses {
-			if status.Dirty || status.Ahead > 0 || status.Stashes > 0 {
+			if status.Dirty || status.Untracked || status.Ahead > 0 || status.Stashes > 0 {
 				filtered = append(filtered, status)
 			}
 		}
@@ -145,11 +151,18 @@ func describeStatus(ctx context.Context, ws *workspace.Workspace, repo manifest.
 		status.Note = "unreadable: " + firstLine(err.Error())
 		return status
 	}
-	if status.Dirty, err = gitx.IsDirty(ctx, dir); err != nil {
+	if status.Dirty, err = gitx.HasLocalModifications(ctx, dir); err != nil {
 		status.Unreadable = true
 		status.Note = "unreadable: " + firstLine(err.Error())
 		return status
 	}
+	anyChange, err := gitx.IsDirty(ctx, dir)
+	if err != nil {
+		status.Unreadable = true
+		status.Note = "unreadable: " + firstLine(err.Error())
+		return status
+	}
+	status.Untracked = anyChange && !status.Dirty
 	if status.Stashes, err = gitx.StashCount(ctx, dir); err != nil {
 		status.Note = "stash list unavailable"
 	}
@@ -214,6 +227,8 @@ func renderStatusTable(env *Env, ws *workspace.Workspace, statuses []repoStatus)
 		case status.Dirty:
 			state = "dirty"
 			dirty++
+		case status.Untracked:
+			state = "untracked"
 		}
 		if status.Ahead > 0 {
 			ahead++

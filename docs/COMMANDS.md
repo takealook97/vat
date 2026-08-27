@@ -93,8 +93,15 @@ vat status [--group <g>] [--role <r>] [--only <names>] [--dirty] [--fetch] [--ar
 Branch, revision, working-tree state, and divergence for every repository. No
 network unless `--fetch` is given, so it is safe to run constantly.
 
+The `TREE` column separates `dirty` — tracked files differing from HEAD or the
+index, which is work at risk — from `untracked`, which is not. vat renders a
+contract into every repository, so an untracked file is the normal state of a
+freshly enrolled one, and calling that dirty said every repository in a new
+workspace held uncommitted work. Under `--json` they are the `dirty` and
+`untracked` fields.
+
 `--dirty` narrows the list to repositories holding work that exists only here:
-uncommitted changes, unpushed commits, or stashes.
+tracked modifications, untracked files, unpushed commits, or stashes.
 
 ---
 

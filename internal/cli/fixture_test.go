@@ -109,6 +109,12 @@ func (h *workspaceFixture) mustRun(args ...string) string {
 	return output
 }
 
+// upstream is the local origin newFixture cloned a repository from, so a test
+// can enrol it without inventing a URL that does not resolve.
+func (h *workspaceFixture) upstream(name string) string {
+	return filepath.Join(filepath.Dir(h.root), "upstream", name)
+}
+
 func (h *workspaceFixture) path(parts ...string) string {
 	return filepath.Join(append([]string{h.root}, parts...)...)
 }

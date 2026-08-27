@@ -359,6 +359,12 @@ Notable changes to `vat`. The format follows
   shows, and nothing checked that — in the one asset a reader takes as evidence
   the tool does what the page claims. A contract test now holds it to naming
   every file `vat init` writes unconditionally, the seeded procedures included.
+- `vat status` separates `untracked` from `dirty`, and `vat doctor` no longer
+  warns about untracked files. Three commands read the same working tree, so on
+  a freshly enrolled repository they gave three answers: sync said `CURRENT`,
+  status said `dirty`, doctor warned "uncommitted changes" — about the AGENTS.md
+  vat had rendered. `--json` gains an `untracked` field, and `dirty` now means
+  tracked files differing from HEAD or the index.
 - Untracked files alone no longer make `vat sync` report `DIRTY`. Rendering the
   per-repository contract leaves an untracked `AGENTS.md` behind, so the very
   first sync of a new workspace reported every repository as dirty and advanced
