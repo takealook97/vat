@@ -246,6 +246,12 @@ Notable changes to `vat`. The format follows
   shows, and nothing checked that — in the one asset a reader takes as evidence
   the tool does what the page claims. A contract test now holds it to naming
   every file `vat init` writes unconditionally, the seeded procedures included.
+- `vat sync` reported the branch the manifest declares rather than the one the
+  repository is on, for a repository with no remote and for a fresh clone. That
+  made this table and `vat status` disagree about the same repository at the
+  same moment, and the row that was wrong is the one somebody would have used to
+  conclude the manifest was right. A clone lands on the remote's own HEAD, which
+  is not always what the manifest names.
 - `vat status` and `vat sync` name an operation git was left part of the way
   through — a merge, rebase, cherry-pick, revert, or bisect. Every one of those
   leaves an ordinary dirty tree, and reporting it as only that invites the

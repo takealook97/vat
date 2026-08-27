@@ -200,8 +200,11 @@ func syncOne(ctx context.Context, ws *workspace.Workspace, repo manifest.Repo, r
 			return Result{Repo: name, State: StateMissing, Optional: !repo.Required,
 				Detail: gitErrorDetail(err)}
 		}
+		// Read back rather than assumed: a clone lands on the remote's own HEAD,
+		// which is not always the branch the manifest declares.
+		current, _ := gitx.CurrentBranch(ctx, dir)
 		revision, _ := gitx.ShortRevision(ctx, dir, "HEAD")
-		return Result{Repo: name, State: StateCloned, Branch: branch, Revision: revision}
+		return Result{Repo: name, State: StateCloned, Branch: displayBranch(current), Revision: revision}
 	}
 
 	actual, err := gitx.RemoteURL(ctx, dir, remote)
@@ -210,9 +213,14 @@ func syncOne(ctx context.Context, ws *workspace.Workspace, repo manifest.Repo, r
 		// supply-chain signal. Reporting it as one made every run fail forever
 		// for a state `vat repo new --no-remote` deliberately produces.
 		if manifest.IsLocalOrigin(repo.Origin) {
+			// The branch the repository is on, never the one the manifest
+			// declares: reporting the declaration makes this row and
+			// `vat status` disagree about the same repository at the same
+			// moment, and the wrong one is the one somebody would trust.
+			current, _ := gitx.CurrentBranch(ctx, dir)
 			revision, _ := gitx.ShortRevision(ctx, dir, "HEAD")
-			return Result{Repo: name, State: StateNoRemote, Branch: branch, Revision: revision,
-				Detail: "no remote, as the manifest records"}
+			return Result{Repo: name, State: StateNoRemote, Branch: displayBranch(current),
+				Revision: revision, Detail: "no remote, as the manifest records"}
 		}
 		return Result{Repo: name, State: StateRemoteMismatch,
 			Detail: fmt.Sprintf("no remote %q configured; the manifest names %s",

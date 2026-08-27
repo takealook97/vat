@@ -475,3 +475,29 @@ func TestADirtyTreeSaysWhenAnOperationWasLeftUnfinished(t *testing.T) {
 		t.Errorf("detail = %q; it does not say the merge was left unfinished", result.Detail)
 	}
 }
+
+// Every row reports the branch the repository is actually on. Reporting the one
+// the manifest declares makes `vat sync` and `vat status` disagree about the
+// same repository at the same moment, and the row that is wrong is the one
+// somebody would use to decide the manifest is right.
+func TestTheBranchReportedIsTheOneTheRepositoryIsActuallyOn(t *testing.T) {
+	// Arrange
+	ws, _, clone := fixture(t)
+	git(t, clone, "remote", "remove", "origin")
+	git(t, clone, "checkout", "--quiet", "-b", "feature")
+	local := ws.Manifest.Active()[0]
+	local.Origin = manifest.LocalOrigin(local.Name)
+	local.DefaultBranch = "declared-elsewhere"
+
+	// Act
+	report := syncx.Run(context.Background(), ws, []manifest.Repo{local}, syncx.Options{Offline: true})
+
+	// Assert
+	result := report.Results[0]
+	if result.State != syncx.StateNoRemote {
+		t.Fatalf("state = %s, want NO_REMOTE (detail: %s)", result.State, result.Detail)
+	}
+	if result.Branch != "feature" {
+		t.Errorf("branch = %q, want the branch the clone is on", result.Branch)
+	}
+}
