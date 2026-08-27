@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path"
-	"slices"
+	"path/filepath"
 	"strings"
 
 	"github.com/takealook97/vat/internal/fsx"
@@ -212,7 +212,7 @@ func renderAfterChange(env *Env, root string) error {
 	for _, file := range changed {
 		env.Printer.Status(ui.LevelOK, file, "regenerated")
 	}
-	reportUncommittedContracts(env, ws, changed)
+	reportUncommittedContracts(env, ws)
 	return nil
 }
 
@@ -226,30 +226,36 @@ func renderAfterChange(env *Env, root string) error {
 //
 // It stops firing the moment the file is committed, so it cannot become the
 // hint people learn to read past.
-func reportUncommittedContracts(env *Env, ws *workspace.Workspace, changed []string) {
+func reportUncommittedContracts(env *Env, ws *workspace.Workspace) {
+	ctx := context.Background()
 	var pending []string
+	// Every repository, not only the ones this run rendered. Reporting what
+	// changed here would name one contract and go quiet about the three
+	// rendered by earlier commands and still uncommitted.
 	for _, repo := range ws.Manifest.Repos {
-		file := path.Join(repo.Dir(), "AGENTS.md")
-		if !slices.Contains(changed, file) {
-			continue
-		}
 		dir := ws.RepoPath(repo)
-		if !gitx.IsRepository(dir) {
+		if repo.Archived || !gitx.IsRepository(dir) || !fsx.Exists(filepath.Join(dir, "AGENTS.md")) {
 			continue
 		}
 		// Tracked means the repository already carries it; whether it has
 		// uncommitted edits is the working tree's business, not this hint's.
-		if tracked, err := gitx.IsTracked(context.Background(), dir, "AGENTS.md"); err != nil || tracked {
+		tracked, err := gitx.IsTracked(ctx, dir, "AGENTS.md")
+		if err != nil || tracked {
 			continue
 		}
-		pending = append(pending, file)
+		// A repository that ignores the path has decided, and a hint that
+		// cannot be satisfied is one people learn to read past.
+		if gitx.Ignores(ctx, dir, "AGENTS.md") {
+			continue
+		}
+		pending = append(pending, path.Join(repo.Dir(), "AGENTS.md"))
 	}
 	if len(pending) == 0 {
 		return
 	}
-	where, what := "its repository", "the contract a session opened there reads"
+	sentence := "Commit %s in its repository. It is the contract a session opened there reads."
 	if len(pending) > 1 {
-		where, what = "their repositories", "the contract a session opened in one of them reads"
+		sentence = "Commit %s in their repositories. They are the contract a session opened in one reads."
 	}
-	env.Printer.Hint("Commit %s in %s. It is %s.", strings.Join(pending, ", "), where, what)
+	env.Printer.Hint(sentence, strings.Join(pending, ", "))
 }

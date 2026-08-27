@@ -1220,8 +1220,25 @@ func TestEnrollingARepositorySaysToCommitTheContractItRendered(t *testing.T) {
 	output := h.mustRun("repo", "add", "payments", "--origin", h.upstream("payments"))
 
 	// Assert
-	if !strings.Contains(output, "Commit payments/AGENTS.md") {
+	if !strings.Contains(output, "Commit payments/AGENTS.md in its repository") {
 		t.Errorf("nothing told the user to commit the contract vat rendered:\n%s", output)
+	}
+}
+
+// Two contracts are "they", not "it". A generated sentence that does not parse
+// is the kind of thing a reader stops trusting the rest of the output over.
+func TestTheCommitHintReadsAsEnglishForMoreThanOneContract(t *testing.T) {
+	// Arrange
+	h := newFixture(t, "payments", "console")
+	h.mustRun("init", "--name", "acme")
+	h.mustRun("repo", "add", "payments", "--origin", h.upstream("payments"))
+
+	// Act
+	output := h.mustRun("repo", "add", "console", "--origin", h.upstream("console"))
+
+	// Assert
+	if !strings.Contains(output, "They are the contract") {
+		t.Errorf("the plural hint does not parse:\n%s", output)
 	}
 }
 
@@ -1241,5 +1258,26 @@ func TestTheCommitHintStopsOnceTheContractIsCommitted(t *testing.T) {
 	// Assert
 	if strings.Contains(output, "Commit ") {
 		t.Errorf("the hint kept firing after the contract was committed:\n%s", output)
+	}
+}
+
+// A repository that ignores AGENTS.md has decided, and a hint nobody can
+// satisfy is one people learn to read past — which costs the hints that matter.
+func TestTheCommitHintRespectsARepositoryThatIgnoresTheContract(t *testing.T) {
+	// Arrange
+	h := newFixture(t, "payments")
+	h.mustRun("init", "--name", "acme")
+	if err := os.WriteFile(h.path("payments", ".gitignore"), []byte("AGENTS.md\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	git(t, h.path("payments"), "add", "-A")
+	git(t, h.path("payments"), "commit", "--quiet", "-m", "chore: ignore the generated contract")
+
+	// Act
+	output := h.mustRun("repo", "add", "payments", "--origin", h.upstream("payments"))
+
+	// Assert
+	if strings.Contains(output, "Commit ") {
+		t.Errorf("the hint fired for a contract the repository ignores:\n%s", output)
 	}
 }
