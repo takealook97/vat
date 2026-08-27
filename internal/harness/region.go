@@ -71,3 +71,26 @@ func RegionMatches(content, region string) bool {
 	// workspace has no such file unless they write one.
 	return fsx.NormaliseNewlines(found) == fsx.NormaliseNewlines(strings.TrimSpace(region))
 }
+
+// CountRegions returns how many generated regions a document carries.
+//
+// Exactly one is correct. A second is a region vat maintains nothing of: it
+// keeps whatever it held, marked as generated, and every session loads it as
+// though vat wrote it that morning.
+func CountRegions(content string) int {
+	count := 0
+	rest := content
+	for {
+		begin := strings.Index(rest, BeginMarker)
+		if begin < 0 {
+			return count
+		}
+		rest = rest[begin+len(BeginMarker):]
+		end := strings.Index(rest, EndMarker)
+		if end < 0 {
+			return count
+		}
+		rest = rest[end+len(EndMarker):]
+		count++
+	}
+}

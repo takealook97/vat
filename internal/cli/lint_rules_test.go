@@ -379,3 +379,45 @@ func TestLintDoesNotCertifyABrainWrittenAgainstANewerSchema(t *testing.T) {
 		t.Error("lint judged the projections of a brain whose format it does not understand")
 	}
 }
+
+// A file carrying two generated regions has one vat maintains and one it never
+// looks at again. The second keeps whatever it held, marked as generated, and
+// every session loads it as though vat wrote it that morning — which is the
+// failure this whole layer exists to prevent, inside the file that prevents it.
+func TestASecondGeneratedRegionIsReported(t *testing.T) {
+	// Arrange
+	h := adoptedFixture(t, "payments")
+	path := h.path("AGENTS.md")
+	content := readFile(t, path)
+	duplicate := content + "\n<!-- vat:begin generated -->\nStale, and nobody will ever regenerate it.\n<!-- vat:end generated -->\n"
+	if err := os.WriteFile(path, []byte(duplicate), 0o644); err != nil {
+		t.Fatalf("write: %v", err)
+	}
+
+	// Act
+	report := h.lint(t, "--offline")
+
+	// Assert
+	if !report.reports("harness/region-duplicated") {
+		t.Errorf("a second generated region went unreported; lint said %v", report.rules())
+	}
+	// Not repaired: which of the two is the real one is a judgement, and the
+	// abandoned one may be the only copy of something somebody wrote.
+	h.mustRun("lint", "--fix", "--offline")
+	if !strings.Contains(readFile(t, path), "Stale, and nobody will ever regenerate it.") {
+		t.Error("--fix deleted a region it cannot know the meaning of")
+	}
+}
+
+func TestASingleGeneratedRegionIsNotReported(t *testing.T) {
+	// Arrange
+	h := adoptedFixture(t, "payments")
+
+	// Act
+	report := h.lint(t, "--offline")
+
+	// Assert
+	if report.reports("harness/region-duplicated") {
+		t.Errorf("a correct contract was reported: %+v", report.Findings)
+	}
+}

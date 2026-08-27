@@ -15,10 +15,13 @@ import (
 // package and the file they were in had grown past the point where the rest of
 // it could be read in one sitting.
 
+// workspaceContract is the file every harness rule below reports against.
+const workspaceContract = "AGENTS.md"
+
 func checkHarness(ws *workspace.Workspace) ([]Finding, error) {
 	var findings []Finding
 
-	rootPath := ws.Path("AGENTS.md")
+	rootPath := ws.Path(workspaceContract)
 	content, exists, err := fsx.ReadFileIfExists(rootPath)
 	if err != nil {
 		return nil, err
@@ -27,20 +30,31 @@ func checkHarness(ws *workspace.Workspace) ([]Finding, error) {
 	switch {
 	case !exists:
 		findings = append(findings, Finding{
-			Rule: "harness/workspace-missing", Severity: SeverityError, Subject: "AGENTS.md",
+			Rule: "harness/workspace-missing", Severity: SeverityError, Subject: workspaceContract,
 			Message: "the workspace has no agent contract",
 			Fix:     fixHarness, Fixable: true,
 		})
+	case harness.CountRegions(string(content)) > 1:
+		// Reported before drift, because drift is about the region vat
+		// maintains and this is about the one it does not. Not repairable:
+		// which of the two is the real one is a judgement, and the abandoned
+		// one may be the only copy of something somebody wrote.
+		findings = append(findings, Finding{
+			Rule: "harness/region-duplicated", Severity: SeverityWarn, Subject: workspaceContract,
+			Message: "more than one generated region; vat maintains the first and never looks at the rest, " +
+				"which keep whatever they hold and are loaded as though it were generated",
+			Fix: "delete the regions vat does not maintain, keeping anything of yours inside them",
+		})
 	case !harness.RegionMatches(string(content), region):
 		findings = append(findings, Finding{
-			Rule: "harness/workspace-drift", Severity: SeverityError, Subject: "AGENTS.md",
+			Rule: "harness/workspace-drift", Severity: SeverityError, Subject: workspaceContract,
 			Message: "the generated region no longer matches the manifest",
 			Fix:     fixHarness, Fixable: true,
 		})
 	}
 	if exists && len(content) > rootHarnessBudget {
 		findings = append(findings, Finding{
-			Rule: "harness/workspace-oversized", Severity: SeverityWarn, Subject: "AGENTS.md",
+			Rule: "harness/workspace-oversized", Severity: SeverityWarn, Subject: workspaceContract,
 			Message: fmt.Sprintf("%d bytes; past roughly %d KiB a runtime may stop loading the per-repository contracts below it. Keep this file a map, not a copy",
 				len(content), rootHarnessBudget/1024),
 		})

@@ -193,6 +193,7 @@ The rules, and what each one prevents:
 | `repo/checks-missing` | warn | a changeset with nothing to verify |
 | `harness/workspace-missing` | error | a workspace with no agent contract |
 | `harness/workspace-drift` | error | a contract that no longer describes the workspace |
+| `harness/region-duplicated` | warn | more than one generated region in a contract, where vat maintains the first and never looks at the rest |
 | `harness/workspace-oversized` | warn | a root file that truncates the contracts below it |
 | `harness/repo-missing` | warn | a session opened in a repository with no contract |
 | `harness/repo-drift` | warn | the same, out of date |

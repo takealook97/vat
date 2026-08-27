@@ -175,6 +175,7 @@ func RuleNames() []string {
 		"repo/checks-missing",
 		"harness/workspace-missing",
 		"harness/workspace-drift",
+		"harness/region-duplicated",
 		"harness/workspace-oversized",
 		"harness/repo-missing",
 		"harness/repo-drift",

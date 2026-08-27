@@ -459,6 +459,13 @@ Notable changes to `vat`. The format follows
   plainly carried a description was then reported as having none, sending
   somebody to fix a file that was already right. Roles, skills, and brain
   records all arrive through the one function that now strips it.
+- `harness/region-duplicated`, for a contract carrying more than one generated
+  region. vat maintains the first and never looks at the rest: they keep
+  whatever they hold, marked as generated, and every session loads them as
+  though vat wrote them that morning — the failure this whole layer exists to
+  prevent, inside the file that prevents it. Not repairable, because which of
+  the two is the real one is a judgement and the abandoned one may be the only
+  copy of something somebody wrote.
 - `brain/schema-newer` is reported by `vat lint` and not only by `vat brain
   check`. The knowledge layer refuses to judge a brain written against a newer
   schema, for the reason its own comment gives — "the records would look clean
