@@ -535,6 +535,13 @@ Notable changes to `vat`. The format follows
   carries it is committed and reaches every colleague's machine. Refused where it
   enters rather than defended at each of a dozen call sites, and `git clone` now
   passes `--` as the second line of that.
+- The entry point is covered. It was the one package `make cover` reported as
+  not measured, and it decides the two things every invocation depends on: the
+  exit code, and what happens to in-flight work when somebody presses Ctrl-C.
+  Both had been fixed once by hand — the signal path by sending SIGINT to a
+  running command rather than by reading the code — and neither was held to
+  anything afterwards. Built and run for real, because what is under test is the
+  process, with the wiring exercised in process as well so the lines are counted.
 - Nothing writes to the terminal around the printer, which is where a control
   character stops being executed and starts being shown. A source check holds it
   there.

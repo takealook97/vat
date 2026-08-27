@@ -16,6 +16,8 @@ func main() {
 	os.Exit(run())
 }
 
+// run is separate from main so it can be called in a test: main's whole body is
+// os.Exit, which a test cannot survive.
 func run() int {
 	// A cancelled context lets in-flight git and check commands stop cleanly
 	// rather than leaving a half-fetched repository behind.

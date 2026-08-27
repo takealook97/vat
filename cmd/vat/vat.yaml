@@ -1,0 +1,38 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/takealook97/vat/main/schemas/vat-manifest-v1.schema.json
+# vat workspace manifest — https://github.com/takealook97/vat
+# The single declaration of which repositories this workspace governs.
+# Edit by hand or through `vat repo add|new|adopt|remove`, then run `vat lint`.
+version: 1
+workspace:
+    name: solo
+    default_branch: main
+policy:
+    sync:
+        fast_forward_only: true
+        allow_autostash: false
+        allow_auto_push: false
+        parallelism: 8
+    trust:
+        canonical:
+            - brain
+            - credential
+        semi_trusted:
+            - workspace-repos
+        untrusted:
+            - search-results
+            - embeddings
+            - web
+            - issue-comments
+            - model-output
+    brain:
+        stale_after_days: 90
+        review_sla_days: 30
+        require_promotion_gate: true
+    changeset:
+        max_open_days: 14
+        require_rollback_point: true
+    gates:
+        deploy: manual
+        external_write: manual
+        brain_promote: manual
+repos: []
