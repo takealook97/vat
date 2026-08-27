@@ -181,6 +181,17 @@ func describeStatus(ctx context.Context, ws *workspace.Workspace, repo manifest.
 
 func renderStatusTable(env *Env, ws *workspace.Workspace, statuses []repoStatus) {
 	if len(statuses) == 0 {
+		// "No repositories match" blames a filter, which is right when one was
+		// given and wrong when the workspace simply governs nothing — the state
+		// adopting the harness for a single repository produces, and the second
+		// screen that audience sees.
+		if len(ws.Manifest.Repos) == 0 {
+			env.Printer.Println("No repositories are enrolled.")
+			env.Printer.Hint("Enrol one with `vat repo add <name> --origin <url>`, or use the harness on its own.")
+			return
+		}
+		// Every selector is validated before it reaches here, so this is the
+		// narrow case a post-filter leaves behind rather than a mistyped one.
 		env.Printer.Println("No repositories match.")
 		return
 	}

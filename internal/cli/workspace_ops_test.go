@@ -1036,3 +1036,24 @@ func TestRepoNewNamesTheRepositoryAlreadyGoverningThatDirectory(t *testing.T) {
 		t.Errorf("the refusal does not name the repository already there:\n%s", output)
 	}
 }
+
+// A workspace that governs nothing is what adopting the harness for a single
+// repository produces, and `vat status` told those users "No repositories
+// match." — which says their filter is wrong when they gave no filter. It is the
+// second screen that audience sees.
+func TestStatusSaysNothingIsEnrolledRatherThanNothingMatched(t *testing.T) {
+	// Arrange
+	h := newFixture(t)
+	h.mustRun("init", "--name", "solo")
+
+	// Act
+	output := h.mustRun("status")
+
+	// Assert
+	if strings.Contains(output, "match") {
+		t.Errorf("status blamed a filter nobody gave:\n%s", output)
+	}
+	if strings.TrimSpace(output) == "" {
+		t.Error("status printed nothing at all")
+	}
+}
