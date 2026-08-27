@@ -88,10 +88,12 @@ per repository so a session at the parent directory cannot edit its way across
 one by accident, and a record of which revisions were verified together.
 
 **You use coding agents on a codebase you care about.** One repository is
-enough. `vat harness` keeps one role definition and generates the per-runtime
-adapters from it, so Claude Code and Codex cannot drift apart, and states the
-trust boundary — that fetched text is data, never instruction — in every
-contract it writes.
+enough. `vat harness` keeps one role body and one procedure body, generates the
+per-runtime adapters from them so Claude Code and Codex cannot drift apart, and
+states the trust boundary — that fetched text is data, never instruction — in
+every contract it writes. If you already have `.claude/agents/` or
+`.claude/skills/`, `vat harness adopt` moves what you wrote under that contract
+in one command, and `vat lint` fails the day a copy diverges from it.
 
 **Your team keeps re-deriving what it already decided.** `vat brain` records a
 fact with the revision it was read from, and demotes it when nobody re-checks
@@ -110,7 +112,33 @@ Being clear about the neighbours is more useful than pretending there are none.
 | a place to file architecture decision records | [`adr-tools`](https://github.com/npryce/adr-tools), [Log4brains](https://github.com/thomvaill/log4brains) |
 | semantic recall over your documents for an agent | a retrieval layer — and point it at `vat brain`, which decides what is canonical |
 | portable agent memory, so what one tool learned another can read | one of the several markdown-and-folders memory formats now converging on that — `vat brain` is readable the same way, and answers a different question, below |
+| agent instructions for one tool | that tool's own directory. `.claude/skills/` is fine until there is a second runtime, or a second copy, and then nothing tells you they disagree — which is the case below |
 | **a history of what crossed between repositories, and rules that fail loudly when reality moves away from them** | `vat` |
+
+### On agent instructions
+
+Every runtime now has a directory of its own: `.claude/agents/`,
+`.claude/skills/`, `.codex/`, `.cursor/rules`. Each one is a perfectly good
+place to keep a role or a procedure, and the format is barely the problem —
+they are all Markdown with front matter, and `AGENTS.md` is converging into a
+shared entry point.
+
+The problem is the second copy. The moment a procedure exists in two runtimes it
+is two documents, and a document nobody diffs is a document that disagrees with
+itself within weeks. Both look authoritative, neither is dated, and the one an
+agent happens to load decides what it does.
+
+`vat harness` keeps the body in `.agents/` and generates each runtime's file as
+a pointer that carries no copy of the prose. That is not a new format — it is
+the same files those tools already read — and the point is the check behind it:
+`vat lint` reports an adapter that no longer matches its definition, one that a
+deleted definition left behind, and one that no runtime can advertise. Copying
+is not prevented, it is *reported*, which is the only version of this that
+survives contact with a repository people are actually working in.
+
+If those directories are already full, `vat harness adopt` moves each body into
+`.agents/` and regenerates the adapters from it. Adoption is a command, not an
+afternoon.
 
 ### On agent memory
 
@@ -522,6 +550,22 @@ a skill adapter; Codex discovers a skill through the canonical directory itself.
 So `runtimes: [codex]` on a skill selects an adapter that does not exist, and
 `vat lint` says so — no adapter means no drift to report, and the definition
 would otherwise sit on disk generating nothing while every check reads green.
+
+**Nobody starts empty.** If those directories already hold files you wrote by
+hand, adoption is one command:
+
+```console
+$ vat harness adopt
+INFO  .claude/agents/reviewer.md      would become .agents/roles/reviewer.md
+INFO  .claude/skills/deploy/SKILL.md  would become .agents/skills/deploy/SKILL.md
+
+2 definitions to adopt. Re-run with --apply to write them.
+```
+
+It writes nothing until `--apply`, skips what vat generated, and will not
+overwrite a definition that already exists. Delete a definition later and
+`vat lint` reports the adapter it left behind — still loaded by the runtime,
+still pointing at a file that is gone.
 
 **Contracts stay in step with reality.** Each `AGENTS.md` carries one generated
 region rendered from `vat.yaml`; everything you write above it is untouched.
