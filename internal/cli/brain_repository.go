@@ -246,9 +246,34 @@ rules gradually rather than converted in one pass.`,
 			}
 			env.Printer.Status(ui.LevelOK, name, "adopted as the brain repository")
 
+			// Declaring a repository the brain and leaving it without the marker
+			// had this command report success and lint say "run vat brain init"
+			// about the same directory in the same breath. Only the marker is
+			// written: the command promises the repository is brought under the
+			// rules gradually, not scaffolded in one pass.
+			marked, err := brain.Mark(ws.RepoPath(repo))
+			if err != nil {
+				return err
+			}
+			if marked {
+				env.Printer.Status(ui.LevelOK,
+					filepath.Join(repo.Name, brain.MarkerFile), "written")
+			}
+
 			store, err := brain.Load(ws.RepoPath(repo))
 			if err != nil {
 				return err
+			}
+			// Marking the repository makes projections it does not have into
+			// drift, and adoption that hands back a workspace failing its own
+			// lint has not finished. Only generated files are written; the
+			// records are read and left exactly as they are.
+			built, err := brain.Build(store, env.Now)
+			if err != nil {
+				return err
+			}
+			for _, file := range built.Changed {
+				env.Printer.Status(ui.LevelOK, filepath.Join(repo.Name, file), "generated")
 			}
 			findings := brain.Check(store, brainPolicy(ws), env.Now)
 			env.Printer.Status(ui.LevelInfo, "records", fmt.Sprintf("%d found", len(store.Records)))

@@ -14,6 +14,26 @@ import (
 // accepts for a single path component.
 const maxFileNameBytes = 200
 
+// Mark writes the marker that makes a directory a brain, reporting whether it
+// had to, and writes nothing else.
+//
+// Adoption needs this and not Init. `vat brain adopt` promises that an existing
+// repository is brought under the rules gradually rather than converted in one
+// pass, so scaffolding eight starter documents beside notes somebody already
+// keeps would break the promise the command is built on. The marker is the whole
+// test of whether a directory is a brain, and writing it is the only part of
+// initialisation that adoption actually asserts.
+func Mark(root string) (bool, error) {
+	path := filepath.Join(root, MarkerFile)
+	if fsx.Exists(path) {
+		return false, nil
+	}
+	if err := fsx.WriteFileAtomic(path, []byte(markerContent()), fsx.DefaultFileMode); err != nil {
+		return false, err
+	}
+	return true, nil
+}
+
 // Init creates the directory layout and starter documents of a brain
 // repository. It never overwrites a file that already exists, so running it on
 // an existing repository is safe and additive.

@@ -206,8 +206,30 @@ func TestBrainAdoptTakesOverADirectoryThatIsAlreadyThere(t *testing.T) {
 	if !strings.Contains(string(written), "role: brain") {
 		t.Errorf("the adopted directory is not recorded as the brain:\n%s\n%s", output, written)
 	}
+	// Read before a record is written, because writing one is what makes the
+	// index stale and `vat brain build` is the command for that. What is under
+	// test is the state adoption itself hands back.
+	//
+	// `vat brain adopt notes` used to report success and be followed
+	// immediately by lint saying "run vat brain init" about the same directory.
+	// Marking it then made the projections it does not have into drift, and
+	// generated files are vat's to write, so adoption writes those too.
+	report := h.lint(t, "--offline")
+	for _, rule := range []string{"brain/not-initialised", "brain/generated-drift"} {
+		if report.reports(rule) {
+			t.Errorf("adoption left the workspace reporting %s", rule)
+		}
+	}
 	if code, out := h.run("brain", "new", "decision", "--title", "Anything"); code != ExitOK {
 		t.Errorf("the knowledge commands still refuse to run after adoption:\n%s", out)
+	}
+	// Only the marker. The command promises an existing repository is brought
+	// under the rules gradually, so it must not scaffold documents beside notes
+	// somebody already keeps.
+	for _, scaffolded := range []string{"DECISIONS.md", "GOAL.md", "AGENT_OPERATING_MODEL.md"} {
+		if _, err := os.Stat(h.path("notes", scaffolded)); err == nil {
+			t.Errorf("adoption scaffolded %s into a repository it promised not to rewrite", scaffolded)
+		}
 	}
 }
 
@@ -548,5 +570,47 @@ func TestBrainInitOnTheAdoptedBrainStillPointsAtTheNextCommand(t *testing.T) {
 	// Assert
 	if !strings.Contains(output, "vat brain new") {
 		t.Errorf("the adopted brain lost its next step:\n%s", output)
+	}
+}
+
+// Every `vat brain` command resolves the brain through the manifest and then
+// checked only that the directory existed. On a repository declared as the brain
+// and never initialised, `vat brain build` wrote an index into a directory that
+// is not a brain — and `vat doctor`, which had advised exactly that, then
+// reported the whole section healthy.
+//
+// The refusal belongs where all ten commands pass through, not in each of them.
+func TestBrainCommandsRefuseADirectoryThatIsNotABrainYet(t *testing.T) {
+	// Arrange
+	// `vat init --adopt` guesses the brain role from the directory name, so this
+	// is the state a workspace with a repository called "brain" starts in.
+	h := adoptedFixture(t, "payments", "brain")
+
+	for _, args := range [][]string{
+		{"brain", "build"},
+		{"brain", "check"},
+		{"brain", "query", "anything"},
+		{"brain", "review"},
+	} {
+		t.Run(strings.Join(args, " "), func(t *testing.T) {
+			// Act
+			code, output := h.run(args...)
+
+			// Assert
+			if code == ExitOK {
+				t.Errorf("`vat %s` succeeded against a directory that is not a brain:\n%s",
+					strings.Join(args, " "), output)
+			}
+			if !strings.Contains(output, "vat brain init") {
+				t.Errorf("the refusal does not say how to fix it:\n%s", output)
+			}
+		})
+	}
+
+	// Assert: nothing was written into the repository that is not a brain.
+	for _, generated := range []string{"CURRENT.md", "graph.json"} {
+		if _, err := os.Stat(h.path("brain", generated)); err == nil {
+			t.Errorf("%s was written into a directory that is not a brain", generated)
+		}
 	}
 }

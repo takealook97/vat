@@ -446,6 +446,19 @@ func checkBrain(ws *workspace.Workspace, now time.Time) []Finding {
 	if !ok || !fsx.IsDir(root) {
 		return nil
 	}
+	// A repository declared as the brain but never initialised has nothing to
+	// judge yet. Judging it anyway reported an empty review queue and its
+	// projections as "out of date", and pointed at `vat brain build` — which
+	// writes an index into a directory that is not a brain and leaves this
+	// section reporting healthy. A diagnostic that can be made to certify a
+	// state by following its own advice is worse than one that says nothing.
+	if !brain.IsBrain(root) {
+		return []Finding{{
+			Section: sectionBrain, Subject: filepath.Base(root), Status: StatusWarn,
+			Detail: "declared as the knowledge repository but has no records yet",
+			Fix:    "vat brain init",
+		}}
+	}
 	store, err := brain.Load(root)
 	if err != nil {
 		return []Finding{{

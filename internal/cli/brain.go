@@ -66,6 +66,18 @@ func openBrain(env *Env) (*workspace.Workspace, *brain.Store, error) {
 	if !fsx.IsDir(root) {
 		return ws, nil, usageErrorf("the brain repository is not cloned; run `vat sync`")
 	}
+	// The refusal belongs here rather than in each of the ten commands that
+	// pass through. Checking only that the directory existed let `vat brain
+	// build` write an index into a repository that is not a brain — and
+	// `vat doctor`, which had advised exactly that, then reported the section
+	// healthy. A directory declared as the brain is not one until it is
+	// initialised.
+	if !brain.IsBrain(root) {
+		return ws, nil, usageErrorf(
+			"%s is declared as the knowledge repository but has no records yet.\n"+
+				"  Initialise it:  vat brain init\n"+
+				"  Adopt one:      vat brain adopt <directory>", ws.Rel(root))
+	}
 	store, err := brain.Load(root)
 	if err != nil {
 		return ws, nil, err

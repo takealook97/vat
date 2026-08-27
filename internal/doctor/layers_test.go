@@ -1,6 +1,7 @@
 package doctor_test
 
 import (
+	"os"
 	"strings"
 	"testing"
 
@@ -187,5 +188,64 @@ func TestNoFindingEverQuotesCredentialMaterial(t *testing.T) {
 				t.Errorf("a finding quoted credential material: %+v", finding)
 			}
 		}
+	}
+}
+
+// A repository declared as the brain and never initialised is the state every
+// workspace starts in when `vat init` guesses the role from a directory name.
+// doctor reported it as a brain with an empty review queue and its generated
+// files "out of date", and pointed at `vat brain build` — which wrote an index
+// into a directory that is not a brain and left doctor reporting the whole
+// section healthy. A diagnostic that can be made to certify a state by
+// following its own advice is worse than one that says nothing.
+//
+// `vat lint` had the guard and the reason for it in a comment; this one never
+// asked.
+func TestDoctorDoesNotJudgeABrainThatWasNeverInitialised(t *testing.T) {
+	// Arrange
+	ws := fixture(t, productRepo(), manifest.Repo{
+		Name: "knowledge", Origin: "https://example.invalid/acme/knowledge.git",
+		Role: manifest.RoleBrain,
+	})
+	root, ok := ws.BrainPath()
+	if !ok {
+		t.Fatal("the fixture declared a brain repository and the workspace reports none")
+	}
+	if err := os.MkdirAll(root, 0o755); err != nil {
+		t.Fatalf("mkdir: %v", err)
+	}
+
+	// Act
+	report := judge(t, ws)
+
+	// Assert
+	finding, found := findingFor(report, "brain", "knowledge")
+	if !found {
+		t.Fatalf("an uninitialised brain was not reported at all: %+v", report.Findings)
+	}
+	if finding.Status != doctor.StatusWarn {
+		t.Errorf("expected a warning, got %v", finding.Status)
+	}
+	if finding.Fix != "vat brain init" {
+		t.Errorf("doctor advises %q; the repository is not a brain yet", finding.Fix)
+	}
+	for _, subject := range []string{"records", "review queue", "generated files"} {
+		if _, reported := findingFor(report, "brain", subject); reported {
+			t.Errorf("doctor judged %q of a brain that does not exist", subject)
+		}
+	}
+}
+
+// The guard must not have silenced the checks it stands in front of.
+func TestDoctorStillJudgesABrainThatWasInitialised(t *testing.T) {
+	// Arrange
+	ws, _ := brainFixture(t)
+
+	// Act
+	report := judge(t, ws)
+
+	// Assert
+	if _, found := findingFor(report, "brain", "records"); !found {
+		t.Errorf("an initialised brain went unjudged: %+v", report.Findings)
 	}
 }

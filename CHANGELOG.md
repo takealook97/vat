@@ -233,6 +233,22 @@ Notable changes to `vat`. The format follows
   should exist while the steps for building one sat in a skill it never named.
   A role is who is running and a skill is how a job is done; the pairs that
   overlap now point at each other.
+- `vat doctor` could be made to certify a knowledge layer that does not exist,
+  by following its own advice. On a repository declared as the brain and never
+  initialised — the state every workspace with a directory called `brain` starts
+  in — it reported an empty review queue and the projections as "out of date",
+  and pointed at `vat brain build`. Running that wrote an index into a directory
+  with no marker and no records, after which doctor reported the whole section
+  healthy while `vat lint` still called it uninitialised. Two commands described
+  one state differently and only one of them was right.
+- Every `vat brain` command checked that the brain directory existed and never
+  that it was a brain. The refusal now lives where all ten pass through.
+- `vat brain adopt` reported "adopted as the brain repository" and left the
+  directory without the marker, so `vat lint` answered "run vat brain init"
+  about the repository just adopted. It writes the marker now, and builds the
+  projections whose absence that marker turns into drift — and nothing else,
+  because the command's whole promise is that an existing repository is brought
+  under the rules gradually rather than scaffolded in one pass.
 - `vat init` told a workspace that enrolled nothing that `vat status` would show
   "those repositories" as dirty, and offered `vat status` as a first step when
   there was nothing for it to report. Enrolling nothing is not a mistake — it is

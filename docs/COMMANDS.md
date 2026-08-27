@@ -391,6 +391,17 @@ quarantine or a revocation must state a reason: a withdrawal nobody explained
 cannot be reviewed later. An end state is one-way — none of these commands, and
 not `promote`, will reopen one.
 
+`adopt` declares which governed repository holds the knowledge layer. It writes
+the `.brain` marker, because a repository declared as the brain and left without
+one is a repository every other command still calls uninitialised, and it builds
+the projections, because marking it makes their absence into drift and a
+generated file is vat's to write. Nothing else is written: an existing
+repository is brought under the rules gradually, not scaffolded in one pass.
+
+Every `vat brain` command refuses a repository that has no marker, naming
+`vat brain init` and `vat brain adopt`. Without that refusal `vat brain build`
+wrote an index into a directory that is not a brain.
+
 `archive` moves superseded, revoked, and resolved records into `archive/`,
 repointing the relative links inside them. Nothing is deleted and an archived
 record is still loaded, so its supersession chain is still checked from both
