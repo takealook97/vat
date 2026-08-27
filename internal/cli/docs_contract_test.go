@@ -749,3 +749,49 @@ func TestEverySampleThresholdIsOneTheAdvisorPrints(t *testing.T) {
 		}
 	}
 }
+
+// A sample is what a reader types. The reference is held to the command tree
+// already; every other document showing a transcript was not, so a renamed or
+// removed command could sit in the README indefinitely with nothing to say.
+func TestEveryCommandShownInTheDocsExists(t *testing.T) {
+	// Arrange
+	known := map[string]bool{}
+	walkCommands(Root(), nil, func(_ *Command, path []string) {
+		known["vat "+strings.Join(path, " ")] = true
+	})
+	// Anchored on the two forms that are an invocation rather than prose about
+	// the tool: inside a code span, or after a shell prompt. "vat reads the
+	// manifest" is a sentence, and holding sentences to the command tree is how
+	// a guard earns being switched off.
+	invocation := regexp.MustCompile("(?m)(?:`|^\\$ )vat(?: [a-z][a-z-]*)+")
+	paths, err := filepath.Glob("../../docs/*.md")
+	if err != nil {
+		t.Fatalf("glob docs: %v", err)
+	}
+	paths = append(paths, "../../README.md", "../../CONTRIBUTING.md", "../../AGENTS.md")
+
+	// Act & Assert
+	for _, path := range paths {
+		content, err := os.ReadFile(path)
+		if err != nil {
+			continue
+		}
+		for _, quoted := range invocation.FindAllString(string(content), -1) {
+			words := strings.Fields(strings.TrimLeft(quoted, "`$ "))
+			// Matched greedily, so trim back to the longest prefix that is a
+			// command: `vat sync` in "vat sync fetches" is the command and
+			// "fetches" is prose.
+			var resolved bool
+			for n := len(words); n > 1; n-- {
+				if known[strings.Join(words[:n], " ")] {
+					resolved = true
+					break
+				}
+			}
+			if !resolved {
+				t.Errorf("%s shows %q, and no prefix of it is a command this binary has",
+					path, quoted)
+			}
+		}
+	}
+}

@@ -434,6 +434,12 @@ Notable changes to `vat`. The format follows
   none. That text is committed into the repository of everybody adopting the
   harness on its own, where it reads as a defect in the generated file rather
   than as the state it describes.
+- Every command shown in the documentation is checked against the command tree.
+  The reference was already held to it; every other document showing one was
+  not, so a renamed or removed command could sit in the README indefinitely with
+  nothing to say. Anchored on a code span or a shell prompt, because "vat reads
+  the manifest" is a sentence and holding sentences to the command tree is how a
+  guard earns being switched off.
 - The README's `vat fit` sample showed thresholds the tool does not print —
   "agents work across more than one repository" where it says "coding agents
   work in this code at all", which is a different recommendation to a different
