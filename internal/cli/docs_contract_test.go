@@ -615,3 +615,40 @@ func TestEverySampleOfTheSyncSummaryNamesTheBucketsItPrints(t *testing.T) {
 		}
 	}
 }
+
+// AGENTS.md opens by telling a session to read the architecture map, and the map
+// is a claim about what exists that nothing checked. A package missing from it
+// sends every session looking in the wrong place, and a line naming a package
+// that was deleted sends them looking for nothing at all.
+func TestTheArchitectureMapNamesExactlyThePackagesThatExist(t *testing.T) {
+	// Arrange
+	entries, err := os.ReadDir("../../internal")
+	if err != nil {
+		t.Fatalf("read internal: %v", err)
+	}
+	contract, err := os.ReadFile("../../AGENTS.md")
+	if err != nil {
+		t.Fatalf("read AGENTS.md: %v", err)
+	}
+	mapped := map[string]bool{}
+	for _, match := range regexp.MustCompile(`(?m)^internal/(\w+)`).FindAllStringSubmatch(string(contract), -1) {
+		mapped[match[1]] = true
+	}
+	if len(mapped) == 0 {
+		t.Fatal("no architecture map found in AGENTS.md; it changed shape and this test stopped checking anything")
+	}
+
+	// Act & Assert
+	for _, entry := range entries {
+		if !entry.IsDir() {
+			continue
+		}
+		if !mapped[entry.Name()] {
+			t.Errorf("internal/%s exists and the map in AGENTS.md does not name it", entry.Name())
+		}
+		delete(mapped, entry.Name())
+	}
+	for name := range mapped {
+		t.Errorf("AGENTS.md maps internal/%s, which does not exist", name)
+	}
+}

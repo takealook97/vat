@@ -289,6 +289,11 @@ Notable changes to `vat`. The format follows
   should exist while the steps for building one sat in a skill it never named.
   A role is who is running and a skill is how a job is done; the pairs that
   overlap now point at each other.
+- The architecture map in `AGENTS.md` is checked against the packages that
+  exist, in both directions. It is the first thing that file tells a session to
+  read, and it was a claim about the codebase that nothing verified: a package
+  missing from it sends every session looking in the wrong place, and a line
+  naming a package that was deleted sends them looking for nothing at all.
 - Every sample of the `vat sync` summary is held to naming the buckets the code
   prints. Changing a summary line silently invalidates every sample of it, and
   the samples are what a reader takes as evidence the page describes the real
