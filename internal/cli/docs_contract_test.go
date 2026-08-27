@@ -553,14 +553,28 @@ func stripComment(line string) string {
 // whole transcript: revisions and repository names in the recording are a
 // scenario, and asserting those would fail for reasons nobody should have to fix.
 func TestTheDemoShowsTheFilesInitAlwaysWrites(t *testing.T) {
-	// Arrange
-	content, err := os.ReadFile(demoPath)
+	// Arrange: every file that shows an init transcript, not only the recording.
+	// The README carries one of its own, and the guard that covered the demo
+	// alone let that one go stale for exactly as long as nobody read it.
+	candidates, err := filepath.Glob("../../docs/*.md")
 	if err != nil {
-		t.Fatalf("read %s: %v", demoPath, err)
+		t.Fatalf("glob docs: %v", err)
 	}
-	demo := string(content)
-	if !strings.Contains(demo, "vat init") {
-		t.Skipf("%s no longer shows `vat init`; this test guards that block", demoPath)
+	candidates = append(candidates, "../../README.md", demoPath)
+	transcripts := map[string]string{}
+	for _, path := range candidates {
+		content, err := os.ReadFile(path)
+		if err != nil {
+			continue
+		}
+		// An init transcript, not a mention of the command: the line only the
+		// command itself prints.
+		if strings.Contains(string(content), "OK    vat.yaml") {
+			transcripts[path] = string(content)
+		}
+	}
+	if len(transcripts) == 0 {
+		t.Fatal("no `vat init` transcript found anywhere; they changed shape and this test stopped checking anything")
 	}
 
 	unconditional := []string{"vat.yaml", ".gitignore", "AGENTS.md", "CLAUDE.md"}
@@ -574,10 +588,12 @@ func TestTheDemoShowsTheFilesInitAlwaysWrites(t *testing.T) {
 	}
 
 	// Act & Assert
-	for _, path := range written {
-		if !strings.Contains(demo, path) {
-			t.Errorf("`vat init` writes %s and %s does not show it; re-record the demo",
-				path, demoPath)
+	for source, transcript := range transcripts {
+		for _, path := range written {
+			if !strings.Contains(transcript, path) {
+				t.Errorf("`vat init` writes %s and the transcript in %s does not show it; re-record it",
+					path, source)
+			}
 		}
 	}
 }

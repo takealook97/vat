@@ -221,12 +221,16 @@ $ cd ~/work                    # a folder with several repos already cloned
 $ vat init --adopt --name acme
 OK    vat.yaml                  4 repositories enrolled
 OK    .gitignore                governed repositories excluded from the root history
+OK    .agents/skills/before-cross-repo-work/SKILL.md  seeded
+OK    .agents/skills/consult-the-brain-first/SKILL.md  seeded
 OK    AGENTS.md                 generated
 OK    CLAUDE.md                 generated
 OK    brain/AGENTS.md           generated
 OK    console/AGENTS.md         generated
 OK    docs/AGENTS.md            generated
 OK    payments/AGENTS.md        generated
+OK    .claude/skills/before-cross-repo-work/SKILL.md  generated
+OK    .claude/skills/consult-the-brain-first/SKILL.md  generated
 INFO  brain                     brain · https://github.com/acme/brain.git
 INFO  console                   product · https://github.com/acme/console.git
 INFO  docs                      docs · https://github.com/acme/docs.git

@@ -334,6 +334,10 @@ Notable changes to `vat`. The format follows
   thing — the buckets are checked and not the numbers, because the numbers
   belong to a scenario and asserting those would fail for reasons nobody should
   have to fix.
+- The README's own `vat init` transcript showed a run that no longer happens.
+  The guard added for the demo covered the recording alone, so the sample twenty
+  lines below it went stale for exactly as long as nobody read it; every file
+  carrying an init transcript is held to it now.
 - The demo at the top of the README showed a `vat init` that no longer happens.
   Its own comment says to regenerate it after changing any of the output it
   shows, and nothing checked that — in the one asset a reader takes as evidence
