@@ -246,6 +246,22 @@ Notable changes to `vat`. The format follows
   shows, and nothing checked that — in the one asset a reader takes as evidence
   the tool does what the page claims. A contract test now holds it to naming
   every file `vat init` writes unconditionally, the seeded procedures included.
+- `NO_REMOTE`, for a repository neither the clone nor the manifest names a
+  remote for. `vat repo new --no-remote` produces exactly that, and `vat init
+  --adopt` records it for any repository git has no origin for — and both
+  `vat sync` and `vat doctor` then compared the placeholder they had written
+  against the empty string git reports and called it a remote mismatch, which
+  means something specific and dangerous. Every run failed forever, over a value
+  vat wrote itself. `vat lint` had drawn the distinction from the start and said
+  in a comment why. A clone that has lost the remote its manifest names is still
+  reported: nobody can sync it, and the manifest says they should be able to.
+- The `local:` convention had one definition per package that used it. It has
+  one now, so reading it cannot drift from writing it.
+- `repo/remote-missing` handed the placeholder back as a URL, so following its
+  fix line created a remote that can never be fetched — the state the rule was
+  reporting.
+- `vat sync` counted no repository at all for a state it reported and left alone
+  on purpose.
 - `vat changeset verify` counted a repository that declares no canonical checks
   as a failed check, and summarised them as "N check(s) failed; recorded against
   the revisions they ran on" when nothing had run. That phrase is the

@@ -531,3 +531,29 @@ func TestARoleTargetingCodexIsNotReported(t *testing.T) {
 		t.Errorf("a role targeting codex was reported, and codex is what it should target: %q", finding.Message)
 	}
 }
+
+// The fix line is a command somebody pastes. For a repository the manifest
+// records as having no remote, it handed back the placeholder as though it were
+// a URL — `git remote add origin local:scratch` creates a remote that can never
+// be fetched, which is the state the rule was reporting in the first place.
+func TestTheRemoteMissingFixDoesNotHandBackThePlaceholderAsAUrl(t *testing.T) {
+	// Arrange
+	ws := fixture(t, manifest.Repo{
+		Name: "scratch", Origin: manifest.LocalOrigin("scratch"), Role: manifest.RoleProduct,
+	})
+	git(t, filepath.Join(ws.Root, "scratch"), "remote", "remove", "origin")
+
+	// Act
+	finding, found := rules(run(t, ws))["repo/remote-missing"]
+
+	// Assert
+	if !found {
+		t.Fatal("the rule did not fire")
+	}
+	if strings.Contains(finding.Fix, manifest.LocalOrigin("scratch")) {
+		t.Errorf("the fix tells the reader to configure the placeholder: %q", finding.Fix)
+	}
+	if !strings.Contains(finding.Fix, "<url>") {
+		t.Errorf("the fix does not say a real url is needed: %q", finding.Fix)
+	}
+}

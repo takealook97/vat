@@ -99,9 +99,10 @@ Fetches, then fast-forwards only what can be advanced without losing anything.
 | `AHEAD` | local commits not pushed | |
 | `ARCHIVED` | excluded from updates | |
 | `PLANNED` | what `--dry-run` reports instead of acting | |
+| `NO_REMOTE` | neither the clone nor the manifest names a remote | |
 | `MISSING` | absent and not cloned | yes |
 | `NOT_GIT` | directory exists but holds no repository | yes |
-| `REMOTE_MISMATCH` | origin points somewhere the manifest does not name | yes |
+| `REMOTE_MISMATCH` | origin points somewhere the manifest does not name, or is absent where it names one | yes |
 | `FETCH_FAILED` | the network step failed | yes |
 | `DIVERGED` | both sides hold commits the other does not | yes |
 | `NO_UPSTREAM` | the default branch has no remote-tracking ref | yes |

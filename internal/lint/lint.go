@@ -279,11 +279,19 @@ func checkRepositories(ctx context.Context, ws *workspace.Workspace) []Finding {
 		if err != nil {
 			// Nothing mismatches when there is no remote at all, and this is
 			// the state `vat repo new --no-remote` deliberately leaves behind.
+			// The manifest's own placeholder is not a URL, and handing it back
+			// as one told the reader to create a remote that cannot be fetched.
+			fix := fmt.Sprintf("git -C %s remote add origin %s",
+				repo.Dir(), gitx.Redact(repo.Origin))
+			if manifest.IsLocalOrigin(repo.Origin) {
+				fix = fmt.Sprintf(
+					"git -C %s remote add origin <url>, then record that url in %s",
+					repo.Dir(), manifest.FileName)
+			}
 			findings = append(findings, Finding{
 				Rule: "repo/remote-missing", Severity: SeverityWarn, Subject: repo.Name,
 				Message: "no origin remote is configured, so it can never be fetched or pushed",
-				Fix: fmt.Sprintf("git -C %s remote add origin %s",
-					repo.Dir(), gitx.Redact(repo.Origin)),
+				Fix:     fix,
 			})
 		} else {
 			// Checked before the mismatch rule rather than as part of it,

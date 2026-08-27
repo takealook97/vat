@@ -5,6 +5,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"testing"
 
@@ -364,3 +365,86 @@ func TestARequiredRepositoryThatIsNotClonedStillFailsTheRun(t *testing.T) {
 		t.Errorf("a required repository that is not on disk passed the run: %+v", report.Results)
 	}
 }
+
+// `vat repo new --no-remote` deliberately leaves a repository with no remote,
+// and `vat init --adopt` records one it finds that way. sync reported both as
+// REMOTE_MISMATCH — whose whole meaning is that origin points somewhere the
+// manifest does not name, which is a supply-chain signal — and counted them as
+// needing attention forever. `vat lint` already made this distinction and says
+// in a comment why.
+
+// `vat repo new --no-remote` deliberately leaves a repository with no remote,
+// and `vat init --adopt` records one it finds that way as a local placeholder.
+// sync reported both as REMOTE_MISMATCH — whose whole meaning is that origin
+// points somewhere the manifest does not name, a supply-chain signal — and
+// counted them as failing every run forever. `vat lint` already drew this
+// distinction and says in a comment why.
+func TestARepositoryTheManifestRecordsAsLocalIsNotASupplyChainSignal(t *testing.T) {
+	// Arrange
+	ws, _, clone := fixture(t)
+	git(t, clone, "remote", "remove", "origin")
+	local := ws.Manifest.Active()[0]
+	local.Origin = manifest.LocalOrigin(local.Name)
+
+	// Act
+	report := syncx.Run(context.Background(), ws, []manifest.Repo{local}, syncx.Options{Offline: true})
+
+	// Assert
+	result := report.Results[0]
+	if result.State != syncx.StateNoRemote {
+		t.Fatalf("state = %s, want NO_REMOTE (detail: %s)", result.State, result.Detail)
+	}
+	if result.Failed() {
+		t.Error("a repository the manifest itself records as having no remote failed the run")
+	}
+}
+
+// A clone that no longer has the remote the manifest names is a different fact.
+// Nobody can sync it, and it is still reported.
+func TestAMissingRemoteTheManifestNamesIsStillReported(t *testing.T) {
+	// Arrange
+	ws, _, clone := fixture(t)
+	git(t, clone, "remote", "remove", "origin")
+
+	// Act
+	result := runSync(t, ws, syncx.Options{Offline: true})
+
+	// Assert
+	if result.State != syncx.StateRemoteMismatch {
+		t.Fatalf("state = %s, want REMOTE_MISMATCH (detail: %s)", result.State, result.Detail)
+	}
+	if !result.Failed() {
+		t.Error("a repository whose declared origin is not configured did not fail the run")
+	}
+}
+
+// The reference table and the states the code can report are compared both
+// ways, for the reason the lint rule table already is: a state nobody has
+// documented is a state nobody can look up when it appears in their terminal.
+func TestTheStateNamesAreExactlyWhatTheReferenceDocuments(t *testing.T) {
+	// Arrange
+	content, err := os.ReadFile("../../docs/COMMANDS.md")
+	if err != nil {
+		t.Fatalf("read the reference: %v", err)
+	}
+	reference := string(content)
+
+	// Act & Assert
+	documented := map[string]bool{}
+	for _, row := range strings.Split(reference, "\n") {
+		if match := stateRow.FindStringSubmatch(row); match != nil {
+			documented[match[1]] = true
+		}
+	}
+	for _, state := range syncx.StateNames() {
+		if !documented[string(state)] {
+			t.Errorf("`vat sync` can report %s and docs/COMMANDS.md does not list it", state)
+		}
+		delete(documented, string(state))
+	}
+	for state := range documented {
+		t.Errorf("docs/COMMANDS.md documents the sync state %s, which the code cannot report", state)
+	}
+}
+
+var stateRow = regexp.MustCompile("^\\| `([A-Z_]+)` \\|")

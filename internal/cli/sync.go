@@ -98,7 +98,8 @@ func renderSyncReport(env *Env, report syncx.Report) {
 		switch result.State {
 		case syncx.StateUpdated, syncx.StateCloned:
 			updated++
-		case syncx.StateDirty, syncx.StateBranch, syncx.StateAhead, syncx.StateDetached:
+		case syncx.StateDirty, syncx.StateBranch, syncx.StateAhead, syncx.StateDetached,
+			syncx.StateNoRemote:
 			skipped++
 		}
 	}

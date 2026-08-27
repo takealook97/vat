@@ -37,8 +37,13 @@ const (
 	// never resolved automatically: the directory may hold unsaved work.
 	StateNotGit State = "NOT_GIT"
 	// StateRemoteMismatch means origin points somewhere the manifest does not
-	// name. Treated as a supply-chain signal, never silently rewritten.
+	// name, or is absent where the manifest names one. Treated as a
+	// supply-chain signal, never silently rewritten.
 	StateRemoteMismatch State = "REMOTE_MISMATCH"
+	// StateNoRemote means neither the clone nor the manifest names a remote.
+	// `vat repo new --no-remote` leaves exactly this, so it is a recorded fact
+	// rather than a problem: there is nothing to fetch and nothing to compare.
+	StateNoRemote State = "NO_REMOTE"
 	// StateFetchFailed means the network step failed.
 	StateFetchFailed State = "FETCH_FAILED"
 	// StateDirty means uncommitted work is present, so nothing was advanced.
@@ -59,6 +64,18 @@ const (
 	// StatePlanned is what a dry run reports instead of acting.
 	StatePlanned State = "PLANNED"
 )
+
+// StateNames lists every state a run can report, in the order the reference
+// documents them. A state nobody has documented is one nobody can look up when
+// it appears in their terminal, so a test compares this against that table.
+func StateNames() []State {
+	return []State{
+		StateCurrent, StateUpdated, StateCloned, StateDirty, StateBranch,
+		StateDetached, StateAhead, StateArchived, StatePlanned, StateNoRemote,
+		StateMissing, StateNotGit, StateRemoteMismatch, StateFetchFailed,
+		StateDiverged, StateNoUpstream,
+	}
+}
 
 // Failure reports whether a state should make the command exit non-zero.
 // Dirty trees, feature branches, and local-ahead branches are normal working
@@ -189,8 +206,17 @@ func syncOne(ctx context.Context, ws *workspace.Workspace, repo manifest.Repo, r
 
 	actual, err := gitx.RemoteURL(ctx, dir, remote)
 	if err != nil {
+		// A repository the manifest itself records as having no remote is not a
+		// supply-chain signal. Reporting it as one made every run fail forever
+		// for a state `vat repo new --no-remote` deliberately produces.
+		if manifest.IsLocalOrigin(repo.Origin) {
+			revision, _ := gitx.ShortRevision(ctx, dir, "HEAD")
+			return Result{Repo: name, State: StateNoRemote, Branch: branch, Revision: revision,
+				Detail: "no remote, as the manifest records"}
+		}
 		return Result{Repo: name, State: StateRemoteMismatch,
-			Detail: fmt.Sprintf("no remote %q configured", remote)}
+			Detail: fmt.Sprintf("no remote %q configured; the manifest names %s",
+				remote, gitx.Redact(repo.Origin))}
 	}
 	if !gitx.SameRemote(actual, repo.Origin) {
 		// Rewriting the remote here would turn a possible supply-chain problem

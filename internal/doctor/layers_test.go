@@ -2,6 +2,7 @@ package doctor_test
 
 import (
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -247,5 +248,57 @@ func TestDoctorStillJudgesABrainThatWasInitialised(t *testing.T) {
 	// Assert
 	if _, found := findingFor(report, "brain", "records"); !found {
 		t.Errorf("an initialised brain went unjudged: %+v", report.Findings)
+	}
+}
+
+// `vat init --adopt` records a repository git has no origin for as a local
+// placeholder, and doctor then compared that placeholder against the empty
+// string git reports and failed the environment with `origin is "", manifest
+// says "local:scratch"` — vat disagreeing with a value it wrote itself. lint
+// had drawn the distinction from the start and says in a comment why.
+func TestDoctorDoesNotCallARecordedAbsenceOfARemoteAMismatch(t *testing.T) {
+	// Arrange
+	ws := fixture(t, manifest.Repo{
+		Name: "scratch", Origin: manifest.LocalOrigin("scratch"), Role: manifest.RoleProduct,
+	})
+	git(t, filepath.Join(ws.Root, "scratch"), "remote", "remove", "origin")
+
+	// Act
+	report := judge(t, ws)
+
+	// Assert
+	finding, found := findingFor(report, "repositories", "scratch")
+	if !found {
+		t.Fatalf("the repository was not judged at all: %+v", report.Findings)
+	}
+	if finding.Status == doctor.StatusFail {
+		t.Errorf("a recorded absence of a remote failed the environment: %q", finding.Detail)
+	}
+	if strings.Contains(finding.Detail, "manifest says") {
+		t.Errorf("doctor calls it a mismatch: %q", finding.Detail)
+	}
+	if !strings.Contains(finding.Detail, "no ") {
+		t.Errorf("doctor does not say the repository has no remote: %q", finding.Detail)
+	}
+}
+
+// A clone that lost the remote the manifest names is a different fact and is
+// still a failure: nobody can fetch or push it, and the manifest says they
+// should be able to.
+func TestDoctorStillFailsAMissingRemoteTheManifestNames(t *testing.T) {
+	// Arrange
+	ws := fixture(t, productRepo())
+	git(t, filepath.Join(ws.Root, "payments"), "remote", "remove", "origin")
+
+	// Act
+	report := judge(t, ws)
+
+	// Assert
+	finding, found := findingFor(report, "repositories", "payments")
+	if !found {
+		t.Fatalf("the repository was not judged at all: %+v", report.Findings)
+	}
+	if finding.Status != doctor.StatusFail {
+		t.Errorf("a repository missing its declared remote did not fail: %q", finding.Detail)
 	}
 }

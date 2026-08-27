@@ -434,3 +434,19 @@ func containsFold(list []string, want string) bool {
 	}
 	return false
 }
+
+// localOriginPrefix marks an origin that names no remote at all.
+//
+// `vat repo new --no-remote` and `vat init --adopt` both record it for a
+// repository git has no origin for, and three packages then compared it against
+// the empty string git reports and called the difference a remote mismatch —
+// which means something specific and dangerous. The convention has one
+// definition here so that reading it cannot drift from writing it.
+const localOriginPrefix = "local:"
+
+// LocalOrigin is the origin recorded for a repository with no remote.
+func LocalOrigin(name string) string { return localOriginPrefix + name }
+
+// IsLocalOrigin reports whether an origin records the absence of a remote
+// rather than naming one.
+func IsLocalOrigin(origin string) bool { return strings.HasPrefix(origin, localOriginPrefix) }

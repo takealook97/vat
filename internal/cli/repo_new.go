@@ -135,7 +135,7 @@ func runRepoNew(ctx context.Context, env *Env, args []string) error {
 	if repo.Origin == "" {
 		// The manifest requires an origin, and a placeholder is more honest
 		// than an invented URL: lint will report it until it is set.
-		repo.Origin = "local:" + name
+		repo.Origin = manifest.LocalOrigin(name)
 		env.Printer.Status(ui.LevelWarn, name, "no remote; origin recorded as a local placeholder")
 	}
 

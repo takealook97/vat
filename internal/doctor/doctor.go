@@ -205,7 +205,24 @@ func checkRepos(ctx context.Context, ws *workspace.Workspace) []Finding {
 			continue
 		}
 		actual, err := gitx.RemoteURL(ctx, dir, "origin")
-		if err != nil || !gitx.SameRemote(actual, repo.Origin) {
+		if err != nil {
+			// Nothing mismatches when there is no remote at all. Comparing the
+			// empty string git reports against the placeholder `vat init
+			// --adopt` recorded had doctor fail the environment over a value vat
+			// wrote itself; `vat lint` drew this distinction from the start.
+			status, detail := StatusFail, fmt.Sprintf(
+				"no origin remote is configured, and the manifest names %s",
+				gitx.Redact(repo.Origin))
+			if manifest.IsLocalOrigin(repo.Origin) {
+				status = StatusWarn
+				detail = "no origin remote is configured, so it can never be fetched or pushed"
+			}
+			findings = append(findings, Finding{
+				Section: sectionRepositories, Subject: repo.Name, Status: status, Detail: detail,
+			})
+			continue
+		}
+		if !gitx.SameRemote(actual, repo.Origin) {
 			findings = append(findings, Finding{
 				Section: sectionRepositories, Subject: repo.Name, Status: StatusFail,
 				Detail: fmt.Sprintf("origin is %q, manifest says %q",

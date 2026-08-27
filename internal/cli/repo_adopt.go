@@ -110,7 +110,7 @@ func describeRepo(ctx context.Context, root, name string) (manifest.Repo, bool) 
 	}
 	origin, err := gitx.RemoteURL(ctx, dir, "origin")
 	if err != nil {
-		origin = "local:" + name
+		origin = manifest.LocalOrigin(name)
 	}
 	// The manifest is committed, so it records identity and never access. A
 	// remote configured with a token still works after this: git reads the
