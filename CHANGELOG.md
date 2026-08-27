@@ -359,6 +359,12 @@ Notable changes to `vat`. The format follows
   shows, and nothing checked that — in the one asset a reader takes as evidence
   the tool does what the page claims. A contract test now holds it to naming
   every file `vat init` writes unconditionally, the seeded procedures included.
+- The commands that render a repository's `AGENTS.md` say to commit it, once,
+  and stop once it is. The per-repository contract is the working permit for a
+  session opened inside that repository alone, so it only works once it travels
+  with the clone — and nothing anywhere said so, in the output or in the
+  reference, while `harness/repo-missing` and `changeset verify` both depended
+  on it.
 - `vat changeset verify` names the files that make a working tree dirty instead
   of only announcing that one is. The answer on a fresh workspace is the
   `AGENTS.md` vat rendered, and the refusal said nothing that would let anyone

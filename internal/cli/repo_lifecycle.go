@@ -4,9 +4,12 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"path"
+	"slices"
 	"strings"
 
 	"github.com/takealook97/vat/internal/fsx"
+	"github.com/takealook97/vat/internal/gitx"
 	"github.com/takealook97/vat/internal/lint"
 	"github.com/takealook97/vat/internal/manifest"
 	"github.com/takealook97/vat/internal/ui"
@@ -209,5 +212,44 @@ func renderAfterChange(env *Env, root string) error {
 	for _, file := range changed {
 		env.Printer.Status(ui.LevelOK, file, "regenerated")
 	}
+	reportUncommittedContracts(env, ws, changed)
 	return nil
+}
+
+// reportUncommittedContracts names the repository contracts that are not yet in
+// their own repository's history.
+//
+// The per-repository AGENTS.md is the working permit for a session opened
+// inside that repository alone, so it does its job only once it is committed
+// and travels with the clone. Nothing said so — and `vat changeset verify` then
+// refuses to verify anything, on the file vat itself had written.
+//
+// It stops firing the moment the file is committed, so it cannot become the
+// hint people learn to read past.
+func reportUncommittedContracts(env *Env, ws *workspace.Workspace, changed []string) {
+	var pending []string
+	for _, repo := range ws.Manifest.Repos {
+		file := path.Join(repo.Dir(), "AGENTS.md")
+		if !slices.Contains(changed, file) {
+			continue
+		}
+		dir := ws.RepoPath(repo)
+		if !gitx.IsRepository(dir) {
+			continue
+		}
+		// Tracked means the repository already carries it; whether it has
+		// uncommitted edits is the working tree's business, not this hint's.
+		if tracked, err := gitx.IsTracked(context.Background(), dir, "AGENTS.md"); err != nil || tracked {
+			continue
+		}
+		pending = append(pending, file)
+	}
+	if len(pending) == 0 {
+		return
+	}
+	where, what := "its repository", "the contract a session opened there reads"
+	if len(pending) > 1 {
+		where, what = "their repositories", "the contract a session opened in one of them reads"
+	}
+	env.Printer.Hint("Commit %s in %s. It is %s.", strings.Join(pending, ", "), where, what)
 }

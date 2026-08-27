@@ -187,6 +187,20 @@ func WorkingTreeChanges(ctx context.Context, dir string, limit int) (paths []str
 	return paths, 0, nil
 }
 
+// IsTracked reports whether a path is in the repository's index.
+//
+// Without --error-unmatch, git answers by printing the path or printing
+// nothing, and exits zero either way. That keeps "not tracked" an answer and
+// leaves a non-zero exit meaning what it should: the question could not be
+// asked.
+func IsTracked(ctx context.Context, dir, path string) (bool, error) {
+	out, err := Run(ctx, dir, "ls-files", "--", path)
+	if err != nil {
+		return false, err
+	}
+	return strings.TrimSpace(out) != "", nil
+}
+
 // HasRef reports whether a ref such as refs/remotes/origin/main resolves.
 func HasRef(ctx context.Context, dir, ref string) bool {
 	_, err := Run(ctx, dir, "show-ref", "--verify", "--quiet", ref)

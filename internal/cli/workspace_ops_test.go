@@ -1206,3 +1206,40 @@ func TestSyncStatusAndDoctorAgreeAboutAModifiedTrackedFile(t *testing.T) {
 		t.Errorf("doctor did not report the modification:\n%s", doctor)
 	}
 }
+
+// The per-repository contract is the working permit for a session opened inside
+// that repository alone, so it only does its job once it is committed and
+// travels with the clone. Nothing said so: not the output, not the reference —
+// and `vat changeset verify` then refuses on the file vat wrote.
+func TestEnrollingARepositorySaysToCommitTheContractItRendered(t *testing.T) {
+	// Arrange
+	h := newFixture(t, "payments")
+	h.mustRun("init", "--name", "acme")
+
+	// Act
+	output := h.mustRun("repo", "add", "payments", "--origin", h.upstream("payments"))
+
+	// Assert
+	if !strings.Contains(output, "Commit payments/AGENTS.md") {
+		t.Errorf("nothing told the user to commit the contract vat rendered:\n%s", output)
+	}
+}
+
+// And it stops once the file is committed, because a hint that never goes away
+// is a hint people learn to read past.
+func TestTheCommitHintStopsOnceTheContractIsCommitted(t *testing.T) {
+	// Arrange
+	h := newFixture(t, "payments")
+	h.mustRun("init", "--name", "acme")
+	h.mustRun("repo", "add", "payments", "--origin", h.upstream("payments"))
+	git(t, h.path("payments"), "add", "AGENTS.md")
+	git(t, h.path("payments"), "commit", "--quiet", "-m", "chore: adopt the workspace contract")
+
+	// Act
+	output := h.mustRun("harness", "render")
+
+	// Assert
+	if strings.Contains(output, "Commit ") {
+		t.Errorf("the hint kept firing after the contract was committed:\n%s", output)
+	}
+}

@@ -50,6 +50,17 @@ what proves the work is done.
 
 `vat lint --fix` renders as part of its repair pass.
 
+### It belongs in the repository's history
+
+A repository's `AGENTS.md` is its working permit, and a permit only works if it
+travels with the clone. So it is committed by that repository, like any other
+file it owns — vat writes it and never commits anything.
+
+Until it is, `vat lint` reports `harness/repo-missing` for every colleague who
+clones, and `vat changeset verify` refuses on a working tree made dirty by the
+file vat rendered. The commands that render one say so, once, and stop saying it
+as soon as it is committed.
+
 ### What the region carries
 
 | Level | Contents |

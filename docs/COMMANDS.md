@@ -347,6 +347,11 @@ vat harness adopt [--apply]
 `render` writes the generated region of every `AGENTS.md` and every runtime
 adapter. Content outside a generated region is never touched.
 
+A repository's `AGENTS.md` belongs in that repository's history: it is the
+contract a session opened inside it reads, and it only travels with the clone
+once it is committed. vat writes it and commits nothing, so every command that
+renders one names it until it is committed — after that the line stops.
+
 `role new` creates a runtime-neutral role under `.agents/roles/`. A role
 defaults to **read-only**: write access is granted by naming the repositories it
 may change, because a role that can edit anything is a role whose boundary
