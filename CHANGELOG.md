@@ -436,6 +436,10 @@ Notable changes to `vat`. The format follows
   none. That text is committed into the repository of everybody adopting the
   harness on its own, where it reads as a defect in the generated file rather
   than as the state it describes.
+- `vat repo add --path ../outside` reached its check through Save and answered
+  "vat.yaml is invalid" with exit 1 — "found errors" — for an argument that was
+  simply mistyped, where a command called wrong is 2 and CI branches on the
+  difference. Asked before anything is written, as the name check already is.
 - An unknown flag is reported as a flag. `vat --nope status` answered "unknown
   command" and offered to suggest a verb, which sends somebody looking through
   the command list for something they never typed.

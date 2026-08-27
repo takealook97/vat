@@ -1084,3 +1084,28 @@ func TestListingsSaySomethingWhenTheWorkspaceGovernsNothing(t *testing.T) {
 		})
 	}
 }
+
+// A path that resolves outside the workspace is a command called wrong, not a
+// file that turned out to be invalid. It reached the check through Save and
+// answered "vat.yaml is invalid" with exit 1 — "found errors" — where a
+// mistyped argument is 2, which CI branches on. The name check was moved ahead
+// of the work for the same reason.
+func TestRepoAddRefusesAnEscapingPathBeforeDoingAnything(t *testing.T) {
+	// Arrange
+	h := adoptedFixture(t, "payments")
+
+	// Act
+	code, output := h.run("repo", "add", "escapee",
+		"--origin", "https://example.invalid/acme/escapee.git", "--path", "../outside", "--no-clone")
+
+	// Assert
+	if code != ExitUsage {
+		t.Errorf("exit = %d, want %d for a command called wrong:\n%s", code, ExitUsage, output)
+	}
+	if strings.Contains(output, "vat.yaml is invalid") {
+		t.Errorf("a mistyped argument was reported as a broken file:\n%s", output)
+	}
+	if !strings.Contains(output, "outside") {
+		t.Errorf("the refusal does not name what was passed:\n%s", output)
+	}
+}

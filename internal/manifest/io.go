@@ -329,6 +329,20 @@ func ValidateRepoName(name string) error {
 	return fsx.PortableName(name)
 }
 
+// ValidateRepoPath reports why a directory cannot hold a governed repository,
+// and nil when it can.
+//
+// Exported for the same reason ValidateRepoName is: a command that builds a path
+// has to ask before it touches the disk. Reaching this through Save reported
+// "vat.yaml is invalid" and exited 1 for an argument that was simply mistyped,
+// where a command called wrong is 2 and CI branches on the difference.
+func ValidateRepoPath(dir string) error {
+	if !containedPath(dir) {
+		return fmt.Errorf("path %q must stay inside the workspace", dir)
+	}
+	return nil
+}
+
 // Save validates and writes the manifest atomically, with a header comment
 // pointing at the documentation.
 func Save(path string, m Manifest) error {

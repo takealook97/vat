@@ -61,6 +61,11 @@ func runRepoAdd(ctx context.Context, env *Env, args []string) error {
 	if err := manifest.ValidateRepoName(name); err != nil {
 		return usageErrorf("%v", err)
 	}
+	if *path != "" {
+		if err := manifest.ValidateRepoPath(*path); err != nil {
+			return usageErrorf("%v", err)
+		}
+	}
 	if _, exists := ws.Manifest.Find(name); exists {
 		return usageErrorf("%s is already in %s", name, manifest.FileName)
 	}
