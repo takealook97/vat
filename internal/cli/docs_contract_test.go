@@ -6,6 +6,7 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"path/filepath"
 	"reflect"
 	"regexp"
 	"sort"
@@ -651,4 +652,50 @@ func TestTheArchitectureMapNamesExactlyThePackagesThatExist(t *testing.T) {
 	for name := range mapped {
 		t.Errorf("AGENTS.md maps internal/%s, which does not exist", name)
 	}
+}
+
+// An anchor that resolves to nothing sends a reader to the top of the page and
+// looks like the page is broken. There is no build step over this Markdown, so
+// nothing else would ever say.
+func TestEveryInternalLinkInTheDocsResolvesToAHeading(t *testing.T) {
+	// Arrange
+	anchor := regexp.MustCompile(`\]\(#([a-z0-9-]+)\)`)
+	heading := regexp.MustCompile(`(?m)^#{1,6} +(.+?)\s*$`)
+	paths, err := filepath.Glob("../../docs/*.md")
+	if err != nil {
+		t.Fatalf("glob docs: %v", err)
+	}
+	paths = append(paths, "../../README.md", "../../CONTRIBUTING.md", "../../AGENTS.md")
+
+	// Act & Assert
+	for _, path := range paths {
+		content, err := os.ReadFile(path)
+		if err != nil {
+			continue
+		}
+		headings := map[string]bool{}
+		for _, match := range heading.FindAllStringSubmatch(string(content), -1) {
+			headings[slugify(match[1])] = true
+		}
+		for _, match := range anchor.FindAllStringSubmatch(string(content), -1) {
+			if !headings[match[1]] {
+				t.Errorf("%s links to #%s, which is not a heading in it", path, match[1])
+			}
+		}
+	}
+}
+
+// slugify renders a heading the way a forge does when it builds an anchor:
+// lower case, punctuation dropped, spaces to hyphens.
+func slugify(heading string) string {
+	var b strings.Builder
+	for _, r := range strings.ToLower(heading) {
+		switch {
+		case r >= 'a' && r <= 'z', r >= '0' && r <= '9':
+			b.WriteRune(r)
+		case r == ' ', r == '-':
+			b.WriteRune('-')
+		}
+	}
+	return b.String()
 }

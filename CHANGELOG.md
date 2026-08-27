@@ -300,6 +300,10 @@ Notable changes to `vat`. The format follows
   of `manifest` and `gitx`. The file calls breaking one a defect regardless of
   what the change achieves, and the tool exists because a rule only written down
   is a hope. They were hopes.
+- Internal links in the documentation are checked against the headings they
+  point at. There is no build step over this Markdown, so an anchor that
+  resolves to nothing sends a reader to the top of the page and looks like the
+  page is broken, and nothing else would ever say.
 - The architecture map in `AGENTS.md` is checked against the packages that
   exist, in both directions. It is the first thing that file tells a session to
   read, and it was a claim about the codebase that nothing verified: a package
