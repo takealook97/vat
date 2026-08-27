@@ -292,13 +292,14 @@ Notable changes to `vat`. The format follows
   reporting.
 - `vat sync` counted no repository at all for a state it reported and left alone
   on purpose.
-- `vat changeset verify` counted a repository that declares no canonical checks
-  as a failed check, and summarised them as "N check(s) failed; recorded against
-  the revisions they ran on" when nothing had run. That phrase is the
-  evidentiary claim the whole record rests on, so a summary that makes it about
-  checks which never executed is not a wording problem. The two are counted
-  apart now: both stop the changeset, and one is evidence that something broke
-  while the other is the absence of any evidence at all.
+- `vat changeset verify` counted every condition that stops a repository being
+  entered — no canonical checks, a dirty working tree, a clone that is not
+  there, a participant no longer in the manifest — as a failed check, and
+  summarised them as "N check(s) failed; recorded against the revisions they ran
+  on" when nothing had run. That phrase is the evidentiary claim the whole
+  record rests on, so a summary that makes it about checks which never executed
+  is not a wording problem. A check that ran and failed is counted apart from a
+  repository nothing could be run in; the specific reason stays beside each one.
 - `vat changeset show` reported "1 checks passed".
 - `vat doctor` could be made to certify a knowledge layer that does not exist,
   by following its own advice. On a repository declared as the brain and never

@@ -774,3 +774,30 @@ func TestChangesetVerifySaysWhenNothingCouldBeVerifiedAtAll(t *testing.T) {
 		t.Errorf("the summary does not count the repositories that could not be verified:\n%s", output)
 	}
 }
+
+// The same fact as the no-checks case, in the other three conditions that stop
+// a repository being verified at all: a dirty tree, a clone that is not there,
+// and a participant no longer in the manifest. Each was counted as a failed
+// check, and the summary said those checks were "recorded against the revisions
+// they ran on" when nothing had run.
+func TestChangesetVerifyCountsARepositoryItCouldNotEnterAsUnverified(t *testing.T) {
+	// Arrange
+	h := adoptedFixture(t, "payments")
+	addCheck(t, h, "payments", "true")
+	h.mustRun("changeset", "new", "Dirty tree", "--repos", "payments")
+	writeFile(t, h.path("payments", "scratch.txt"), "uncommitted\n")
+
+	// Act
+	code, output := h.run("changeset", "verify", "CS-0001")
+
+	// Assert
+	if code == ExitOK {
+		t.Fatalf("a dirty tree was verified:\n%s", output)
+	}
+	if strings.Contains(output, "check") && strings.Contains(output, "failed; recorded") {
+		t.Errorf("the summary claims a check ran and was recorded:\n%s", output)
+	}
+	if !strings.Contains(output, "could not be verified") {
+		t.Errorf("the summary does not say the repository could not be verified:\n%s", output)
+	}
+}

@@ -66,13 +66,13 @@ func runChangesetVerify(ctx context.Context, env *Env, args []string) error {
 		repo, ok := ws.Manifest.Find(participant.Name)
 		if !ok {
 			env.Printer.Status(ui.LevelFail, participant.Name, "no longer in the manifest")
-			failures++
+			unverifiable++
 			continue
 		}
 		dir := ws.RepoPath(repo)
 		if !gitx.IsRepository(dir) {
 			env.Printer.Status(ui.LevelFail, participant.Name, "not cloned")
-			failures++
+			unverifiable++
 			continue
 		}
 		revision, err := gitx.HeadRevision(ctx, dir)
@@ -86,7 +86,7 @@ func runChangesetVerify(ctx context.Context, env *Env, args []string) error {
 			// the one thing a verification record must never do.
 			env.Printer.Status(ui.LevelFail, participant.Name,
 				"git cannot read the working tree state; not verified")
-			failures++
+			unverifiable++
 			continue
 		}
 		if dirty {
@@ -97,7 +97,7 @@ func runChangesetVerify(ctx context.Context, env *Env, args []string) error {
 			env.Printer.Status(ui.LevelFail, participant.Name,
 				"working tree is dirty; results would not describe "+shortRev(revision)+
 					". Commit or stash, then verify")
-			failures++
+			unverifiable++
 			updated := participant
 			updated.Revision = ""
 			updated.Checks = nil
@@ -173,23 +173,28 @@ func runChangesetVerify(ctx context.Context, env *Env, args []string) error {
 }
 
 // verifySummary states what stopped the changeset, keeping a check that ran and
-// failed apart from a repository that had nothing to run.
+// failed apart from a repository nothing could be run in at all.
 //
-// Reporting both as "check(s) failed ... recorded against the revisions they ran
-// on" made the record's evidentiary claim about checks that never executed,
-// which is the one sentence a reader is entitled to trust.
+// Four conditions stop a repository being entered — no canonical checks, a dirty
+// tree, a clone that is not there, a participant no longer in the manifest — and
+// every one of them was counted as a failed check. The summary then said those
+// checks were "recorded against the revisions they ran on" when nothing had run,
+// which makes the record's evidentiary claim about checks that never executed.
+// That is the one sentence a reader is entitled to trust.
+//
+// The specific reason stays beside each repository. This counts.
 func verifySummary(failures, unverifiable int) string {
 	switch {
 	case failures > 0 && unverifiable > 0:
-		return fmt.Sprintf("%s failed, recorded against the revisions they ran on; %s no canonical checks",
+		return fmt.Sprintf("%s failed, recorded against the revisions they ran on; %s could not be verified",
 			pluralise(failures, "check", "checks"),
-			pluralise(unverifiable, "repository declares", "repositories declare"))
+			pluralise(unverifiable, "repository", "repositories"))
 	case failures > 0:
 		return fmt.Sprintf("%s failed; recorded against the revisions they ran on",
 			pluralise(failures, "check", "checks"))
 	case unverifiable > 0:
-		return fmt.Sprintf("%s no canonical checks, so nothing could be verified",
-			pluralise(unverifiable, "repository declares", "repositories declare"))
+		return fmt.Sprintf("%s could not be verified; the reason is beside each one above",
+			pluralise(unverifiable, "repository", "repositories"))
 	}
 	return ""
 }
