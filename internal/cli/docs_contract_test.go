@@ -15,6 +15,7 @@ import (
 	"testing"
 
 	"github.com/takealook97/vat/internal/brain"
+	"github.com/takealook97/vat/internal/fit"
 	"github.com/takealook97/vat/internal/harness"
 	"github.com/takealook97/vat/internal/lint"
 	"github.com/takealook97/vat/internal/manifest"
@@ -714,4 +715,37 @@ func slugify(heading string) string {
 		}
 	}
 	return b.String()
+}
+
+// The thresholds `vat fit` prints are the sentence a reader decides on, and the
+// README's sample of them had drifted from the code — "agents work across more
+// than one repository" where the tool says "coding agents work in this code at
+// all", which is a different recommendation to a different person.
+//
+// The thresholds are checked and the reasons are not: a reason names the
+// reader's own numbers, and holding a sample to those would fail for reasons
+// nobody should have to fix.
+func TestEverySampleThresholdIsOneTheAdvisorPrints(t *testing.T) {
+	// Arrange
+	printed := map[string]bool{}
+	for _, verdict := range fit.Assess(fit.Signals{}) {
+		printed[verdict.Threshold] = true
+	}
+	if len(printed) == 0 {
+		t.Fatal("the advisor produced no thresholds; it changed shape and this test stopped checking anything")
+	}
+	line := regexp.MustCompile(`(?m)^ +threshold: (.+?)\s*$`)
+
+	// Act & Assert
+	for _, path := range []string{"../../README.md", "../../docs/ADOPTION.md", "../../docs/FAQ.md"} {
+		content, err := os.ReadFile(path)
+		if err != nil {
+			continue
+		}
+		for _, match := range line.FindAllStringSubmatch(string(content), -1) {
+			if !printed[match[1]] {
+				t.Errorf("%s shows the threshold %q, which `vat fit` does not print", path, match[1])
+			}
+		}
+	}
 }

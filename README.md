@@ -380,13 +380,17 @@ $ vat fit --contracts 1 --people 1
 OK    workspace                 adopt — 4 repositories: knowing what to clone, and what state each is in, has stopped being memorable
       threshold: 3 or more repositories worked in together
       start with: vat init
-SKIP  harness                   not yet — without agents in the loop, a written contract per repository is enough
-      threshold: agents work across more than one repository
-SKIP  changesets                not yet — nothing here says an interface crosses a repository boundary; count them with --contracts
+SKIP  harness                   not yet — nothing here says agents work in this code; if any do,
+                                this layer pays from the first one — pass --agent-sessions
+      threshold: coding agents work in this code at all
+SKIP  changesets                not yet — nothing here says an interface crosses a repository
+                                boundary; count them with --contracts
       threshold: 2 or more interfaces cross a repository boundary
-SKIP  brain                     not yet — one person across a few repositories still remembers why
-      threshold: a decision has already been lost, or 2+ people across 4+ repositories
-SKIP  credential                not yet — a single secret location is still auditable by looking at it
+SKIP  brain                     not yet — nothing here says a decision has been lost or that more
+                                than one person works across these repositories; either would pay
+      threshold: a decision has already been lost, agents work here weekly, or 2+ people across 4+ repositories
+SKIP  credential                not yet — no repository here is declared as holding secrets; if they
+                                live in more than one place, this pays
       threshold: 2 or more repositories hold their own secrets
 
 Conclusion

@@ -434,6 +434,11 @@ Notable changes to `vat`. The format follows
   none. That text is committed into the repository of everybody adopting the
   harness on its own, where it reads as a defect in the generated file rather
   than as the state it describes.
+- The README's `vat fit` sample showed thresholds the tool does not print —
+  "agents work across more than one repository" where it says "coding agents
+  work in this code at all", which is a different recommendation to a different
+  person. Every sampled threshold is checked against the advisor now; the
+  reasons are not, because a reason names the reader's own numbers.
 - `vat fit` stated a fact about the reader from a flag default. `Signals` says
   anything left at zero is unknown and that the recommendation says so rather
   than guessing; two of the reasons guessed, telling a workspace nobody had

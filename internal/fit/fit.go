@@ -113,7 +113,9 @@ func Assess(signals Signals) []Verdict {
 				signals.AgentSessions >= 5 ||
 				(signals.People >= 2 && signals.Repositories >= 4),
 				brainReason(signals),
-				"one person across a few repositories still remembers why; the layer would store what you already know"),
+				// --people defaults to one, so "one person" is this command's
+				// assumption and not something it was told.
+				"nothing here says a decision has been lost or that more than one person works across these repositories; either would make this pay"),
 			Command: "vat brain init",
 		},
 		{
@@ -123,7 +125,9 @@ func Assess(signals Signals) []Verdict {
 			Because: because(signals.SecretRepos >= 2,
 				fmt.Sprintf("secrets live in %d places: nobody can say which copy is current, and a new machine cannot be rebuilt reliably",
 					signals.SecretRepos),
-				"a single secret location is still auditable by looking at it"),
+				// Counted from repositories declared as the credential role. That
+				// is what vat can see, not where secrets actually are.
+				"no repository here is declared as holding secrets; if they live in more than one place, this pays"),
 			Command: "vat repo new credential --role credential --private",
 		},
 	}
