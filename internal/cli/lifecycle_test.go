@@ -528,3 +528,67 @@ func TestFitStartsRecommendingTheHarnessOnceAgentsAreInTheLoop(t *testing.T) {
 		t.Errorf("fit never judged the harness layer at all: %+v", verdicts)
 	}
 }
+
+// docs/ADOPTION.md tells a reader which rules a CI checkout can answer, and the
+// answer rests on a fact about vat's own design: the governed repositories are
+// excluded from the workspace's history, so the workspace repository checked
+// out on its own has the manifest and none of the trees it names.
+//
+// The advice was wrong before it was checked. It said to run `vat lint` and
+// `vat doctor`, and both fail there — every repository reported missing, which
+// is true and tells the reader nothing about what they changed. What makes the
+// corrected advice safe is that the failures are confined to `repo/`: if a rule
+// outside that prefix ever starts needing a working tree, the documented
+// selectors quietly begin failing builds for a reason the documentation does
+// not mention.
+func TestOnlyRepositoryRulesNeedTheWorkingTreesToBePresent(t *testing.T) {
+	// Arrange
+	h := newFixture(t)
+	h.mustRun("init", "--name", "acme")
+	h.mustRun("repo", "add", "payments",
+		"--origin", "https://example.invalid/acme/payments.git", "--no-clone")
+	h.mustRun("repo", "add", "console",
+		"--origin", "https://example.invalid/acme/console.git", "--no-clone")
+
+	// Act
+	code, output := h.run("lint", "--offline")
+
+	// Assert
+	if code == 0 {
+		t.Fatalf("lint passed with every repository absent, so this test is checking nothing:\n%s", output)
+	}
+	for _, line := range strings.Split(output, "\n") {
+		if !strings.Contains(line, "FAIL") && !strings.Contains(line, "WARN") {
+			continue
+		}
+		if strings.Contains(line, "lint ") || strings.Contains(line, "errors") {
+			continue // the summary line, not a finding
+		}
+		if !strings.Contains(line, "repo/") {
+			t.Errorf("a rule outside repo/ needs the working trees, which docs/ADOPTION.md does not account for:\n%s", line)
+		}
+	}
+}
+
+// docs/HARNESS.md says `vat repo add|new|adopt|rename|archive` re-renders
+// automatically, so a new repository arrives with a contract already in it.
+// --no-clone returned before the render, so the one command documented to
+// leave the harness current left it stale: `repo add` reported success and the
+// very next `vat lint` reported drift in the file that command had just made
+// wrong. The generated region comes from the manifest, and the manifest changed
+// whether or not anything reached disk.
+func TestRegisteringARepositoryWithoutCloningStillRendersTheContract(t *testing.T) {
+	// Arrange
+	h := newFixture(t)
+	h.mustRun("init", "--name", "acme")
+
+	// Act
+	h.mustRun("repo", "add", "payments",
+		"--origin", "https://example.invalid/acme/payments.git", "--no-clone")
+
+	// Assert
+	code, output := h.run("lint", "--offline", "--only", "harness")
+	if code != 0 {
+		t.Errorf("the harness is stale immediately after the command that renders it:\n%s", output)
+	}
+}

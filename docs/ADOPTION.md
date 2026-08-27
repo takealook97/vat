@@ -97,8 +97,9 @@ vat harness role new planner  --description "Turns a goal into an ordered plan."
 vat harness render
 ```
 
-Add `vat lint` to CI. Without it the contracts drift within a month and the
-layer is decorative.
+Add `vat lint --only harness` to CI. Without it the contracts drift within a
+month and the layer is decorative; see **In CI** below for why the selector is
+there.
 
 ---
 
@@ -187,10 +188,28 @@ The repository is created with ignore rules that refuse plaintext by default.
 
 **In CI**
 
+Run it where the workspace is. A pipeline for one governed repository has no
+`vat.yaml` above it and vat refuses to guess, so it stops before checking
+anything.
+
+The workspace's own repository is the checkout that works, with one limit worth
+knowing before you write the job: the governed repositories are excluded from
+its history — that is what `workspace/gitignore-drift` enforces, and the reason
+a root commit cannot swallow a nested clone. So a CI checkout has the manifest
+and none of the repositories it names. Ask it only what it can see:
+
 ```yaml
-- run: vat lint
-- run: vat doctor
+- run: vat lint --only harness    # contracts and adapters, rendered from the manifest
+- run: vat lint --only workspace
+- run: vat lint --only brain
+- run: vat lint --only changeset
 ```
+
+Everything under `repo/`, and `vat doctor` entirely, reads the working trees.
+With the repositories absent both report every one of them missing, which is
+true and useless: a red build that says nothing about what changed. Run those
+where the workspace is checked out whole — a developer's machine, or a job that
+runs `vat sync` first and can reach every origin.
 
 **Weekly, wherever your team already meets**
 

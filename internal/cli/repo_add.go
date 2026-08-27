@@ -69,6 +69,14 @@ func runRepoAdd(ctx context.Context, env *Env, args []string) error {
 	env.Printer.Status(ui.LevelOK, name, "registered as "+string(repo.Role))
 
 	if *noClone {
+		// The generated contract is rendered from the manifest, not from the
+		// working trees, so it went stale the moment the manifest changed —
+		// whether or not anything was cloned. Returning here left `vat repo
+		// add --no-clone` reporting success and `vat lint` reporting drift
+		// immediately afterwards, from the one command documented to render.
+		if err := renderAfterChange(env, ws.Root); err != nil {
+			return err
+		}
 		env.Printer.Hint("Not cloned. Run `vat sync` when you want it on disk.")
 		return nil
 	}
