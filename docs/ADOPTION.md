@@ -66,8 +66,15 @@ repos:
 
 ```bash
 vat lint --fix
-git add vat.yaml AGENTS.md CLAUDE.md .gitignore && git commit -m "chore: adopt vat"
+git add vat.yaml AGENTS.md CLAUDE.md .gitignore .agents .claude
+git commit -m "chore: adopt vat"
 ```
+
+`init` also seeded two procedures under `.agents/skills/` and generated their
+adapters under `.claude/skills/`. They describe vat's own command sequences and
+nothing else; they are yours from the moment they land, so edit or delete them.
+Deleting one is without consequence and nothing puts it back — re-seeding on a
+later run would undo a removal somebody meant.
 
 Replace whatever loop you were using with `vat sync`. That alone stops the
 category of accident where an update destroys uncommitted work.
@@ -96,6 +103,19 @@ vat harness role new reviewer --description "Reviews a finished diff against its
 vat harness role new planner  --description "Turns a goal into an ordered plan." --writes brain
 vat harness render
 ```
+
+A role is who is running. A procedure that only applies sometimes — how a
+release is cut, what has to change together when a contract does — is a skill,
+and belongs in `.agents/skills/` rather than in `AGENTS.md`, which every session
+loads whether or not the job ever comes up:
+
+```bash
+vat harness skill new cut-a-release --description "Take one service from a green build to a verified deployment."
+vat harness skills
+```
+
+A workspace that adopted vat before skills existed gains none by upgrading;
+`vat init` seeds only at creation. Create them with the command above.
 
 Add `vat lint --only harness` to CI. Without it the contracts drift within a
 month and the layer is decorative; see **In CI** below for why the selector is
@@ -238,6 +258,7 @@ Everything `vat` produces is plain text you already own:
 | `vat.yaml` | a readable list of repositories and policy |
 | `AGENTS.md` | a Markdown file with an HTML comment in it |
 | `.agents/roles/*.md` | Markdown with YAML front matter |
+| `.agents/skills/*/SKILL.md` | the same, one directory per procedure |
 | `.claude/`, `.codex/` | exactly the files those tools expect |
 | brain records | one Markdown file per fact |
 | `changesets/*.yaml` | readable YAML records |

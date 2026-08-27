@@ -203,6 +203,10 @@ Notable changes to `vat`. The format follows
   canonical procedure with the suite green. It now also makes the two checks
   `harness/skill-metadata` and `harness/runtime-unknown` would make elsewhere: a
   skill with no description, and one that renders no adapter at all.
+- `docs/ADOPTION.md` told a reader adopting vat to commit four files by name,
+  which stopped being every file `vat init` writes the moment init began seeding
+  procedures. Its stage 2 also defined roles and never mentioned skills, so the
+  walkthrough for adopting the harness taught half of it.
 - `docs/METHODOLOGY.md` listed `.agents/roles/` in the harness inventory and
   stopped, and the README's harness section did not contain the word "skill" at
   all. A format that is normative in `docs/SPEC.md` and absent from the two
