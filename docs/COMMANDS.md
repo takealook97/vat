@@ -36,7 +36,14 @@ vat init [--name <name>] [--adopt] [--from-tsv <file>]
 ```
 
 Creates `vat.yaml` in the current directory, writes the `.gitignore` managed
-region, and renders the harness.
+region, seeds the starter procedures, and renders the harness.
+
+The seeded skills — `before-cross-repo-work` and `consult-the-brain-first` —
+describe vat's own command sequences and nothing else, because a procedure vat
+writes once and never maintains would be a second source of truth of exactly the
+kind this tool exists to remove. A test holds every command they name to
+actually existing. They are canonical files under `.agents/skills/` from the
+moment they land: edit them, or delete them, with no consequence.
 
 | Flag | Effect |
 | --- | --- |

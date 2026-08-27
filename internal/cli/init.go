@@ -9,6 +9,7 @@ import (
 
 	"github.com/takealook97/vat/internal/fsx"
 	"github.com/takealook97/vat/internal/gitx"
+	"github.com/takealook97/vat/internal/harness"
 	"github.com/takealook97/vat/internal/lint"
 	"github.com/takealook97/vat/internal/manifest"
 	"github.com/takealook97/vat/internal/ui"
@@ -96,6 +97,13 @@ func runInit(ctx context.Context, env *Env, args []string) error {
 	if _, err := ws.SyncGitignore(built); err != nil {
 		return err
 	}
+	// Seeded before the harness renders, so the adapters arrive in the same run.
+	// Seeding afterwards would leave a canonical procedure that no runtime could
+	// discover until somebody happened to run `vat harness render`.
+	seeded, err := harness.WriteStarterSkills(ws.Root)
+	if err != nil {
+		return err
+	}
 	rendered, err := lint.RenderHarness(ws)
 	if err != nil {
 		return err
@@ -104,6 +112,9 @@ func runInit(ctx context.Context, env *Env, args []string) error {
 	printer := env.Printer
 	printer.Status(ui.LevelOK, manifest.FileName, fmt.Sprintf("%s enrolled", pluralise(len(built.Repos), "repository", "repositories")))
 	printer.Status(ui.LevelOK, ".gitignore", "governed repositories excluded from the root history")
+	for _, file := range seeded {
+		printer.Status(ui.LevelOK, file, "seeded")
+	}
 	for _, file := range rendered {
 		printer.Status(ui.LevelOK, file, "generated")
 	}

@@ -393,6 +393,12 @@ because both look authoritative.
 An implementation **MUST** be able to report an adapter that no longer matches
 what its canonical file would generate.
 
+An implementation **MAY** seed canonical procedures when a workspace is created.
+A seeded file is canonical and belongs to the workspace: an implementation
+**MUST NOT** rewrite one that already exists, and removing one **MUST** be
+without consequence. Anything seeded is therefore ordinary content under
+`.agents/skills/`, distinguished by nothing on disk.
+
 A definition **MAY** name the runtimes it targets; naming none targets every
 runtime that has an adapter of that kind. The two kinds do not share one set: a
 role has an adapter for Claude Code and for Codex, a skill for Claude Code only,

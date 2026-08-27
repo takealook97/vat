@@ -375,7 +375,6 @@ func TestEmptyListingsSaySoRatherThanPrintingNothing(t *testing.T) {
 		args []string
 	}{
 		{"harness roles", []string{"harness", "roles"}},
-		{"harness skills", []string{"harness", "skills"}},
 		{"evidence list", []string{"evidence", "list"}},
 		{"changeset list", []string{"changeset", "list"}},
 	}
@@ -562,14 +561,51 @@ func TestHarnessSkillsReportsWhatEachSkillAdvertises(t *testing.T) {
 	h.runJSON(&listed, "harness", "skills")
 
 	// Assert
-	if len(listed) != 1 {
-		t.Fatalf("expected one skill, got %+v", listed)
+	var found bool
+	for _, entry := range listed {
+		if entry.Name != "release-a-service" {
+			continue
+		}
+		found = true
+		if entry.Description != "Ship one service." {
+			t.Errorf("the listing does not describe the skill that was created: %+v", entry)
+		}
+		if len(entry.Runtimes) != 1 || entry.Runtimes[0] != "claude" {
+			t.Errorf("expected the claude adapter alone, got %v", entry.Runtimes)
+		}
 	}
-	if listed[0].Name != "release-a-service" || listed[0].Description != "Ship one service." {
-		t.Errorf("the listing does not describe the skill that was created: %+v", listed[0])
+	if !found {
+		t.Errorf("the created skill is missing from the listing: %+v", listed)
 	}
-	if len(listed[0].Runtimes) != 1 || listed[0].Runtimes[0] != "claude" {
-		t.Errorf("expected the claude adapter alone, got %v", listed[0].Runtimes)
+}
+
+func TestDeletingTheSeededSkillsCostsNothing(t *testing.T) {
+	// Arrange: `vat init` seeds two procedures and the reference says removing
+	// one is without consequence. That is a promise about behaviour, so it is
+	// checked rather than asserted in prose: a loader that treated the missing
+	// directory as a problem would make the documentation false.
+	h := adoptedFixture(t, "payments")
+	if err := os.RemoveAll(h.path(".agents", "skills")); err != nil {
+		t.Fatalf("remove the seeds: %v", err)
+	}
+
+	// Act
+	output := h.mustRun("harness", "skills")
+	var listed []map[string]any
+	h.runJSON(&listed, "harness", "skills")
+
+	// Assert
+	if strings.TrimSpace(output) == "" {
+		t.Error("`vat harness skills` printed nothing at all once the seeds were gone")
+	}
+	if listed == nil {
+		t.Error("`vat harness skills --json` produced null rather than an empty array")
+	}
+	if len(listed) != 0 {
+		t.Errorf("skills were reported after the directory was removed: %+v", listed)
+	}
+	if code, out := h.run("lint", "--offline"); code == ExitUsage {
+		t.Errorf("`vat lint` could not run with no skills directory:\n%s", out)
 	}
 }
 

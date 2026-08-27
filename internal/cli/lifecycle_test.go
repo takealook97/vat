@@ -3,8 +3,11 @@ package cli
 import (
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"testing"
+
+	"github.com/takealook97/vat/internal/harness"
 )
 
 // The commands in integration_test.go are the ones a workspace uses daily. The
@@ -428,6 +431,65 @@ func TestRepoNewArrivesWithAContractAlreadyInIt(t *testing.T) {
 	}
 	if !strings.Contains(string(ignore), "console") {
 		t.Error("the new repository is in the manifest but not excluded from the root history")
+	}
+}
+
+// A seeded procedure that names a command vat does not have is worse than no
+// seed: it is wrong advice, published by the tool, into every workspace ever
+// initialised. The seeds are therefore restricted to vat's own command
+// sequences precisely so that this test can hold them to being true.
+func TestEveryCommandAStarterSkillNamesActuallyExists(t *testing.T) {
+	// Arrange
+	known := map[string]bool{}
+	walkCommands(Root(), nil, func(_ *Command, path []string) {
+		known["vat "+strings.Join(path, " ")] = true
+	})
+	// Matched whole, never by prefix. Accepting `vat brain` for `vat brain read`
+	// is how a body naming a subcommand that does not exist passes: the parent
+	// does exist, and the wrong half is the half that was checked.
+	invocation := regexp.MustCompile("`vat(?: [a-z][a-z-]+)+")
+
+	// Act & Assert
+	for _, skill := range harness.StarterSkills() {
+		for _, quoted := range invocation.FindAllString(skill.Body, -1) {
+			named := strings.TrimPrefix(quoted, "`")
+			if !known[named] {
+				t.Errorf("starter skill %q names %q, which is not a command this binary has",
+					skill.Name, named)
+			}
+		}
+	}
+}
+
+func TestInitSeedsTheProceduresVatCanKeepTrue(t *testing.T) {
+	// Arrange
+	h := newFixture(t, "payments")
+
+	// Act
+	h.mustRun("init", "--name", "acme", "--adopt")
+
+	// Assert
+	starters := harness.StarterSkills()
+	if len(starters) == 0 {
+		t.Fatal("nothing to seed")
+	}
+	for _, skill := range starters {
+		if _, err := os.Stat(h.path(".agents", "skills", skill.Name, "SKILL.md")); err != nil {
+			t.Errorf("init did not seed %q: %v", skill.Name, err)
+		}
+		// Seeded before the harness renders, so the adapter arrives in the same
+		// run. Seeding afterwards would leave a canonical procedure no runtime
+		// could discover until somebody happened to run `vat harness render`.
+		if _, err := os.Stat(h.path(".claude", "skills", skill.Name, "SKILL.md")); err != nil {
+			t.Errorf("init seeded %q without generating its adapter: %v", skill.Name, err)
+		}
+	}
+	var listed []struct {
+		Name string `json:"name"`
+	}
+	h.runJSON(&listed, "harness", "skills")
+	if len(listed) != len(starters) {
+		t.Errorf("`harness skills` reports %d skills, expected the %d seeded", len(listed), len(starters))
 	}
 }
 
