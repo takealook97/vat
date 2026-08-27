@@ -385,6 +385,13 @@ window exists in which a consumer expects an interface that is already gone.
 .codex/agents/<name>.toml            generated adapter; `-` in the name becomes `_`
 ```
 
+An implementation **MUST NOT** silently overwrite a manifest that changed
+between reading it and writing it. Every command that changes the manifest reads
+the whole file, edits what it read, and writes the whole file back, so two of
+them running together otherwise leave only the later one's work — and both
+report success. The conflict **MUST** be reported and the write refused; merging
+is a guess about whether the other change belongs beside this one.
+
 A name that becomes a directory or a file — a repository, a role, a skill —
 **MUST NOT** be one a supported platform cannot create. An implementation
 **MUST** refuse the Windows device names (`con`, `prn`, `aux`, `nul`, `com0`

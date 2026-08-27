@@ -72,6 +72,11 @@ platform. They are one directory on macOS and on Windows, and a manifest that
 validates on the author's machine and puts two entries over one colleague's
 working tree is not the shared truth a workspace is built on.
 
+Two `vat` commands changing the manifest at once are serialised, and the later
+one is refused rather than overwriting work it never saw: it reads the whole
+file, edits what it read, and writes the whole file back. Re-run it. `.vat/` is
+vat's own local state and is excluded from the workspace's history.
+
 A workspace that enrols nothing is a supported state, not a mistake: it is what
 somebody adopting the harness for a single repository ends up with. `init` says
 so rather than warning about repositories that do not exist, and offers

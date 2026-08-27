@@ -300,6 +300,17 @@ Notable changes to `vat`. The format follows
   of `manifest` and `gitx`. The file calls breaking one a defect regardless of
   what the change achieves, and the tool exists because a rule only written down
   is a hope. They were hopes.
+- A manifest is never silently overwritten by a command that did not see the
+  change it lands on. Eight `vat repo add` calls started together left a
+  manifest holding two of them and reported eight successes: each read the whole
+  file, added its entry to what it had read, and wrote the whole file back, so
+  six additions were overwritten by commands that had never seen them. Silently
+  losing work is the one outcome this tool exists to prevent, and it was doing
+  it to its own manifest. The six are refused and told to re-run now — merging
+  would be a guess about whether the other change belongs beside this one, and a
+  state that cannot be resolved safely is reported. Sequential use is unchanged;
+  the lock is held for one read and one write, so a clone or a commit elsewhere
+  in a command never blocks anybody.
 - A filesystem error is reported with its path once. Twenty places wrapped an
   error that already carried the path with the path again, and two layers doing
   it printed it three times: a directory where a `SKILL.md` belongs reported
