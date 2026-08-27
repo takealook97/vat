@@ -251,6 +251,12 @@ Notable changes to `vat`. The format follows
   should exist while the steps for building one sat in a skill it never named.
   A role is who is running and a skill is how a job is done; the pairs that
   overlap now point at each other.
+- Every sample of the `vat sync` summary is held to naming the buckets the code
+  prints. Changing a summary line silently invalidates every sample of it, and
+  the samples are what a reader takes as evidence the page describes the real
+  thing — the buckets are checked and not the numbers, because the numbers
+  belong to a scenario and asserting those would fail for reasons nobody should
+  have to fix.
 - The demo at the top of the README showed a `vat init` that no longer happens.
   Its own comment says to regenerate it after changing any of the output it
   shows, and nothing checked that — in the one asset a reader takes as evidence

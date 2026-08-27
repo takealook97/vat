@@ -582,3 +582,36 @@ func TestTheDemoShowsTheFilesInitAlwaysWrites(t *testing.T) {
 }
 
 const demoPath = "../../docs/assets/demo.svg"
+
+// Changing what a summary line prints silently invalidates every sample of it,
+// and the samples are what a reader takes as evidence the page describes the
+// real thing. The sync summary gained a bucket and the README and the demo went
+// on showing the old shape.
+//
+// The buckets are checked, not the numbers: the numbers belong to a scenario,
+// and asserting those would fail for reasons nobody should have to fix.
+func TestEverySampleOfTheSyncSummaryNamesTheBucketsItPrints(t *testing.T) {
+	// Arrange
+	buckets := []string{"advanced", "already current", "left alone on purpose"}
+	summary := regexp.MustCompile(`\d+ advanced[^<\n]*`)
+
+	// Act & Assert
+	for _, path := range []string{"../../README.md", demoPath} {
+		content, err := os.ReadFile(path)
+		if err != nil {
+			t.Fatalf("read %s: %v", path, err)
+		}
+		samples := summary.FindAllString(string(content), -1)
+		if len(samples) == 0 {
+			continue
+		}
+		for _, sample := range samples {
+			for _, bucket := range buckets {
+				if !strings.Contains(sample, bucket) {
+					t.Errorf("%s shows %q, which does not name %q; re-record it",
+						path, sample, bucket)
+				}
+			}
+		}
+	}
+}

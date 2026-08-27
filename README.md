@@ -242,7 +242,7 @@ console     DIRTY    feature  772418c  uncommitted changes; nothing advanced
 docs        UPDATED  master   1e5b9a0
 payments    CURRENT  main     3bebc3c
 
-1 advanced · 1 left alone on purpose · 0 need attention
+1 advanced · 2 already current · 1 left alone on purpose · 0 need attention
 ```
 
 

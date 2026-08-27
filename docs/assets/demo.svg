@@ -122,7 +122,7 @@
 <text x="22" y="426.0" class="t" fill="#c9d1d9">brain       AHEAD     main     d76ef69  local commits not pushed</text>
 <text x="22" y="445.0" class="t" fill="#c9d1d9">console     DIRTY     feature  a9596d3  uncommitted changes; nothing advanced</text>
 <text x="22" y="464.0" class="t" fill="#c9d1d9">payments    DIVERGED  main     768391d  history diverged; see git log --left-right HEAD...origin/main</text>
-<text x="22" y="483.0" class="t" fill="#c9d1d9">0 advanced · 2 left alone on purpose · 1 needs attention</text>
+<text x="22" y="483.0" class="t" fill="#c9d1d9">0 advanced · 0 already current · 2 left alone on purpose · 1 needs attention</text>
 </g>
 <g class="f" id="f6">
 <text x="22" y="46.0" class="t" fill="#e3b341">$ vat init --adopt --name acme</text>
@@ -148,7 +148,7 @@
 <text x="22" y="426.0" class="t" fill="#c9d1d9">brain       AHEAD     main     d76ef69  local commits not pushed</text>
 <text x="22" y="445.0" class="t" fill="#c9d1d9">console     DIRTY     feature  a9596d3  uncommitted changes; nothing advanced</text>
 <text x="22" y="464.0" class="t" fill="#c9d1d9">payments    DIVERGED  main     768391d  history diverged; see git log --left-right HEAD...origin/main</text>
-<text x="22" y="483.0" class="t" fill="#c9d1d9">0 advanced · 2 left alone on purpose · 1 needs attention</text>
+<text x="22" y="483.0" class="t" fill="#c9d1d9">0 advanced · 0 already current · 2 left alone on purpose · 1 needs attention</text>
 <text x="22" y="502.0" class="t" fill="#e3b341">$ vat lint</text>
 </g>
 <g class="f" id="f7">
@@ -175,7 +175,7 @@
 <text x="22" y="426.0" class="t" fill="#c9d1d9">brain       AHEAD     main     d76ef69  local commits not pushed</text>
 <text x="22" y="445.0" class="t" fill="#c9d1d9">console     DIRTY     feature  a9596d3  uncommitted changes; nothing advanced</text>
 <text x="22" y="464.0" class="t" fill="#c9d1d9">payments    DIVERGED  main     768391d  history diverged; see git log --left-right HEAD...origin/main</text>
-<text x="22" y="483.0" class="t" fill="#c9d1d9">0 advanced · 2 left alone on purpose · 1 needs attention</text>
+<text x="22" y="483.0" class="t" fill="#c9d1d9">0 advanced · 0 already current · 2 left alone on purpose · 1 needs attention</text>
 <text x="22" y="502.0" class="t" fill="#e3b341">$ vat lint</text>
 <text x="22" y="521.0" class="t" fill="#f85149">FAIL  workspace/gitignore-drift · brain, console, payments  3 governed repositories are not excluded by .gitignore; a workspace commit would swallow them</text>
 <text x="22" y="540.0" class="t" fill="#8b949e">      → vat lint --fix</text>
