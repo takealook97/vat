@@ -195,3 +195,49 @@ func TestAdoptableIsEmptyWhenNoRuntimeDirectoryExists(t *testing.T) {
 		t.Errorf("found something to adopt in an empty workspace: %+v", found)
 	}
 }
+
+func TestAdoptableRefusesTwoAdaptersThatWouldBecomeOneFile(t *testing.T) {
+	// Arrange: two hand-written files whose names collapse to one destination.
+	// Adopting both would have the second silently replace the first, and what
+	// it destroys is a body somebody wrote by hand.
+	root := t.TempDir()
+	writeAt(t, root, ".claude/agents/reviewer.md",
+		"---\nname: reviewer\ndescription: First.\n---\n\nFirst body.\n")
+	writeAt(t, root, ".claude/agents/nested/reviewer.md",
+		"---\nname: reviewer\ndescription: Second.\n---\n\nSecond body.\n")
+
+	// Act
+	found, err := harness.Adoptable(root)
+	if err != nil {
+		t.Fatalf("Adoptable: %v", err)
+	}
+	if _, err := harness.Adopt(root, found); err != nil {
+		t.Fatalf("Adopt: %v", err)
+	}
+
+	// Assert
+	var refused int
+	for _, adoption := range found {
+		if adoption.Refusal != "" {
+			refused++
+		}
+	}
+	if len(found) != 2 || refused != 1 {
+		t.Fatalf("expected one of the two to be refused, got %+v", found)
+	}
+	// Sorted order decides which keeps the destination, so the outcome does not
+	// depend on the order a directory happened to be walked in.
+	if found[0].Refusal != "" || found[1].Refusal == "" {
+		t.Fatalf("the refusal did not fall on the later adapter: %+v", found)
+	}
+	if !strings.Contains(found[1].Refusal, found[0].Adapter) {
+		t.Errorf("the refusal does not name what claimed the destination: %q", found[1].Refusal)
+	}
+	body, err := os.ReadFile(filepath.Join(root, ".agents", "roles", "reviewer.md"))
+	if err != nil {
+		t.Fatalf("read: %v", err)
+	}
+	if !strings.Contains(string(body), "Second body.") {
+		t.Errorf("the definition written is not the one that claimed the name:\n%s", body)
+	}
+}

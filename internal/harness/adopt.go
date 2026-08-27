@@ -50,7 +50,30 @@ func Adoptable(root string) ([]Adoption, error) {
 		return nil, err
 	}
 	sort.Slice(found, func(i, j int) bool { return found[i].Adapter < found[j].Adapter })
-	return found, nil
+	return refuseCollisions(found), nil
+}
+
+// refuseCollisions stops two adapters from being adopted into one canonical
+// file. Sorted order decides which keeps the destination, so the outcome does
+// not depend on the order a directory happened to be walked in.
+//
+// Without this the second write silently replaces the first, and what it
+// destroys is a body somebody wrote by hand — the one thing adoption exists to
+// preserve.
+func refuseCollisions(found []Adoption) []Adoption {
+	claimed := map[string]string{}
+	refused := make([]Adoption, 0, len(found))
+	for _, adoption := range found {
+		if adoption.Refusal == "" {
+			if first, taken := claimed[adoption.Canonical]; taken {
+				adoption.Refusal = adoption.Canonical + " is already claimed by " + first
+			} else {
+				claimed[adoption.Canonical] = adoption.Adapter
+			}
+		}
+		refused = append(refused, adoption)
+	}
+	return refused
 }
 
 func candidates(root string) ([]Adoption, error) {
