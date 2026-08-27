@@ -8,6 +8,16 @@ Notable changes to `vat`. The format follows
 
 ### Added
 
+- `harness/adapter-orphaned`, for a generated adapter left behind by a deleted
+  definition. Drift compares an adapter with the definition it came from and
+  cannot see the case where there is none left to compare against: delete
+  `.agents/roles/planner.md` and the Claude and Codex adapters stay, the runtime
+  keeps advertising the role, and the session that opens it is told to read a
+  file that is gone — while `vat harness check` reported that every contract
+  matched. The rule reads the generated marker rather than the directory, so an
+  agent file somebody wrote by hand is left alone. It is not fixable: the repair
+  is a deletion, and the adapter may be the only remaining copy of a definition
+  removed by accident.
 - `vat harness skills` and `vat harness skill new`, the counterparts roles have
   had since skills existed. A format vat specifies, generates, and lints four
   ways had no command that produced one, so the only way to add a skill was to
@@ -196,6 +206,10 @@ Notable changes to `vat`. The format follows
 
 ### Fixed
 
+- `.claude/agents/<name>.md` carried no "generated" marker while the Codex
+  adapter and the Claude skill adapter both did, which left the file people open
+  most often as the only generated file that never said it was generated — and
+  left it invisible to the rule above.
 - The self-contract test kept vat's own **role** adapters in step with their
   definitions and did not do the same for skills. vat has no `vat.yaml` and runs
   no lint on itself, so that test is the only thing standing where every other

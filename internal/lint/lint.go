@@ -185,6 +185,7 @@ func RuleNames() []string {
 		"harness/skill-metadata",
 		"harness/runtime-unknown",
 		"harness/definition-malformed",
+		"harness/adapter-orphaned",
 		"policy/trust-undeclared",
 		"brain/not-initialised",
 		ruleUnreferencedBrain,
@@ -478,6 +479,23 @@ func checkHarness(ws *workspace.Workspace) ([]Finding, error) {
 			Rule: "harness/adapter-drift", Severity: SeverityWarn, Subject: path,
 			Message: "runtime adapter no longer matches its skill definition in " + harness.SkillsDir,
 			Fix:     fixHarness, Fixable: true,
+		})
+	}
+
+	// Deliberately not fixable. The repair is deleting a file, and vat does not
+	// delete: the adapter may be the only remaining copy of a definition
+	// somebody removed by accident, and a tool that tidies it away turns a
+	// recoverable mistake into a silent one. The finding names the file.
+	orphans, err := harness.OrphanedAdapters(ws.Root, roles, skills)
+	if err != nil {
+		return nil, err
+	}
+	for _, path := range orphans {
+		findings = append(findings, Finding{
+			Rule: "harness/adapter-orphaned", Severity: SeverityWarn, Subject: path,
+			Message: "generated adapter for a definition that no longer exists; a session still " +
+				"loads it and it points at a missing file",
+			Fix: "restore the definition it was generated from, or delete " + path,
 		})
 	}
 	return findings, nil

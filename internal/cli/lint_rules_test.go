@@ -229,3 +229,82 @@ func TestLintCountsTheRulesItActuallyChecked(t *testing.T) {
 		t.Error("lint reported checking no rules at all")
 	}
 }
+
+// A generated adapter whose definition has been deleted keeps being loaded. The
+// runtime still advertises the role, the session still opens it, and the file it
+// points at is gone — while `vat harness check` reported that every contract
+// matched. Drift compares an adapter to its definition and cannot see the case
+// where there is no definition left to compare against.
+func TestAnAdapterLeftBehindByADeletedDefinitionIsReported(t *testing.T) {
+	// Arrange
+	h := adoptedFixture(t, "payments")
+	h.mustRun("harness", "role", "new", "planner", "--description", "Plans work.")
+	h.mustRun("harness", "skill", "new", "deploy", "--description", "Deploys one service.")
+	stale := []string{
+		filepath.Join(".claude", "agents", "planner.md"),
+		filepath.Join(".codex", "agents", "planner.toml"),
+		filepath.Join(".claude", "skills", "deploy", "SKILL.md"),
+	}
+	for _, path := range stale {
+		if _, err := os.Stat(h.path(strings.Split(path, string(filepath.Separator))...)); err != nil {
+			t.Fatalf("the adapter this test is about was never generated: %v", err)
+		}
+	}
+	if err := os.Remove(h.path(".agents", "roles", "planner.md")); err != nil {
+		t.Fatalf("remove the role: %v", err)
+	}
+	if err := os.RemoveAll(h.path(".agents", "skills", "deploy")); err != nil {
+		t.Fatalf("remove the skill: %v", err)
+	}
+
+	// Act
+	report := h.lint(t)
+
+	// Assert
+	if !report.reports("harness/adapter-orphaned") {
+		t.Fatalf("three adapters point at definitions that no longer exist and lint reported %v",
+			report.rules())
+	}
+	reported := map[string]bool{}
+	for _, finding := range report.Findings {
+		if finding.Rule == "harness/adapter-orphaned" {
+			reported[filepath.ToSlash(finding.Subject)] = true
+		}
+	}
+	for _, path := range stale {
+		if !reported[filepath.ToSlash(path)] {
+			t.Errorf("%s was left behind and is not reported; reported %v", path, reported)
+		}
+	}
+	if code, output := h.run("harness", "check"); code == ExitOK && !strings.Contains(output, "orphaned") {
+		t.Errorf("`harness check` still says the harness is healthy:\n%s", output)
+	}
+}
+
+// The rule reads the generated marker rather than the directory, so an agent
+// definition somebody wrote by hand and never asked vat to manage is left alone.
+// A rule that fires on a correct workspace is a rule that gets disabled.
+func TestAHandWrittenAgentFileIsNotMistakenForAnOrphan(t *testing.T) {
+	// Arrange
+	h := adoptedFixture(t, "payments")
+	mine := h.path(".claude", "agents", "mine.md")
+	if err := os.MkdirAll(filepath.Dir(mine), 0o755); err != nil {
+		t.Fatalf("mkdir: %v", err)
+	}
+	const handWritten = "---\nname: mine\ndescription: Written by me.\n---\n\nMy own agent.\n"
+	if err := os.WriteFile(mine, []byte(handWritten), 0o644); err != nil {
+		t.Fatalf("write: %v", err)
+	}
+
+	// Act
+	report := h.lint(t)
+
+	// Assert
+	if report.reports("harness/adapter-orphaned") {
+		t.Errorf("a hand-written agent file was reported as an orphaned adapter: %+v", report.Findings)
+	}
+	after, err := os.ReadFile(mine)
+	if err != nil || string(after) != handWritten {
+		t.Errorf("the hand-written file was disturbed: %v", err)
+	}
+}
