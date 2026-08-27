@@ -424,6 +424,12 @@ func TestAFailedAtomicWriteNamesTheFileItWasAskedToWrite(t *testing.T) {
 	if os.Geteuid() == 0 {
 		t.Skip("root writes through the permission bit this test needs")
 	}
+	// Windows does not honour the POSIX write bit on a directory, so there is
+	// no way to make one that refuses a create — the arrangement this test
+	// needs cannot be built there.
+	if runtime.GOOS == "windows" {
+		t.Skip("a directory's write permission is not enforced on windows")
+	}
 	dir := t.TempDir()
 	locked := filepath.Join(dir, "locked")
 	if err := os.MkdirAll(locked, 0o555); err != nil {

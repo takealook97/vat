@@ -218,7 +218,7 @@ func lockManifest(root string) (func(), error) {
 			_ = file.Close()
 			return func() { _ = os.Remove(path) }, nil
 		}
-		if !errors.Is(err, fs.ErrExist) {
+		if !IsLockContention(err, path) {
 			return nil, err
 		}
 		// A lock is held for one read and one write. One older than lockStale
@@ -239,6 +239,29 @@ func lockManifest(root string) (func(), error) {
 		}
 		time.Sleep(lockPoll)
 	}
+}
+
+// IsLockContention reports whether a failure to create the lock file means
+// somebody else holds it, rather than that something is wrong.
+//
+// POSIX answers "already exists". Windows answers "access denied" whenever the
+// name is in delete-pending state — the instant between one holder releasing
+// the lock and the next acquiring it — so an ordinary race between two vat
+// commands surfaced as "Access is denied", which names nothing a person can act
+// on and stopped the write.
+//
+// Deciding by whether the lock is actually there gives the same answer on every
+// platform, and keeps a real permission problem a real error: with no lock file
+// present, a refusal to create one is not contention.
+func IsLockContention(err error, path string) bool {
+	if errors.Is(err, fs.ErrExist) {
+		return true
+	}
+	if !errors.Is(err, fs.ErrPermission) {
+		return false
+	}
+	_, statErr := os.Stat(path)
+	return statErr == nil
 }
 
 // lockWait is how long a command waits for another to finish writing the

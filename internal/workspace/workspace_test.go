@@ -1,7 +1,9 @@
 package workspace_test
 
 import (
+	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"strings"
@@ -227,5 +229,47 @@ func TestALockSomebodyIsHoldingIsWaitedOnAndThenReported(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), "another vat command") {
 		t.Errorf("the refusal does not say what is in the way: %v", err)
+	}
+}
+
+// Windows reports a name in "delete pending" state — the instant between one
+// holder releasing the lock and the next acquiring it — as a permission error
+// rather than as "already exists". Treating only fs.ErrExist as contention
+// turned an ordinary race between two vat commands into "Access is denied",
+// which names nothing a person can act on and stopped the write entirely.
+//
+// The rule is decided by whether the lock is there, so it is the same answer on
+// every platform rather than a branch nobody can test from the other one.
+func TestContentionIsDecidedByTheLockBeingThereNotByTheErrno(t *testing.T) {
+	// Arrange
+	dir := t.TempDir()
+	present := filepath.Join(dir, "held.lock")
+	if err := os.WriteFile(present, nil, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	absent := filepath.Join(dir, "gone.lock")
+
+	cases := []struct {
+		name string
+		err  error
+		path string
+		want bool
+	}{
+		{"exists, which is what POSIX reports", fs.ErrExist, present, true},
+		{"permission denied while the lock is there", fs.ErrPermission, present, true},
+		{"permission denied and no lock: a real problem", fs.ErrPermission, absent, false},
+		{"any other failure", errors.New("disk on fire"), present, false},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			// Act
+			got := workspace.IsLockContention(tc.err, tc.path)
+
+			// Assert
+			if got != tc.want {
+				t.Errorf("IsLockContention(%v) = %v, want %v", tc.err, got, tc.want)
+			}
+		})
 	}
 }

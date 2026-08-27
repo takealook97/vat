@@ -178,7 +178,11 @@ func TestAMalformedDefinitionIsReportedWithoutRepeatingItsPath(t *testing.T) {
 	if strings.Contains(entry.Problem, entry.Path) {
 		t.Errorf("the problem repeats the path it is printed beside: %q", entry.Problem)
 	}
-	if !strings.Contains(entry.Problem, "is a directory") {
+	// The operating system supplies the cause and words it differently: POSIX
+	// says "is a directory", Windows says "Incorrect function." Asserting the
+	// POSIX phrase made this a test of the platform. What has to hold
+	// everywhere is that a cause is carried at all.
+	if strings.TrimSpace(entry.Problem) == "" {
 		t.Errorf("the problem does not say what went wrong: %q", entry.Problem)
 	}
 }

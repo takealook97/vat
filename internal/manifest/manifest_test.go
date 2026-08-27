@@ -363,7 +363,16 @@ func TestReadingAnUnreadableManifestSaysThePathOnce(t *testing.T) {
 	if strings.Count(err.Error(), path) > 1 {
 		t.Errorf("the path is reported more than once: %v", err)
 	}
-	if !strings.Contains(err.Error(), "is a directory") {
+	// The operating system supplies the cause and words it differently: POSIX
+	// says "is a directory", Windows says "Incorrect function." Asserting the
+	// POSIX phrase made this a test of the platform. What has to hold
+	// everywhere is that the cause is carried through rather than dropped for
+	// the path alone, which is the failure this test was written for.
+	cause := err.Error()
+	if at := strings.LastIndex(cause, ": "); at >= 0 {
+		cause = cause[at+2:]
+	}
+	if strings.TrimSpace(cause) == "" || strings.Contains(cause, path) {
 		t.Errorf("the error does not say what went wrong: %v", err)
 	}
 }

@@ -359,6 +359,12 @@ Notable changes to `vat`. The format follows
   shows, and nothing checked that — in the one asset a reader takes as evidence
   the tool does what the page claims. A contract test now holds it to naming
   every file `vat init` writes unconditionally, the seeded procedures included.
+- Contention on the manifest lock is decided by whether the lock file is there,
+  not by the errno. Windows reports a name in delete-pending state — the instant
+  between one holder releasing and the next acquiring — as a permission error
+  rather than as "already exists", so an ordinary race between two vat commands
+  surfaced as `Access is denied` and stopped the write. A real permission
+  problem, where no lock file exists, stays a real error.
 - `vat lint` and `vat harness adopt` align every message to the widest subject
   in the report. A single status line pads to a fixed width because it sees one
   line at a time, so any finding whose rule and subject ran past it pushed its

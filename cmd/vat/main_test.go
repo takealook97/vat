@@ -5,6 +5,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -92,6 +93,12 @@ func TestTheExitCodeSaysWhichKindOfFailureItWas(t *testing.T) {
 // -9, which is how a half-fetched repository gets left behind.
 func TestAnInterruptStopsTheRunPromptly(t *testing.T) {
 	// Arrange
+	// Windows has no signal delivery: os.Interrupt cannot be sent to another
+	// process at all, so there is nothing here to assert rather than a
+	// behaviour that differs. The handler it exercises is POSIX-only too.
+	if runtime.GOOS == "windows" {
+		t.Skip("sending os.Interrupt to another process is not supported on windows")
+	}
 	binary := build(t)
 	workspace := t.TempDir()
 	initialise := exec.Command(binary, "init", "--name", "solo")
