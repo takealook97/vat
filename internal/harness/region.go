@@ -11,6 +11,8 @@ package harness
 
 import (
 	"strings"
+
+	"github.com/takealook97/vat/internal/fsx"
 )
 
 // Region markers delimit the part of a file vat owns. Everything outside them
@@ -67,12 +69,5 @@ func RegionMatches(content, region string) bool {
 	// back, and the finding returned on the next run for as long as anybody kept
 	// looking. This repository pins its own tree in .gitattributes; a user's
 	// workspace has no such file unless they write one.
-	return NormaliseNewlines(found) == NormaliseNewlines(strings.TrimSpace(region))
-}
-
-// NormaliseNewlines collapses CRLF so a comparison is about content rather than
-// about the reader's git configuration. Exported because every check that asks
-// whether generated content has drifted has to ask the same question.
-func NormaliseNewlines(text string) string {
-	return strings.ReplaceAll(text, "\r\n", "\n")
+	return fsx.NormaliseNewlines(found) == fsx.NormaliseNewlines(strings.TrimSpace(region))
 }

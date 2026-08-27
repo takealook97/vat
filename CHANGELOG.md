@@ -445,7 +445,11 @@ Notable changes to `vat`. The format follows
   into a CRLF document and left a file holding both. This repository pins its
   own tree in `.gitattributes` and its self-contract test already normalised for
   exactly this reason. A user's workspace has no such file, and the product did
-  not.
+  not. The knowledge layer's projections and the `.gitignore` managed region had
+  the same comparison and the same outcome: `vat brain check` permanently red,
+  `vat brain build` rewriting both files every run, and every command that
+  touches the manifest reporting ".gitignore updated" on a file nobody had
+  changed.
 - A file saved with a UTF-8 byte order mark is read. The mark sits in front of
   the opening delimiter, so the header stopped being one — and nothing errored:
   the whole file became body, every declared field was lost, and a role that

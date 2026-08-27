@@ -130,7 +130,7 @@ func applyRegion(path, region, preamble string) (bool, error) {
 	// generated file comes back with CRLF, and an exact match had each run
 	// rewrite all of them — splicing an LF region into a CRLF document and
 	// leaving a file with both.
-	if harness.NormaliseNewlines(next) == harness.NormaliseNewlines(string(current)) {
+	if fsx.NormaliseNewlines(next) == fsx.NormaliseNewlines(string(current)) {
 		return false, nil
 	}
 	if err := fsx.WriteFileAtomic(path, []byte(next), fsx.DefaultFileMode); err != nil {

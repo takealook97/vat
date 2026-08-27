@@ -1,7 +1,6 @@
 package workspace
 
 import (
-	"fmt"
 	"sort"
 	"strings"
 
@@ -91,11 +90,14 @@ func (w *Workspace) SyncGitignore(m manifest.Manifest) (bool, error) {
 		return false, err
 	}
 	next := ApplyGitignoreRegion(string(current), RenderGitignoreRegion(m))
-	if next == string(current) {
+	// Compared on content: under the default core.autocrlf on Windows this file
+	// comes back with CRLF, and an exact match had every command that touches
+	// the manifest rewrite it and report ".gitignore updated".
+	if fsx.NormaliseNewlines(next) == fsx.NormaliseNewlines(string(current)) {
 		return false, nil
 	}
 	if err := fsx.WriteFileAtomic(path, []byte(next), fsx.DefaultFileMode); err != nil {
-		return false, fmt.Errorf("update %s: %w", path, err)
+		return false, err
 	}
 	return true, nil
 }

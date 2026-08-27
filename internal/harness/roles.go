@@ -502,7 +502,7 @@ func WriteAdapters(root string, roles []Role) ([]string, error) {
 			// Compared on content: under the default core.autocrlf on Windows a
 			// committed adapter comes back with CRLF, and an exact match had
 			// every run rewrite every adapter and report it as written.
-			if NormaliseNewlines(string(current)) == NormaliseNewlines(adapter.Content) {
+			if fsx.NormaliseNewlines(string(current)) == fsx.NormaliseNewlines(adapter.Content) {
 				continue
 			}
 			if err := fsx.WriteFileAtomic(path, []byte(adapter.Content), fsx.DefaultFileMode); err != nil {
@@ -541,7 +541,7 @@ func AdapterDrift(root string, roles []Role) ([]string, error) {
 			// back with CRLF, and comparing bytes reported every one of them as
 			// drifted on every run, while `--fix` rewrote them for git to
 			// convert straight back.
-			if !exists || NormaliseNewlines(string(current)) != NormaliseNewlines(adapter.Content) {
+			if !exists || fsx.NormaliseNewlines(string(current)) != fsx.NormaliseNewlines(adapter.Content) {
 				drifted = append(drifted, adapter.Path)
 			}
 		}

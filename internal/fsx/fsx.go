@@ -154,3 +154,14 @@ func PortableName(name string) error {
 	}
 	return nil
 }
+
+// NormaliseNewlines collapses CRLF so a comparison is about content rather than
+// about the reader's git configuration.
+//
+// Here rather than beside any one check because four packages ask whether
+// generated content has drifted — harness, lint, brain, and the tests that hold
+// this repository to its own output — and internal/brain deliberately imports
+// neither manifest nor gitx, so a shared answer has to live below all of them.
+func NormaliseNewlines(text string) string {
+	return strings.ReplaceAll(text, "\r\n", "\n")
+}

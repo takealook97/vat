@@ -684,3 +684,50 @@ func TestAnUnparseableSchemaIsReportedRatherThanReadAsAncient(t *testing.T) {
 		}
 	}
 }
+
+// The same failure the harness had: under git's default on Windows a committed
+// projection comes back with CRLF, so a byte comparison reported CURRENT.md and
+// graph.json as drifted on every run, and every build rewrote both.
+func TestALineEndingIsNotProjectionDrift(t *testing.T) {
+	// Arrange
+	root := t.TempDir()
+	if _, err := brain.Init(root, reference); err != nil {
+		t.Fatalf("Init: %v", err)
+	}
+	store, err := brain.Load(root)
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	if _, err := brain.Build(store, reference); err != nil {
+		t.Fatalf("Build: %v", err)
+	}
+	for _, name := range brain.Generated() {
+		path := filepath.Join(root, name)
+		content, err := os.ReadFile(path)
+		if err != nil {
+			t.Fatalf("read %s: %v", name, err)
+		}
+		crlf := strings.ReplaceAll(string(content), "\n", "\r\n")
+		if err := os.WriteFile(path, []byte(crlf), 0o644); err != nil {
+			t.Fatalf("write %s: %v", name, err)
+		}
+	}
+
+	// Act
+	drifted, err := brain.Drift(store, reference)
+	if err != nil {
+		t.Fatalf("Drift: %v", err)
+	}
+	rebuilt, err := brain.Build(store, reference)
+	if err != nil {
+		t.Fatalf("Build: %v", err)
+	}
+
+	// Assert
+	if len(drifted) != 0 {
+		t.Errorf("projections reported as drifted for their line endings: %v", drifted)
+	}
+	if len(rebuilt.Changed) != 0 {
+		t.Errorf("projections rewritten for their line endings: %v", rebuilt.Changed)
+	}
+}

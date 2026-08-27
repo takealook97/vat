@@ -256,3 +256,45 @@ func TestTheManagedRegionStillExplainsWhyItExcludesTheRepositories(t *testing.T)
 		t.Errorf("the governed repository is not excluded:\n%s", region)
 	}
 }
+
+// Under git's default on Windows this file comes back with CRLF, and an exact
+// comparison had every command that touches the manifest rewrite it and report
+// ".gitignore updated" — on a file nobody had changed.
+func TestSyncingTheGitignoreIsIdempotentAcrossLineEndings(t *testing.T) {
+	// Arrange
+	root := t.TempDir()
+	m := manifest.Default("acme")
+	m = manifest.WithRepo(m, manifest.Repo{
+		Name: "payments", Origin: "https://example.invalid/acme/payments.git",
+		Role: manifest.RoleProduct,
+	})
+	if err := manifest.Save(filepath.Join(root, manifest.FileName), m); err != nil {
+		t.Fatalf("seed: %v", err)
+	}
+	ws, err := workspace.OpenAt(root)
+	if err != nil {
+		t.Fatalf("OpenAt: %v", err)
+	}
+	if _, err := ws.SyncGitignore(m); err != nil {
+		t.Fatalf("SyncGitignore: %v", err)
+	}
+	path := ws.GitignorePath()
+	content, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("read: %v", err)
+	}
+	if err := os.WriteFile(path, []byte(strings.ReplaceAll(string(content), "\n", "\r\n")), 0o644); err != nil {
+		t.Fatalf("write: %v", err)
+	}
+
+	// Act
+	changed, err := ws.SyncGitignore(m)
+
+	// Assert
+	if err != nil {
+		t.Fatalf("SyncGitignore: %v", err)
+	}
+	if changed {
+		t.Error("the managed region was rewritten for its line endings")
+	}
+}

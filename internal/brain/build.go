@@ -50,7 +50,10 @@ func Build(store *Store, now time.Time) (BuildResult, error) {
 		if err != nil {
 			return result, err
 		}
-		if string(current) == string(renders[name]) {
+		// Compared on content: under the default core.autocrlf on Windows a
+		// committed projection comes back with CRLF, and an exact match had
+		// every build rewrite both files and report them as regenerated.
+		if fsx.NormaliseNewlines(string(current)) == fsx.NormaliseNewlines(string(renders[name])) {
 			continue
 		}
 		if err := fsx.WriteFileAtomic(path, renders[name], fsx.DefaultFileMode); err != nil {
@@ -78,7 +81,10 @@ func Drift(store *Store, now time.Time) ([]string, error) {
 		if err != nil {
 			return nil, err
 		}
-		if !exists || string(current) != string(expected[name]) {
+		// The same question the harness asks of its own generated files: a line
+		// ending is not drift, and reporting it as one gave a Windows checkout
+		// a permanently red `vat brain check` on files nobody had touched.
+		if !exists || fsx.NormaliseNewlines(string(current)) != fsx.NormaliseNewlines(string(expected[name])) {
 			drifted = append(drifted, name)
 		}
 	}
