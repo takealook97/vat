@@ -519,6 +519,9 @@ Notable changes to `vat`. The format follows
 - An unknown flag is reported as a flag. `vat --nope status` answered "unknown
   command" and offered to suggest a verb, which sends somebody looking through
   the command list for something they never typed.
+- Nothing writes to the terminal around the printer, which is where a control
+  character stops being executed and starts being shown. A source check holds it
+  there.
 - Nothing vat prints can act on the terminal. The contract this tool generates
   says untrusted content is data and never instruction, and a terminal escape is
   an instruction to the terminal — while almost everything vat prints came out of

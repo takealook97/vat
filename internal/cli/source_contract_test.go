@@ -242,3 +242,28 @@ func TestNoFilesystemErrorIsWrappedWithThePathItAlreadyCarries(t *testing.T) {
 		}
 	})
 }
+
+// Everything vat prints passes through the printer, which renders a control
+// character rather than executing it. A write straight to the process's own
+// streams goes round that, and the values are file content somebody else may
+// have written.
+func TestNothingWritesToTheTerminalAroundThePrinter(t *testing.T) {
+	// Arrange
+	direct := regexp.MustCompile(`os\.(Stdout|Stderr)|fmt\.Print(f|ln)?\(`)
+
+	// Act & Assert
+	productionGoFiles(t, func(path, source string) {
+		// The printer is where the rendering happens, and the entry point wires
+		// the real streams into it.
+		if strings.Contains(path, filepath.Join("internal", "ui")) ||
+			strings.Contains(path, filepath.Join("cmd", "vat")) {
+			return
+		}
+		for number, line := range strings.Split(source, "\n") {
+			if direct.MatchString(line) {
+				t.Errorf("%s:%d: %s\n  everything printed goes through internal/ui, which renders a control character rather than executing it",
+					path, number+1, strings.TrimSpace(line))
+			}
+		}
+	})
+}
