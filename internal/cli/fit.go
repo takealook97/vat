@@ -75,6 +75,12 @@ func runFit(ctx context.Context, env *Env, args []string) error {
 		// A workspace that already defines agent roles is one where agents are
 		// in the loop, whatever the caller typed. Advising against a layer that
 		// is visibly already in use reads as the tool not looking.
+		//
+		// Roles and not skills: `vat init` seeds two procedures into every
+		// workspace it creates, so their presence is evidence that vat ran, not
+		// that anybody is running agents. Counting them would make this signal
+		// true everywhere and therefore worth nothing. A role is written by
+		// hand, with `vat harness role new`.
 		if signals.AgentSessions == 0 && definesRoles(ws) {
 			signals.AgentSessions = 1
 		}

@@ -567,6 +567,19 @@ overwrite a definition that already exists. Delete a definition later and
 `vat lint` reports the adapter it left behind — still loaded by the runtime,
 still pointing at a file that is gone.
 
+**A state it cannot resolve is a state it names.** A merge that stopped on a
+conflict, a rebase abandoned halfway, a cherry-pick nobody finished — each one
+leaves an ordinary dirty tree, and "uncommitted changes" invites committing your
+way out of it. What that commits is a file full of conflict markers, in the one
+repository of twelve you had not looked inside.
+
+```console
+$ vat status
+REPOSITORY  BRANCH  REV      TREE   VS ORIGIN  NOTE
+console     main    8e1e4e8  dirty  =          unfinished merge
+payments    main    2446495  clean  +2
+```
+
 **Contracts stay in step with reality.** Each `AGENTS.md` carries one generated
 region rendered from `vat.yaml`; everything you write above it is untouched.
 
