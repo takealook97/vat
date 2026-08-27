@@ -9,6 +9,10 @@ import (
 	"github.com/takealook97/vat/internal/harness"
 )
 
+// repositoryRoot is where these tests read vat's own committed contracts from.
+// The package is one directory below the repository root.
+const repositoryRoot = "../.."
+
 // vat generates the agent contracts it asks every other workspace to generate,
 // and until this test nothing checked that its own were in step. The gap was
 // not theoretical: `.codex/agents/*.toml` shipped `model = "opus"` — a name
@@ -20,7 +24,6 @@ import (
 // renders what the adapters should be, and compares them to what is committed.
 func TestVatsOwnAdaptersMatchItsOwnRoleDefinitions(t *testing.T) {
 	// Arrange
-	const repositoryRoot = "../.."
 	roles, _, err := harness.LoadRoles(repositoryRoot)
 	if err != nil {
 		t.Fatalf("LoadRoles: %v", err)
@@ -55,7 +58,6 @@ func TestVatsOwnAdaptersMatchItsOwnRoleDefinitions(t *testing.T) {
 // committed, not of a fixture, because those are what a session loads.
 func TestNoCommittedAdapterNamesAnotherRuntimesModel(t *testing.T) {
 	// Arrange
-	const repositoryRoot = "../.."
 	roles, _, err := harness.LoadRoles(repositoryRoot)
 	if err != nil {
 		t.Fatalf("LoadRoles: %v", err)
@@ -101,4 +103,60 @@ func adapterPathFor(t *testing.T, role harness.Role, runtime string) string {
 	}
 	t.Fatalf("role %q renders no %s adapter", role.Name, runtime)
 	return ""
+}
+
+// The same seam as the role test above, for skills. It is kept separate rather
+// than folded into one loop because the two kinds do not render alike: a skill
+// has a Claude adapter and no Codex one, so a single loop would assert the
+// wrong shape for whichever kind it was not written for.
+func TestVatsOwnSkillAdaptersMatchItsOwnSkillDefinitions(t *testing.T) {
+	// Arrange
+	skills := ownSkills(t)
+
+	// Act & Assert
+	for _, skill := range skills {
+		for _, adapter := range harness.RenderSkillAdapters(skill) {
+			path := filepath.Join(repositoryRoot, adapter.Path)
+			committed, err := os.ReadFile(path)
+			if err != nil {
+				t.Errorf("skill %q has no %s adapter at %s: %v", skill.Name, adapter.Runtime, adapter.Path, err)
+				continue
+			}
+			if normaliseNewlines(string(committed)) != adapter.Content {
+				t.Errorf("%s is out of step with %s/%s/%s; re-render it\n--- committed ---\n%s\n--- expected ---\n%s",
+					adapter.Path, harness.SkillsDir, skill.Dir, harness.SkillFile, committed, adapter.Content)
+			}
+		}
+	}
+}
+
+// In a governed workspace `harness/skill-metadata` reports a skill no runtime
+// can advertise and `harness/runtime-unknown` reports one that generates
+// nothing. vat has no vat.yaml and runs no lint on itself, so the checks that
+// cover every other repository cover this one only here.
+func TestVatsOwnSkillsCanBeAdvertised(t *testing.T) {
+	// Arrange
+	skills := ownSkills(t)
+
+	// Act & Assert
+	for _, skill := range skills {
+		if strings.TrimSpace(skill.Description) == "" {
+			t.Errorf("skill %q has no description, so no runtime can advertise it", skill.Name)
+		}
+		if len(harness.RenderSkillAdapters(skill)) == 0 {
+			t.Errorf("skill %q renders no adapter, so it sits on disk generating nothing", skill.Name)
+		}
+	}
+}
+
+func ownSkills(t *testing.T) []harness.Skill {
+	t.Helper()
+	skills, _, err := harness.LoadSkills(repositoryRoot)
+	if err != nil {
+		t.Fatalf("LoadSkills: %v", err)
+	}
+	if len(skills) == 0 {
+		t.Fatal("no skills found; this repository defines its own and the path must be wrong")
+	}
+	return skills
 }
