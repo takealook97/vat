@@ -70,6 +70,7 @@ func harnessRenderCommand() *Command {
 			for _, file := range changed {
 				env.Printer.Status(ui.LevelOK, file, "written")
 			}
+			reportUncommittedContracts(env, ws)
 			env.Printer.Hint("\n%s updated.", pluralise(len(changed), "file", "files"))
 			return nil
 		},

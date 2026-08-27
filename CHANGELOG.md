@@ -388,12 +388,13 @@ Notable changes to `vat`. The format follows
   directory is empty, every build reads it as a missing dependency, and until now
   `vat sync` reported `CURRENT` and `vat status` reported clean while the
   canonical checks failed for a reason nothing in the tool named.
-- The commands that render a repository's `AGENTS.md` say to commit it, once,
+- Every command that renders a repository's `AGENTS.md` says to commit it, once,
   and stop once it is. The per-repository contract is the working permit for a
   session opened inside that repository alone, so it only works once it travels
   with the clone — and nothing anywhere said so, in the output or in the
   reference, while `harness/repo-missing` and `changeset verify` both depended
-  on it.
+  on it. `vat lint --fix` is the command the tool itself advises for that
+  finding, so it is the most travelled path to a rendered contract.
 - `vat changeset verify` names the files that make a working tree dirty instead
   of only announcing that one is. The answer on a fresh workspace is the
   `AGENTS.md` vat rendered, and the refusal said nothing that would let anyone

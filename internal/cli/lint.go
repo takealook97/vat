@@ -79,6 +79,10 @@ func runLint(ctx context.Context, env *Env, args []string) error {
 		if ws, err = env.Workspace(); err != nil {
 			return err
 		}
+		// This is the command the tool advises for harness/repo-missing, so it
+		// is the most travelled path to a rendered contract — and a contract
+		// nobody commits is one the next clone does not have.
+		reportUncommittedContracts(env, ws)
 	}
 
 	selectors := splitList(*only)

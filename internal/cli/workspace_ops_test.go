@@ -1281,3 +1281,33 @@ func TestTheCommitHintRespectsARepositoryThatIgnoresTheContract(t *testing.T) {
 		t.Errorf("the hint fired for a contract the repository ignores:\n%s", output)
 	}
 }
+
+// Every command that renders a repository contract has to say it belongs in
+// that repository's history, not only the ones that enrol. `vat lint --fix` is
+// the command the tool itself advises for harness/repo-missing, so it is the
+// most travelled path to a rendered contract — and it was the silent one.
+func TestEveryCommandThatRendersAContractSaysToCommitIt(t *testing.T) {
+	for _, command := range [][]string{
+		{"lint", "--fix"},
+		{"harness", "render"},
+	} {
+		t.Run(strings.Join(command, " "), func(t *testing.T) {
+			// Arrange
+			h := newFixture(t, "payments")
+			h.mustRun("init", "--name", "acme")
+			h.mustRun("repo", "add", "payments", "--origin", h.upstream("payments"))
+			if err := os.Remove(h.path("payments", "AGENTS.md")); err != nil {
+				t.Fatal(err)
+			}
+
+			// Act
+			_, output := h.run(command...)
+
+			// Assert
+			if !strings.Contains(output, "Commit payments/AGENTS.md") {
+				t.Errorf("`vat %s` rendered a contract and said nothing about committing it:\n%s",
+					strings.Join(command, " "), output)
+			}
+		})
+	}
+}
