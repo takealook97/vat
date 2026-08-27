@@ -122,19 +122,31 @@ func runInit(ctx context.Context, env *Env, args []string) error {
 		printer.Status(ui.LevelInfo, repo.Name, fmt.Sprintf("%s · %s", repo.Role, gitx.Redact(repo.Origin)))
 	}
 
-	if len(rendered) > 0 {
+	switch {
+	case len(built.Repos) > 0 && len(rendered) > 0:
 		// Without this, the very first `vat status` a new user runs shows every
 		// repository dirty and nothing explains why.
 		printer.Hint("\nThe generated contracts above are uncommitted, so `vat status` will")
 		printer.Hint("show those repositories as dirty until you commit them.")
+	case len(rendered) > 0:
+		// Saying the same thing here would name repositories that do not exist,
+		// which is the first screen somebody adopting the harness alone sees.
+		printer.Hint("\nThe files above are uncommitted. Commit them and the contract travels")
+		printer.Hint("with the code rather than living on one machine.")
 	}
 
 	printer.Heading("Next")
-	printer.Println("  vat status        see where every repository stands")
+	if len(built.Repos) > 0 {
+		printer.Println("  vat status        see where every repository stands")
+	}
 	printer.Println("  vat doctor        judge the environment")
 	printer.Println("  vat fit           decide which layers are worth adopting yet")
 	if len(built.Repos) == 0 {
-		printer.Println("  vat repo add <name> --origin <url>")
+		// A workspace with nothing enrolled is usually somebody here for the
+		// harness alone, and the step they need is the one that picks up the
+		// agent files they have already written.
+		printer.Println("  vat harness adopt bring agent files you already wrote under the contract")
+		printer.Println("  vat repo add <name> --origin <url>   enrol a repository")
 	}
 	return nil
 }

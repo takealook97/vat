@@ -59,6 +59,11 @@ silently skip it forever.
 Roles are guessed from the name (`brain`, `credential`, `docs`, `infra`) and
 written into the manifest where they are visible and easy to correct.
 
+A workspace that enrols nothing is a supported state, not a mistake: it is what
+somebody adopting the harness for a single repository ends up with. `init` says
+so rather than warning about repositories that do not exist, and offers
+`vat harness adopt` as the next step.
+
 ---
 
 ## vat status

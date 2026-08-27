@@ -233,6 +233,11 @@ Notable changes to `vat`. The format follows
   should exist while the steps for building one sat in a skill it never named.
   A role is who is running and a skill is how a job is done; the pairs that
   overlap now point at each other.
+- `vat init` told a workspace that enrolled nothing that `vat status` would show
+  "those repositories" as dirty, and offered `vat status` as a first step when
+  there was nothing for it to report. Enrolling nothing is not a mistake — it is
+  what adopting the harness for a single repository looks like, and that is the
+  widest audience this layer has and the first screen it sees.
 - `docs/ADOPTION.md` told a reader adopting vat to commit four files by name,
   which stopped being every file `vat init` writes the moment init began seeding
   procedures. Its stage 2 also defined roles and never mentioned skills, so the

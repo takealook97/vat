@@ -654,3 +654,36 @@ func TestRegisteringARepositoryWithoutCloningStillRendersTheContract(t *testing.
 		t.Errorf("the harness is stale immediately after the command that renders it:\n%s", output)
 	}
 }
+
+// The widest audience for the harness is somebody with one repository, and this
+// is the first screen they see. Telling them their repositories will show as
+// dirty when they enrolled none reads as a bug in the first ten seconds.
+func TestInitSaysNothingAboutRepositoriesWhenNoneWereEnrolled(t *testing.T) {
+	// Arrange
+	h := newFixture(t)
+
+	// Act
+	output := h.mustRun("init", "--name", "solo")
+
+	// Assert
+	if strings.Contains(output, "those repositories as dirty") {
+		t.Errorf("init warned about repositories it did not enrol:\n%s", output)
+	}
+	if !strings.Contains(output, "harness") {
+		t.Errorf("a workspace with no repositories was offered no harness step:\n%s", output)
+	}
+}
+
+func TestInitStillWarnsAboutUncommittedContractsWhenItEnrolledSomething(t *testing.T) {
+	// Arrange: with repositories enrolled the warning is the one that stops the
+	// first `vat status` from looking broken.
+	h := newFixture(t, "payments")
+
+	// Act
+	output := h.mustRun("init", "--name", "acme", "--adopt")
+
+	// Assert
+	if !strings.Contains(output, "those repositories as dirty") {
+		t.Errorf("init stopped explaining why the first `vat status` shows dirty trees:\n%s", output)
+	}
+}
