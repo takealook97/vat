@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"strings"
@@ -840,4 +841,77 @@ func TestExecStatesTheOutcomeOnceRatherThanTwice(t *testing.T) {
 	if strings.Contains(output, "commands failed") && strings.Contains(output, "succeeded") {
 		t.Errorf("the outcome is stated twice:\n%s", output)
 	}
+}
+
+// git converts LF to CRLF on checkout under its default configuration on
+// Windows, so every file this tool generates comes back different from what it
+// wrote. Comparing bytes made the whole harness layer unusable there: a
+// permanently red `vat lint`, a `--fix` that fixed nothing because git undid it,
+// and a `vat harness render` that reported every file written on every run.
+//
+// Driven end to end rather than per comparison, because the failure was that
+// four packages each answered this question and one of them was enough to keep
+// the workspace red.
+func TestNothingIsDriftedAfterACheckoutRewritesEveryLineEnding(t *testing.T) {
+	// Arrange
+	h := adoptedFixture(t, "payments", "brain")
+	h.mustRun("brain", "init")
+	h.mustRun("brain", "build")
+	h.mustRun("harness", "role", "new", "planner", "--description", "Plans work.")
+	rewritten := rewriteEveryGeneratedFileToCRLF(t, h.root)
+	if rewritten == 0 {
+		t.Fatal("no generated file was rewritten; the layout changed and this test stopped checking anything")
+	}
+
+	// Act & Assert
+	report := h.lint(t, "--offline")
+	for _, finding := range report.Findings {
+		if strings.Contains(finding.Rule, "drift") {
+			t.Errorf("%s reported after a checkout rewrote line endings: %s", finding.Rule, finding.Subject)
+		}
+	}
+	if output := h.mustRun("harness", "render"); !strings.Contains(output, "already current") {
+		t.Errorf("rendering rewrote files for their line endings:\n%s", output)
+	}
+	if output := h.mustRun("brain", "build"); !strings.Contains(output, "already current") {
+		t.Errorf("building rewrote projections for their line endings:\n%s", output)
+	}
+}
+
+// rewriteEveryGeneratedFileToCRLF does to the workspace what a checkout does,
+// and returns how many files it touched.
+func rewriteEveryGeneratedFileToCRLF(t *testing.T, root string) int {
+	t.Helper()
+	touched := 0
+	err := filepath.WalkDir(root, func(path string, entry fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if entry.IsDir() {
+			if entry.Name() == ".git" {
+				return filepath.SkipDir
+			}
+			return nil
+		}
+		switch filepath.Ext(path) {
+		case ".md", ".json", ".toml", ".yaml":
+		default:
+			if entry.Name() != ".gitignore" && entry.Name() != ".brain" {
+				return nil
+			}
+		}
+		content, err := os.ReadFile(path)
+		if err != nil {
+			return err
+		}
+		if !bytes.Contains(content, []byte("\n")) || bytes.Contains(content, []byte("\r\n")) {
+			return nil
+		}
+		touched++
+		return os.WriteFile(path, bytes.ReplaceAll(content, []byte("\n"), []byte("\r\n")), 0o644)
+	})
+	if err != nil {
+		t.Fatalf("walk the workspace: %v", err)
+	}
+	return touched
 }

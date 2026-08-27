@@ -436,6 +436,9 @@ Notable changes to `vat`. The format follows
   none. That text is committed into the repository of everybody adopting the
   harness on its own, where it reads as a defect in the generated file rather
   than as the state it describes.
+- A workspace whose files a checkout rewrote is driven end to end, because four
+  packages each answered the drift question and one of them getting it wrong was
+  enough to keep the workspace permanently red.
 - Drift is decided on content, not on line endings. Under git's default
   `core.autocrlf` on Windows every generated file comes back with CRLF, so a
   byte comparison reported the workspace contract, every repository contract,
