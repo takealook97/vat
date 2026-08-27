@@ -507,9 +507,12 @@ all — no canonical checks, a dirty working tree, a clone that is not there, a
 participant no longer in the manifest — and those are counted apart from a check
 that ran and failed. Both stop the changeset, and they are not the same fact:
 one is evidence that something broke, the other is the absence of any evidence.
-The specific reason is printed beside each repository. It refuses on a dirty working tree, because
-results recorded against a revision that does not describe what was tested are
-worse than none, and refuses on a changeset that is already closed.
+The specific reason is printed beside each repository. It refuses on a dirty
+working tree, because results recorded against a revision that does not describe
+what was tested are worse than none, and refuses on a changeset that is already
+closed. A dirty tree is named, not merely announced: the refusal lists what git
+reports as changed, bounded, because otherwise the answer is usually the
+`AGENTS.md` vat rendered and nothing said so.
 
 `close` requires `--acceptance`, and it must describe something end to end.
 

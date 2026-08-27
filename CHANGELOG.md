@@ -359,6 +359,10 @@ Notable changes to `vat`. The format follows
   shows, and nothing checked that — in the one asset a reader takes as evidence
   the tool does what the page claims. A contract test now holds it to naming
   every file `vat init` writes unconditionally, the seeded procedures included.
+- `vat changeset verify` names the files that make a working tree dirty instead
+  of only announcing that one is. The answer on a fresh workspace is the
+  `AGENTS.md` vat rendered, and the refusal said nothing that would let anyone
+  reach that conclusion.
 - `vat status` separates `untracked` from `dirty`, and `vat doctor` no longer
   warns about untracked files. Three commands read the same working tree, so on
   a freshly enrolled repository they gave three answers: sync said `CURRENT`,

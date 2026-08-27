@@ -625,3 +625,58 @@ func TestRemovingCredentialsKeepsAnSSHLoginName(t *testing.T) {
 		}
 	}
 }
+
+// Run trims its output, so the first line of an unstaged change arrives without
+// the leading space porcelain v1 puts there. Parsing by fixed column cut a
+// character off the first filename, and only the first — which reads as a typo
+// rather than as a parser that is wrong.
+func TestWorkingTreeChangesNamesEveryPathInFull(t *testing.T) {
+	// Arrange
+	dir := newRepo(t)
+	for name, content := range map[string]string{"README.md": "two\n", "scratch.txt": "wip\n"} {
+		if err := os.WriteFile(filepath.Join(dir, name), []byte(content), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	// Act
+	paths, remaining, err := gitx.WorkingTreeChanges(context.Background(), dir, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Assert
+	if remaining != 0 {
+		t.Errorf("remaining = %d with no limit, want 0", remaining)
+	}
+	got := strings.Join(paths, ",")
+	if got != "README.md,scratch.txt" {
+		t.Errorf("paths = %q, want \"README.md,scratch.txt\"", got)
+	}
+}
+
+// The limit is what keeps one repository holding a build directory from pushing
+// every other repository's line off the screen.
+func TestWorkingTreeChangesReportsWhatItDidNotName(t *testing.T) {
+	// Arrange
+	dir := newRepo(t)
+	for _, name := range []string{"a", "b", "c", "d", "e"} {
+		if err := os.WriteFile(filepath.Join(dir, name+".txt"), []byte("x\n"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	// Act
+	paths, remaining, err := gitx.WorkingTreeChanges(context.Background(), dir, 2)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Assert
+	if len(paths) != 2 {
+		t.Errorf("named %d paths, want 2: %v", len(paths), paths)
+	}
+	if remaining != 3 {
+		t.Errorf("remaining = %d, want 3", remaining)
+	}
+}

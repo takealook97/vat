@@ -3,6 +3,7 @@ package cli
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/takealook97/vat/internal/changeset"
@@ -96,7 +97,7 @@ func runChangesetVerify(ctx context.Context, env *Env, args []string) error {
 			// refusing, because the record looked verified either way.
 			env.Printer.Status(ui.LevelFail, participant.Name,
 				"working tree is dirty; results would not describe "+shortRev(revision)+
-					". Commit or stash, then verify")
+					". Commit or stash, then verify: "+dirtyPaths(ctx, dir))
 			unverifiable++
 			updated := participant
 			updated.Revision = ""
@@ -197,4 +198,23 @@ func verifySummary(failures, unverifiable int) string {
 			pluralise(unverifiable, "repository", "repositories"))
 	}
 	return ""
+}
+
+// dirtyPathLimit bounds the list so one repository holding a build directory
+// cannot push every other repository's line off the screen.
+const dirtyPathLimit = 6
+
+// dirtyPaths names what git reports as changed. It degrades to a phrase rather
+// than an error: the refusal above is the finding, and this only says what it
+// is about.
+func dirtyPaths(ctx context.Context, dir string) string {
+	paths, remaining, err := gitx.WorkingTreeChanges(ctx, dir, dirtyPathLimit)
+	if err != nil || len(paths) == 0 {
+		return "git could not say which files"
+	}
+	listed := strings.Join(paths, ", ")
+	if remaining > 0 {
+		return fmt.Sprintf("%s and %d more", listed, remaining)
+	}
+	return listed
 }

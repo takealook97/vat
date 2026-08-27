@@ -151,6 +151,42 @@ func HasLocalModifications(ctx context.Context, dir string) (bool, error) {
 	return out != "", nil
 }
 
+// WorkingTreeChanges returns the paths git reports as changed, tracked and
+// untracked alike, at most limit of them, plus how many were left unnamed.
+//
+// "the working tree is dirty" is one word where the finding is a list, and a
+// person facing that refusal has to go and run git themselves to learn what it
+// means.
+func WorkingTreeChanges(ctx context.Context, dir string, limit int) (paths []string, remaining int, err error) {
+	out, err := Run(ctx, dir, "status", "--porcelain")
+	if err != nil {
+		return nil, 0, err
+	}
+	for _, line := range strings.Split(out, "\n") {
+		// Porcelain v1 is two status columns and then the path, but Run trims
+		// its output, so the first line of an unstaged change arrives without
+		// its leading space and fixed columns cut a character off the name.
+		// Split on the first space instead: the status field never holds one.
+		trimmed := strings.TrimSpace(line)
+		_, path, ok := strings.Cut(trimmed, " ")
+		if !ok {
+			continue
+		}
+		path = strings.TrimSpace(path)
+		// A rename reads "old -> new"; the new name is the one on disk.
+		if _, to, isRename := strings.Cut(path, " -> "); isRename {
+			path = to
+		}
+		if path = strings.Trim(path, `"`); path != "" {
+			paths = append(paths, path)
+		}
+	}
+	if limit > 0 && len(paths) > limit {
+		return paths[:limit], len(paths) - limit, nil
+	}
+	return paths, 0, nil
+}
+
 // HasRef reports whether a ref such as refs/remotes/origin/main resolves.
 func HasRef(ctx context.Context, dir, ref string) bool {
 	_, err := Run(ctx, dir, "show-ref", "--verify", "--quiet", ref)

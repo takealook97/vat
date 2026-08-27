@@ -316,3 +316,53 @@ func stripLandingEvidence(t *testing.T, h *workspaceFixture, id string) {
 		t.Fatalf("write %s: %v", id, err)
 	}
 }
+
+// "working tree is dirty" is one word where the finding is a list of paths. The
+// refusal is correct — results filed against a revision the tree does not match
+// are a lie — but a person facing it has to go and run git themselves to learn
+// what it means, and the answer is often the AGENTS.md vat rendered.
+func TestVerifyNamesWhatMakesTheTreeDirty(t *testing.T) {
+	// Arrange
+	h := adoptedFixture(t, "payments")
+	addCheck(t, h, "payments", "true")
+	h.mustRun("changeset", "new", "Move cancellation to v2", "--repos", "payments")
+	if err := os.WriteFile(h.path("payments", "scratch.txt"), []byte("wip\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(h.path("payments", "README.md"), []byte("edited\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	// Act
+	_, output := h.run("changeset", "verify", "CS-0001")
+
+	// Assert
+	for _, want := range []string{"scratch.txt", "README.md"} {
+		if !strings.Contains(output, want) {
+			t.Errorf("the refusal does not name %s:\n%s", want, output)
+		}
+	}
+}
+
+// A repository with more uncommitted files than fit on a line still gets a
+// usable message rather than a paragraph, and says how many it did not name.
+func TestVerifyBoundsTheListOfDirtyPaths(t *testing.T) {
+	// Arrange
+	h := adoptedFixture(t, "payments")
+	addCheck(t, h, "payments", "true")
+	h.mustRun("changeset", "new", "Move cancellation to v2", "--repos", "payments")
+	for i := range 12 {
+		name := filepath.Join(h.path("payments"), "f"+string(rune('a'+i))+".txt")
+		if err := os.WriteFile(name, []byte("x\n"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	// Act
+	_, output := h.run("changeset", "verify", "CS-0001")
+
+	// Assert
+	if !strings.Contains(output, "more") {
+		t.Errorf("the refusal named every path instead of bounding the list:\n%s", output)
+	}
+}
