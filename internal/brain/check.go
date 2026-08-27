@@ -70,6 +70,7 @@ func RuleNames() []string {
 		"brain/claim-source",
 		"brain/claim-source-branch",
 		"brain/claim-stale",
+		"brain/date-unreadable",
 		"brain/id-duplicate",
 		"brain/id-missing",
 		"brain/link-broken",
@@ -442,7 +443,26 @@ func checkReviewQueue(store *Store, policy CheckPolicy, now time.Time) []Finding
 			continue
 		}
 		age, ok := record.AgeDays(now)
-		if !ok || age <= policy.ReviewSLADays {
+		if !ok {
+			// Both staleness rules ask the record how old it is and skip it
+			// when it cannot say, so an unreadable date exempted a record from
+			// brain/claim-stale and brain/review-overdue at once — the two
+			// rules that stop this layer filling with statements nobody has
+			// re-checked. An honest old record was reported and the unreadable
+			// one was silent, which is the wrong way round.
+			//
+			// brain/claim-observed already reports this for a current-state
+			// claim, and says something more specific, so it keeps that case.
+			if !record.IsCurrentStateClaim() {
+				findings = append(findings, Finding{
+					Rule: "brain/date-unreadable", Severity: SeverityWarn, Path: record.Path, ID: record.ID,
+					Message: fmt.Sprintf("date %q cannot be read, so no staleness rule can judge this record; write it as YYYY-MM-DD",
+						firstNonEmpty(record.ObservedAt, record.Date)),
+				})
+			}
+			continue
+		}
+		if age <= policy.ReviewSLADays {
 			continue
 		}
 		// A review queue nobody drains becomes the very thing this layer was
@@ -492,4 +512,15 @@ func checkSchema(store *Store) []Finding {
 			"written against schema %d; this build understands %d, so anything newer is invisible to these checks",
 			declared, SchemaVersion),
 	}}
+}
+
+// firstNonEmpty returns the first value with content, so a finding quotes the
+// field the reader has to go and fix rather than an empty string.
+func firstNonEmpty(values ...string) string {
+	for _, value := range values {
+		if strings.TrimSpace(value) != "" {
+			return value
+		}
+	}
+	return ""
 }

@@ -436,6 +436,7 @@ knows to look for, so this table and `brain.RuleNames()` are compared by a test.
 | `brain/claim-source` | error | a current-state claim with no `source_ref`, or one that is not `<repo>@<revision>[:<path>]` |
 | `brain/claim-source-branch` | warn | evidence pinned to a branch, which keeps moving and takes the claim's meaning with it |
 | `brain/claim-stale` | warn | an active claim past the policy window; `vat brain sweep --apply` demotes it |
+| `brain/date-unreadable` | warn | a date no staleness rule can read, which exempts the record from all of them |
 | `brain/id-duplicate` | error | two records claiming the same identifier, so a reference resolves to either |
 | `brain/id-missing` | error | a record with no identifier; nothing can cite it and nothing can supersede it |
 | `brain/link-broken` | error | a relative link in a record that resolves to nothing |

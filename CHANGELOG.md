@@ -359,6 +359,12 @@ Notable changes to `vat`. The format follows
   shows, and nothing checked that — in the one asset a reader takes as evidence
   the tool does what the page claims. A contract test now holds it to naming
   every file `vat init` writes unconditionally, the seeded procedures included.
+- `vat brain check` reports a record whose date cannot be read
+  (`brain/date-unreadable`). `brain/claim-stale` and `brain/review-overdue` both
+  ask the record how old it is and skip it when it cannot say, so one unreadable
+  line exempted a record from both — the two rules that stop this layer filling
+  with statements nobody has re-checked. An honest old record was reported and
+  the unreadable one was silent.
 - An `opened_at` a changeset record cannot be read as a date is reported. The age
   is computed by parsing it, and a parse failure returned zero — which reads as
   "opened today" and hid the record from `changeset/open-too-long`, the rule

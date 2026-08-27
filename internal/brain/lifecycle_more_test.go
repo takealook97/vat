@@ -800,3 +800,55 @@ func TestRetireRefusesToReopenAnEndState(t *testing.T) {
 		t.Fatal("a tombstone was moved back into the lifecycle")
 	}
 }
+
+// Both staleness rules ask the record how old it is and skip it when it cannot
+// say. So a record whose date nobody can read is exempt from brain/claim-stale
+// and brain/review-overdue at once — the two rules that stop this layer filling
+// with statements no one has re-checked. An honest old record is reported; the
+// unreadable one is silent, which is the wrong way round.
+func TestARecordWhoseDateCannotBeReadIsReported(t *testing.T) {
+	// Arrange
+	root := newStore(t)
+	mustCreate(t, root, NewRecordInput{Kind: KindDecision, ID: "D-0001", Title: "Readable"})
+	unreadable := filepath.Join(root, "decisions", "D-0002-unreadable.md")
+	if err := os.WriteFile(unreadable,
+		[]byte("---\nid: D-0002\nstatus: provisional\ndate: sometime last year\n---\n\n# D-0002\n"),
+		0o644); err != nil {
+		t.Fatalf("write: %v", err)
+	}
+
+	// Act
+	findings := Check(mustLoad(t, root), defaultPolicy(), longAfter)
+
+	// Assert
+	var found *Finding
+	for i, finding := range findings {
+		if finding.Rule == "brain/date-unreadable" {
+			found = &findings[i]
+		}
+	}
+	if found == nil {
+		t.Fatalf("a record no staleness rule can judge went unreported: %+v", findings)
+	}
+	if found.ID != "D-0002" {
+		t.Errorf("the finding names %q, want D-0002", found.ID)
+	}
+}
+
+// A record whose date reads fine must not be reported, or the rule fires on
+// every workspace and gets turned off.
+func TestARecordWithAReadableDateIsNotReported(t *testing.T) {
+	// Arrange
+	root := newStore(t)
+	mustCreate(t, root, NewRecordInput{Kind: KindDecision, ID: "D-0001", Title: "Readable"})
+
+	// Act
+	findings := Check(mustLoad(t, root), defaultPolicy(), longAfter)
+
+	// Assert
+	for _, finding := range findings {
+		if finding.Rule == "brain/date-unreadable" {
+			t.Errorf("a record vat wrote itself was reported: %+v", finding)
+		}
+	}
+}
