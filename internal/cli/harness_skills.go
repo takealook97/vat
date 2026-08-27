@@ -150,40 +150,56 @@ func runHarnessSkill(ctx context.Context, env *Env, args []string) error {
 	}
 	env.Printer.Status(ui.LevelOK, ws.Rel(path), "created")
 
-	skills, malformed, err := harness.LoadSkills(ws.Root)
+	if err := renderSkillAdapters(env, ws.Root); err != nil {
+		return err
+	}
+	reportSkillGaps(env, skill)
+	env.Printer.Hint("\nWrite the procedure in %s. The adapters regenerate from it.", ws.Rel(path))
+	return nil
+}
+
+// renderSkillAdapters regenerates every skill adapter and names what it wrote.
+//
+// A definition that was already broken is not this command's fault and must not
+// fail it, but creating one beside a file nobody can read while saying nothing
+// leaves the workspace quietly short of an adapter.
+func renderSkillAdapters(env *Env, root string) error {
+	skills, malformed, err := harness.LoadSkills(root)
 	if err != nil {
 		return err
 	}
-	adapters, err := harness.WriteSkillAdapters(ws.Root, skills)
+	adapters, err := harness.WriteSkillAdapters(root, skills)
 	if err != nil {
 		return err
 	}
 	for _, adapter := range adapters {
 		env.Printer.Status(ui.LevelOK, adapter, "generated")
 	}
-	// Both of these are what `vat lint` would report on the next run. Saying
-	// them now costs one line and saves creating a skill, walking away, and
-	// discovering days later that nothing ever loaded it.
+	for _, entry := range malformed {
+		env.Printer.Status(ui.LevelWarn, entry.Path,
+			"cannot be read, so it renders no adapter: "+entry.Problem)
+	}
+	return nil
+}
+
+// reportSkillGaps says at creation what `vat lint` would say on the next run.
+//
+// One line each, and they save creating a skill, walking away, and discovering
+// days later that nothing ever loaded it.
+func reportSkillGaps(env *Env, skill harness.Skill) {
 	if len(harness.RenderSkillAdapters(skill)) == 0 {
-		env.Printer.Status(ui.LevelWarn, name, fmt.Sprintf(
+		env.Printer.Status(ui.LevelWarn, skill.Name, fmt.Sprintf(
 			"renders no adapter, so nothing will load it; a skill is generated for %s or nothing at all",
 			strings.Join(harness.SkillRuntimeNames(), ", ")))
 	}
-	// Left empty rather than filled with a placeholder. A generated description
-	// would satisfy harness/skill-metadata while telling the runtime nothing,
-	// and the rule exists to catch exactly the skill nobody can be offered.
+	// The description is left empty rather than filled with a placeholder: a
+	// generated one would satisfy harness/skill-metadata while telling the
+	// runtime nothing, and that rule exists to catch exactly the skill nobody
+	// can be offered.
 	if strings.TrimSpace(skill.Description) == "" {
-		env.Printer.Status(ui.LevelWarn, name,
+		env.Printer.Status(ui.LevelWarn, skill.Name,
 			"has no description, so no runtime can advertise it; add description: to the skill")
 	}
-	// A skill that was already broken is not this command's fault and must not
-	// fail it, but creating one beside a definition nobody can read while saying
-	// nothing leaves the workspace quietly short of an adapter.
-	for _, entry := range malformed {
-		env.Printer.Status(ui.LevelWarn, entry.Path, "cannot be read, so it renders no adapter: "+entry.Problem)
-	}
-	env.Printer.Hint("\nWrite the procedure in %s. The adapters regenerate from it.", ws.Rel(path))
-	return nil
 }
 
 func renderSkillTemplate(skill harness.Skill) ([]byte, error) {
