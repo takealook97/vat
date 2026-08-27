@@ -165,6 +165,7 @@ func selected(rule string, only []string) bool {
 func RuleNames() []string {
 	return []string{
 		"workspace/gitignore-drift",
+		"workspace/ignore-region-duplicated",
 		"workspace/not-a-repository",
 		"repo/missing",
 		"repo/not-a-repository",
@@ -202,6 +203,9 @@ func RuleNames() []string {
 }
 
 func checkGitignore(ws *workspace.Workspace) []Finding {
+	if findings := checkGitignoreRegionCount(ws); findings != nil {
+		return findings
+	}
 	missing, err := ws.GitignoreDrift(ws.Manifest)
 	if err != nil {
 		return []Finding{{
@@ -690,4 +694,30 @@ func nestedRelative(outer, inner manifest.Repo) string {
 	outerDir := path.Clean(filepath.ToSlash(outer.Dir()))
 	innerDir := path.Clean(filepath.ToSlash(inner.Dir()))
 	return strings.TrimPrefix(innerDir, outerDir+"/")
+}
+
+// checkGitignoreRegionCount reports a second managed region, and reports it
+// instead of drift: drift is about the region vat maintains, and this is about
+// the one it does not. The last matching pattern in a .gitignore decides, so
+// the abandoned copy overrides the maintained one — `vat repo remove` reports
+// success while the tree it stopped governing stays invisible to git.
+//
+// Not repairable. Which region is the real one is a judgement, and the
+// abandoned one may hold something a person put there.
+func checkGitignoreRegionCount(ws *workspace.Workspace) []Finding {
+	content, exists, err := fsx.ReadFileIfExists(ws.GitignorePath())
+	if err != nil || !exists {
+		// An unreadable .gitignore is the drift check's error to report, so
+		// that one failure is not reported twice under two rule names.
+		return nil
+	}
+	if workspace.CountGitignoreRegions(string(content)) <= 1 {
+		return nil
+	}
+	return []Finding{{
+		Rule: "workspace/ignore-region-duplicated", Severity: SeverityError, Subject: ".gitignore",
+		Message: "more than one managed region; vat maintains the first and never looks at the rest, " +
+			"and the last matching pattern in a .gitignore is the one that decides",
+		Fix: "delete the regions vat does not maintain, keeping any rules of your own inside them",
+	}}
 }

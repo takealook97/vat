@@ -359,6 +359,14 @@ Notable changes to `vat`. The format follows
   shows, and nothing checked that — in the one asset a reader takes as evidence
   the tool does what the page claims. A contract test now holds it to naming
   every file `vat init` writes unconditionally, the seeded procedures included.
+- `vat lint` reports a duplicated managed region in `.gitignore`
+  (`workspace/ignore-region-duplicated`). The same exposure `harness/region-duplicated`
+  covers for `AGENTS.md` is worse here, because the last matching pattern in a
+  `.gitignore` decides: vat maintains the first region and never looks past it,
+  so a frozen second copy overrides it. `vat repo remove` reported success,
+  dropped the directory from the region it maintains, and the abandoned copy
+  below kept that tree invisible to git — against a command whose whole purpose
+  is checking that no work is lost.
 - `vat sync --dry-run` summarises the plan rather than an outcome. A repository
   it would clone was counted as "already current", which says the opposite of
   what the row means, in the line somebody reads to decide whether to run it for

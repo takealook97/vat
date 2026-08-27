@@ -182,6 +182,7 @@ The rules, and what each one prevents:
 | Rule | Severity | Prevents |
 | --- | --- | --- |
 | `workspace/gitignore-drift` | error | a root commit swallowing an entire nested clone |
+| `workspace/ignore-region-duplicated` | error | a frozen second copy of the roster overriding the one vat maintains |
 | `workspace/not-a-repository` | warn | an unversioned manifest and harness |
 | `repo/missing` | error / warn | a repository never cloned; error when `required`, warning otherwise — `vat sync` draws the same line |
 | `repo/not-a-repository` | error | a directory shadowing a governed repository |

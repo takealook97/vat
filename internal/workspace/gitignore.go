@@ -51,6 +51,26 @@ func RenderGitignoreRegion(m manifest.Manifest) string {
 	return b.String()
 }
 
+// CountGitignoreRegions reports how many managed regions the content holds.
+// vat replaces the first and never looks past it, so a second one is a frozen
+// copy of an old roster — and because the last matching pattern in a
+// .gitignore decides, it is the copy that wins.
+func CountGitignoreRegions(content string) int {
+	count, rest := 0, content
+	for {
+		beginAt := strings.Index(rest, ignoreBegin)
+		if beginAt < 0 {
+			return count
+		}
+		endAt := strings.Index(rest[beginAt:], ignoreEnd)
+		if endAt < 0 {
+			return count
+		}
+		count++
+		rest = rest[beginAt+endAt+len(ignoreEnd):]
+	}
+}
+
 // ApplyGitignoreRegion returns existing .gitignore content with the managed
 // region replaced, appending the region when it is absent. It never mutates
 // the caller's string.

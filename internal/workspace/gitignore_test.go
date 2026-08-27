@@ -298,3 +298,34 @@ func TestSyncingTheGitignoreIsIdempotentAcrossLineEndings(t *testing.T) {
 		t.Error("the managed region was rewritten for its line endings")
 	}
 }
+
+// A second managed region is a frozen copy of an old roster that vat never
+// updates again, and in a .gitignore the *last* matching pattern decides. So
+// `vat repo remove` reports success, drops the directory from the region it
+// maintains, and the abandoned copy below it keeps the tree invisible to git.
+func TestCountGitignoreRegionsSeesTheCopyVatWillNeverUpdate(t *testing.T) {
+	// Arrange
+	one := workspace.RenderGitignoreRegion(manifest.Manifest{})
+	cases := []struct {
+		name    string
+		content string
+		want    int
+	}{
+		{"no region", "build/\n", 0},
+		{"one region", "build/\n" + one + "\n", 1},
+		{"duplicated", one + "\n" + one + "\n", 2},
+		{"duplicated with prose between", one + "\n# mine\n" + one + "\n", 2},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			// Act
+			got := workspace.CountGitignoreRegions(tc.content)
+
+			// Assert
+			if got != tc.want {
+				t.Errorf("counted %d regions, want %d", got, tc.want)
+			}
+		})
+	}
+}

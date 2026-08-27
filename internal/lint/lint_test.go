@@ -610,3 +610,39 @@ func TestRenderingIsIdempotentWhenTheFilesCameBackWithCRLF(t *testing.T) {
 		}
 	}
 }
+
+// The rule exists because the failure is silent and expensive: the workspace
+// stops governing a repository, says so, and the abandoned region below keeps
+// its tree ignored. In a .gitignore the last matching pattern decides, so the
+// copy vat will never update again is the copy that wins.
+func TestASecondManagedGitignoreRegionIsReportedRatherThanIgnored(t *testing.T) {
+	// Arrange
+	ws := fixture(t, manifest.Repo{Name: "payments", Origin: "https://example.invalid/acme/payments.git", Role: manifest.RoleProduct})
+	if _, err := lint.Fix(ws, reference); err != nil {
+		t.Fatalf("Fix returned an error: %v", err)
+	}
+	region := workspace.RenderGitignoreRegion(ws.Manifest)
+	existing, err := os.ReadFile(ws.GitignorePath())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(ws.GitignorePath(), []byte(string(existing)+"\n"+region+"\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	reloaded, err := workspace.OpenAt(ws.Root)
+	if err != nil {
+		t.Fatalf("OpenAt: %v", err)
+	}
+
+	// Act
+	report := run(t, reloaded)
+
+	// Assert
+	finding, found := rules(report)["workspace/ignore-region-duplicated"]
+	if !found {
+		t.Fatalf("a duplicated managed region went unreported: %+v", report.Findings)
+	}
+	if finding.Fixable {
+		t.Error("which region to keep is a judgement; this must not claim to be repairable")
+	}
+}
