@@ -519,6 +519,15 @@ Notable changes to `vat`. The format follows
 - An unknown flag is reported as a flag. `vat --nope status` answered "unknown
   command" and offered to suggest a verb, which sends somebody looking through
   the command list for something they never typed.
+- A value carrying a newline no longer breaks the row it sits in. Every table
+  and status line here is laid out in columns, and the values are free text
+  somebody typed — a description, an objective, a record title — so one newline
+  put the rest of the row on the next line and lost every column after it, in
+  `vat harness roles`, `vat repo list`, `vat changeset list`, and the rest.
+- A record title carrying a newline is refused. It becomes the record's H1,
+  which is one line by construction: the first line was kept as the heading and
+  the rest left sitting in the body as prose — half a title, silently, in the
+  file the knowledge layer exists to make trustworthy.
 - Tables align by what the terminal shows rather than by rune count. A wide
   character occupies two cells, so a Korean group name or a Japanese description
   shifted every column after it by one cell per character — in the output this

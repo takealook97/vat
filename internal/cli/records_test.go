@@ -711,3 +711,29 @@ func TestTheChangesetListingDoesNotMarkAnOrdinaryClosure(t *testing.T) {
 		t.Errorf("a changeset nobody forced was marked:\n%s", output)
 	}
 }
+
+// A record's title becomes its H1, which is one line by construction. A title
+// carrying a newline kept its first line as the heading and left the rest
+// sitting in the body as prose — half a title, silently, in the file the whole
+// layer exists to make trustworthy.
+func TestARecordTitleCarryingANewlineIsRefused(t *testing.T) {
+	// Arrange
+	h := adoptedFixture(t, "payments", "brain")
+	h.mustRun("brain", "init")
+
+	// Act
+	code, output := h.run("brain", "new", "decision", "--title", "first line\nsecond line")
+
+	// Assert
+	if code == ExitOK {
+		t.Fatalf("a title spanning two lines was accepted:\n%s", output)
+	}
+	if !strings.Contains(output, "one line") {
+		t.Errorf("the refusal does not say why:\n%s", output)
+	}
+	var listed []map[string]any
+	h.runJSON(&listed, "brain", "query", "first")
+	if len(listed) != 0 {
+		t.Errorf("the refused record was written anyway: %+v", listed)
+	}
+}

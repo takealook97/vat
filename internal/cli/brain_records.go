@@ -60,6 +60,13 @@ func runBrainNew(ctx context.Context, env *Env, args []string) error {
 	if strings.TrimSpace(*title) == "" {
 		return usageErrorf("--title is required")
 	}
+	// The title becomes the record's H1, which is one line by construction. A
+	// title carrying a newline kept its first line as the heading and left the
+	// rest in the body as prose — half a title, silently, in the file this layer
+	// exists to make trustworthy.
+	if strings.ContainsAny(*title, "\r\n") {
+		return usageErrorf("--title must be one line: it becomes the record's heading")
+	}
 
 	ws, store, err := openBrain(env)
 	if err != nil {

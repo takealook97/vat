@@ -166,10 +166,10 @@ func (p *Printer) Status(level Level, subject, detail string) {
 	}
 	label := p.paint(level.color(), pad(level.Label(), 5))
 	if detail == "" {
-		_, _ = fmt.Fprintf(p.out, "%s %s\n", label, subject)
+		_, _ = fmt.Fprintf(p.out, "%s %s\n", label, oneLine(subject))
 		return
 	}
-	_, _ = fmt.Fprintf(p.out, "%s %s  %s\n", label, pad(subject, 24), detail)
+	_, _ = fmt.Fprintf(p.out, "%s %s  %s\n", label, pad(oneLine(subject), 24), oneLine(detail))
 }
 
 // Table renders rows under headers with columns padded to their widest cell.
@@ -177,6 +177,20 @@ func (p *Printer) Table(headers []string, rows [][]string) {
 	if len(headers) == 0 {
 		return
 	}
+	// Collapsed before anything is measured. A cell holding a newline put the
+	// rest of its row on the next line and lost every column after it, and the
+	// values here are descriptions, objectives, and titles — free text somebody
+	// typed, which reaches every table this tool prints.
+	flattened := make([][]string, 0, len(rows))
+	for _, row := range rows {
+		cells := make([]string, len(row))
+		for i, cell := range row {
+			cells[i] = oneLine(cell)
+		}
+		flattened = append(flattened, cells)
+	}
+	rows = flattened
+
 	widths := make([]int, len(headers))
 	for i, header := range headers {
 		widths[i] = displayWidth(header)
@@ -290,4 +304,17 @@ func colorEnabled() bool {
 		return false
 	}
 	return info.Mode()&os.ModeCharDevice != 0
+}
+
+// oneLine collapses a value onto a single terminal line.
+//
+// Every table and status line here is laid out in columns, and a value carrying
+// a newline puts the rest of its row on the next line and loses every column
+// after it. The values are free text somebody typed — a description, an
+// objective, a record title — so this is reachable from most of what vat prints.
+func oneLine(value string) string {
+	if !strings.ContainsAny(value, "\r\n") {
+		return value
+	}
+	return strings.Join(strings.Fields(value), " ")
 }

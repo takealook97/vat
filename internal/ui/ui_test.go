@@ -227,3 +227,51 @@ func displayIndexOf(line, want string) int {
 	}
 	return cells
 }
+
+// A cell holding a newline puts the rest of its row on the next line, and every
+// column after it is lost. The values in these tables are descriptions,
+// objectives, and titles — free text somebody typed — so this is reachable from
+// `vat harness roles`, `vat changeset list`, `vat repo list`, and every other
+// table this tool prints.
+func TestATableKeepsEachRowOnOneLine(t *testing.T) {
+	// Arrange
+	printer, out, _ := newPrinter()
+
+	// Act
+	printer.Table(
+		[]string{"NAME", "DESCRIPTION", "BRANCH"},
+		[][]string{
+			{"orders", "one line", "main"},
+			{"payments", "first line\nsecond line", "main"},
+			{"console", "carriage\r\nreturn", "main"},
+		},
+	)
+
+	// Assert
+	lines := strings.Split(strings.TrimRight(out.String(), "\n"), "\n")
+	if len(lines) != 4 {
+		t.Fatalf("expected a header and three rows, got %d lines:\n%s", len(lines), out.String())
+	}
+	for _, line := range lines[1:] {
+		if !strings.HasSuffix(strings.TrimRight(line, " "), "main") {
+			t.Errorf("a row lost its last column: %q", line)
+		}
+	}
+	if !strings.Contains(out.String(), "first line second line") {
+		t.Errorf("the cell's text was dropped rather than joined:\n%s", out.String())
+	}
+}
+
+// The same in a status line, whose detail is free text too.
+func TestAStatusKeepsItsDetailOnOneLine(t *testing.T) {
+	// Arrange
+	printer, out, _ := newPrinter()
+
+	// Act
+	printer.Status(ui.LevelWarn, "payments", "first line\nsecond line")
+
+	// Assert
+	if strings.Count(strings.TrimRight(out.String(), "\n"), "\n") != 0 {
+		t.Errorf("a status ran onto a second line:\n%q", out.String())
+	}
+}
