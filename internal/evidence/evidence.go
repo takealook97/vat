@@ -144,7 +144,7 @@ func List(root string) ([]Packet, error) {
 		return []Packet{}, nil
 	}
 	if err != nil {
-		return nil, fmt.Errorf("read %s: %w", Dir, err)
+		return nil, err
 	}
 	packets := []Packet{}
 	for _, entry := range entries {

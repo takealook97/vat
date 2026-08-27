@@ -23,7 +23,10 @@ func Load(path string) (Manifest, error) {
 		return Manifest{}, fmt.Errorf("%w at %s", ErrNotFound, path)
 	}
 	if err != nil {
-		return Manifest{}, fmt.Errorf("read %s: %w", path, err)
+		// Returned as it came. A filesystem error already carries the path, and
+		// wrapping it with the path again reported it twice in the first message
+		// somebody sees when their workspace is not what they expected.
+		return Manifest{}, err
 	}
 	return Parse(data)
 }

@@ -76,7 +76,7 @@ func LoadSkills(root string) ([]Skill, []Malformed, error) {
 		return nil, nil, nil
 	}
 	if err != nil {
-		return nil, nil, fmt.Errorf("read %s: %w", dir, err)
+		return nil, nil, err
 	}
 	skills := make([]Skill, 0, len(entries))
 	var malformed []Malformed
@@ -124,7 +124,7 @@ func LoadSkills(root string) ([]Skill, []Malformed, error) {
 func LoadSkill(path string) (Skill, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
-		return Skill{}, fmt.Errorf("read %s: %w", path, err)
+		return Skill{}, err
 	}
 	doc := frontmatter.Split(string(data))
 	var skill Skill

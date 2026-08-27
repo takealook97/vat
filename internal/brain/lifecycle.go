@@ -136,7 +136,7 @@ func SetStatus(root string, record Record, status Status, reason string) error {
 	path := filepath.Join(root, filepath.FromSlash(record.Path))
 	data, err := os.ReadFile(path)
 	if err != nil {
-		return fmt.Errorf("read %s: %w", record.Path, err)
+		return err
 	}
 	doc := frontmatter.Split(string(data))
 	if !doc.Present {
@@ -248,7 +248,7 @@ func Promote(root string, record Record, request PromoteRequest) error {
 	path := filepath.Join(root, filepath.FromSlash(record.Path))
 	data, err := os.ReadFile(path)
 	if err != nil {
-		return fmt.Errorf("read %s: %w", record.Path, err)
+		return err
 	}
 	doc := frontmatter.Split(string(data))
 	metadata.Status = StatusActive
@@ -333,7 +333,7 @@ func Supersede(root string, previous, replacement Record, opts SupersedeOptions)
 		path := filepath.Join(root, filepath.FromSlash(update.record.Path))
 		data, err := os.ReadFile(path)
 		if err != nil {
-			return fmt.Errorf("read %s: %w", update.record.Path, err)
+			return err
 		}
 		doc := frontmatter.Split(string(data))
 		rendered, err := doc.Merge(update.metadata)

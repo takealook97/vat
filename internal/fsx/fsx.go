@@ -31,7 +31,7 @@ const DefaultDirMode fs.FileMode = 0o755
 func WriteFileAtomic(path string, data []byte, mode fs.FileMode) error {
 	dir := filepath.Dir(path)
 	if err := os.MkdirAll(dir, DefaultDirMode); err != nil {
-		return fmt.Errorf("create %s: %w", dir, err)
+		return err
 	}
 	tmp, err := os.CreateTemp(dir, ".vat-*")
 	if err != nil {
@@ -42,7 +42,7 @@ func WriteFileAtomic(path string, data []byte, mode fs.FileMode) error {
 
 	if _, err := tmp.Write(data); err != nil {
 		_ = tmp.Close()
-		return fmt.Errorf("write %s: %w", tmpName, err)
+		return err
 	}
 	if err := tmp.Sync(); err != nil {
 		_ = tmp.Close()
@@ -86,7 +86,7 @@ func IsEmptyDir(path string) (bool, error) {
 // EnsureDir creates path and all missing parents.
 func EnsureDir(path string) error {
 	if err := os.MkdirAll(path, DefaultDirMode); err != nil {
-		return fmt.Errorf("create %s: %w", path, err)
+		return err
 	}
 	return nil
 }
@@ -99,7 +99,7 @@ func ReadFileIfExists(path string) ([]byte, bool, error) {
 		return nil, false, nil
 	}
 	if err != nil {
-		return nil, false, fmt.Errorf("read %s: %w", path, err)
+		return nil, false, err
 	}
 	return data, true, nil
 }

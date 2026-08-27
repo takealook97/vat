@@ -196,7 +196,7 @@ func LoadAll(root string) ([]Changeset, error) {
 		return []Changeset{}, nil
 	}
 	if err != nil {
-		return nil, fmt.Errorf("read %s: %w", dir, err)
+		return nil, err
 	}
 	sets := []Changeset{}
 	for _, entry := range entries {

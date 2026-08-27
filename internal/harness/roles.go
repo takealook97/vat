@@ -3,6 +3,7 @@ package harness
 import (
 	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"sort"
@@ -146,7 +147,7 @@ func LoadRoles(root string) ([]Role, []Malformed, error) {
 		return nil, nil, nil
 	}
 	if err != nil {
-		return nil, nil, fmt.Errorf("read %s: %w", dir, err)
+		return nil, nil, err
 	}
 	roles := make([]Role, 0, len(entries))
 	var malformed []Malformed
@@ -256,7 +257,17 @@ func record(malformed []Malformed, root, relPath string, err error) ([]Malformed
 	// The problem is shown beside Path, so repeating the location adds nothing a
 	// reader needs — and the absolute form puts the layout of the machine into
 	// output that gets pasted into issues and CI logs.
-	problem := strings.ReplaceAll(err.Error(), root+string(filepath.Separator), "")
+	//
+	// A filesystem error already carries the path, and every layer that wrapped
+	// it added the path again: a directory where a SKILL.md belongs reported the
+	// path three times, once per layer that thought it was adding context. The
+	// cause underneath a PathError is the whole of what a reader needs.
+	problem := err.Error()
+	var pathErr *fs.PathError
+	if errors.As(err, &pathErr) {
+		problem = pathErr.Err.Error()
+	}
+	problem = strings.ReplaceAll(problem, root+string(filepath.Separator), "")
 	problem = strings.TrimPrefix(problem, relPath+": ")
 	return append(malformed, Malformed{
 		// Forward slashes, matching what the brain package records and what
@@ -328,7 +339,7 @@ func ValidateDefinitionName(kind, name string) error {
 func LoadRole(path string) (Role, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
-		return Role{}, fmt.Errorf("read %s: %w", path, err)
+		return Role{}, err
 	}
 	doc := frontmatter.Split(string(data))
 	var role Role

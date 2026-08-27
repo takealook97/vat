@@ -156,7 +156,7 @@ func runInit(ctx context.Context, env *Env, args []string) error {
 func discoverRepos(ctx context.Context, root string) ([]manifest.Repo, error) {
 	entries, err := os.ReadDir(root)
 	if err != nil {
-		return nil, fmt.Errorf("read %s: %w", root, err)
+		return nil, err
 	}
 	var repos []manifest.Repo
 	for _, entry := range entries {
@@ -173,7 +173,7 @@ func discoverRepos(ctx context.Context, root string) ([]manifest.Repo, error) {
 func importTSV(path string) ([]manifest.Repo, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
-		return nil, fmt.Errorf("read %s: %w", path, err)
+		return nil, err
 	}
 	var repos []manifest.Repo
 	for _, line := range strings.Split(string(data), "\n") {

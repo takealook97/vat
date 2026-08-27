@@ -218,3 +218,27 @@ func TestTheBrainImportsNeitherTheManifestNorGit(t *testing.T) {
 		t.Fatal("internal/brain parsed to nothing; the layout changed and this test stopped checking anything")
 	}
 }
+
+// A filesystem error already carries the path it is about. Wrapping it with the
+// path again prints it twice, and two layers doing it printed it three times:
+//
+//	.agents/skills/weird/SKILL.md: read .agents/skills/weird/SKILL.md: read
+//	.agents/skills/weird/SKILL.md: is a directory
+//
+// That is the first thing somebody reads when their workspace is in a state
+// they did not expect, and it was in fifteen places. Nothing but this would say
+// when it comes back.
+func TestNoFilesystemErrorIsWrappedWithThePathItAlreadyCarries(t *testing.T) {
+	// Arrange
+	doubling := regexp.MustCompile(`fmt\.Errorf\("(read|write|open|create|remove|stat) %s: %w"`)
+
+	// Act & Assert
+	productionGoFiles(t, func(path, source string) {
+		for number, line := range strings.Split(source, "\n") {
+			if doubling.MatchString(line) {
+				t.Errorf("%s:%d: %s\n  the error already names the path; wrapping it repeats it",
+					path, number+1, strings.TrimSpace(line))
+			}
+		}
+	})
+}

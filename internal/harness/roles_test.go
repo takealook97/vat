@@ -1,6 +1,8 @@
 package harness_test
 
 import (
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -141,5 +143,40 @@ func TestTwoDefinitionsWithGenuinelyDifferentNamesLoad(t *testing.T) {
 	}
 	if len(roles) != 2 {
 		t.Errorf("expected both roles, got %d", len(roles))
+	}
+}
+
+// The path is printed beside the problem by every caller, so repeating it inside
+// the problem is noise in the one situation a reader is already confused by. A
+// directory where a SKILL.md should be produced
+// ".agents/skills/weird/SKILL.md: read .agents/skills/weird/SKILL.md: read
+// .agents/skills/weird/SKILL.md: is a directory" — the path three times, once
+// per layer that thought it was adding context.
+func TestAMalformedDefinitionIsReportedWithoutRepeatingItsPath(t *testing.T) {
+	// Arrange
+	root := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(root, harness.SkillsDir, "weird", harness.SkillFile), 0o755); err != nil {
+		t.Fatalf("mkdir: %v", err)
+	}
+
+	// Act
+	_, malformed, err := harness.LoadSkills(root)
+	if err != nil {
+		t.Fatalf("LoadSkills: %v", err)
+	}
+
+	// Assert
+	if len(malformed) != 1 {
+		t.Fatalf("expected one malformed definition, got %+v", malformed)
+	}
+	entry := malformed[0]
+	if entry.Path != ".agents/skills/weird/SKILL.md" {
+		t.Errorf("path = %q", entry.Path)
+	}
+	if strings.Contains(entry.Problem, entry.Path) {
+		t.Errorf("the problem repeats the path it is printed beside: %q", entry.Problem)
+	}
+	if !strings.Contains(entry.Problem, "is a directory") {
+		t.Errorf("the problem does not say what went wrong: %q", entry.Problem)
 	}
 }

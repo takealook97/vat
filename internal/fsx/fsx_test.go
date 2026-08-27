@@ -320,8 +320,14 @@ func TestEnsureDirReportsAParentThatIsAFile(t *testing.T) {
 	if err == nil {
 		t.Fatal("EnsureDir succeeded through a file used as a directory")
 	}
-	if !strings.Contains(err.Error(), "create ") {
+	// The path, once. This used to assert a "create " prefix the helper added on
+	// top of the one mkdir already reports, which put the path in the message
+	// twice; what the caller needs is which path could not be made.
+	if !strings.Contains(err.Error(), blocker) {
 		t.Errorf("error %q does not say what it failed to create", err)
+	}
+	if strings.Count(err.Error(), blocker) > 1 {
+		t.Errorf("error %q names the path more than once", err)
 	}
 }
 

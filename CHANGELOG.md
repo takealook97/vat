@@ -300,6 +300,14 @@ Notable changes to `vat`. The format follows
   of `manifest` and `gitx`. The file calls breaking one a defect regardless of
   what the change achieves, and the tool exists because a rule only written down
   is a hope. They were hopes.
+- A filesystem error is reported with its path once. Twenty places wrapped an
+  error that already carried the path with the path again, and two layers doing
+  it printed it three times: a directory where a `SKILL.md` belongs reported
+  `.agents/skills/weird/SKILL.md: read .agents/skills/weird/SKILL.md: read
+  .agents/skills/weird/SKILL.md: is a directory`. That is the first thing
+  somebody reads when their workspace is in a state they did not expect, and a
+  message that cannot say a path once does not invite reading the rest. A source
+  check keeps it from coming back.
 - Internal links in the documentation are checked against the headings they
   point at. There is no build step over this Markdown, so an anchor that
   resolves to nothing sends a reader to the top of the page and looks like the

@@ -1,6 +1,8 @@
 package manifest_test
 
 import (
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -336,5 +338,32 @@ func TestNamesThatCannotBecomeADirectoryOnEveryPlatformAreRefused(t *testing.T) 
 		if err := manifest.ValidateRepoName(name); err != nil {
 			t.Errorf("%q is a usable directory name and was refused: %v", name, err)
 		}
+	}
+}
+
+// The path is already in the error the filesystem returns, so wrapping it with
+// the path again reported it twice: "read /long/path/vat.yaml: read
+// /long/path/vat.yaml: is a directory". That is the first thing somebody sees
+// when their workspace is in a state they did not expect.
+func TestReadingAnUnreadableManifestSaysThePathOnce(t *testing.T) {
+	// Arrange
+	root := t.TempDir()
+	path := filepath.Join(root, manifest.FileName)
+	if err := os.MkdirAll(path, 0o755); err != nil {
+		t.Fatalf("mkdir: %v", err)
+	}
+
+	// Act
+	_, err := manifest.Load(path)
+
+	// Assert
+	if err == nil {
+		t.Fatal("a directory was read as a manifest")
+	}
+	if strings.Count(err.Error(), path) > 1 {
+		t.Errorf("the path is reported more than once: %v", err)
+	}
+	if !strings.Contains(err.Error(), "is a directory") {
+		t.Errorf("the error does not say what went wrong: %v", err)
 	}
 }

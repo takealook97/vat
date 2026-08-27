@@ -130,7 +130,7 @@ func applyRegion(path, region, preamble string) (bool, error) {
 		return false, nil
 	}
 	if err := fsx.WriteFileAtomic(path, []byte(next), fsx.DefaultFileMode); err != nil {
-		return false, fmt.Errorf("write %s: %w", path, err)
+		return false, err
 	}
 	return true, nil
 }

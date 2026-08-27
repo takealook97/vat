@@ -235,7 +235,7 @@ func FastForward(ctx context.Context, dir, upstream string) error {
 func Clone(ctx context.Context, url, dir string) error {
 	parent := filepath.Dir(dir)
 	if err := os.MkdirAll(parent, 0o755); err != nil {
-		return fmt.Errorf("create %s: %w", parent, err)
+		return err
 	}
 	_, err := Run(ctx, parent, "clone", "--quiet", url, filepath.Base(dir))
 	return err
@@ -244,7 +244,7 @@ func Clone(ctx context.Context, url, dir string) error {
 // Init creates a new repository with the given initial branch.
 func Init(ctx context.Context, dir, branch string) error {
 	if err := os.MkdirAll(dir, 0o755); err != nil {
-		return fmt.Errorf("create %s: %w", dir, err)
+		return err
 	}
 	_, err := Run(ctx, dir, "init", "--quiet", "--initial-branch", branch)
 	return err

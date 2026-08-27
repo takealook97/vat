@@ -62,7 +62,7 @@ func moveRecord(root string, record Record, destination string) error {
 	}
 	data, err := os.ReadFile(source)
 	if err != nil {
-		return fmt.Errorf("read %s: %w", record.Path, err)
+		return err
 	}
 	repointed := repointLinks(string(data), path.Dir(record.Path), path.Dir(destination))
 	if err := fsx.WriteFileAtomic(target, []byte(repointed), fsx.DefaultFileMode); err != nil {
@@ -71,7 +71,7 @@ func moveRecord(root string, record Record, destination string) error {
 	// The copy is written and fsynced before the original goes, so an
 	// interruption leaves the record in two places rather than in none.
 	if err := os.Remove(source); err != nil {
-		return fmt.Errorf("remove %s: %w", record.Path, err)
+		return err
 	}
 	return nil
 }
