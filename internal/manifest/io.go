@@ -143,12 +143,18 @@ func Validate(m Manifest) error {
 
 		if strings.TrimSpace(repo.Origin) == "" {
 			problems = append(problems, where+": origin is required")
+		} else if err := ValidateRepoOrigin(repo.Origin); err != nil {
+			problems = append(problems, where+": "+err.Error())
 		} else if HasEmbeddedCredential(repo.Origin) {
 			// vat.yaml is committed. A token pasted into an origin would be
 			// published by the next `git push` of the workspace root, and the
 			// only place vat could report it is a message it must not print.
 			problems = append(problems, where+
 				": origin embeds a credential; store it in your git credential helper and record the plain URL")
+		}
+		if branch := repo.Branch(m.Workspace.DefaultBranch); strings.HasPrefix(branch, "-") {
+			problems = append(problems, fmt.Sprintf(
+				"%s: branch %q begins with '-', which git reads as an option", where, branch))
 		}
 		if !repo.Role.Valid() {
 			problems = append(problems, fmt.Sprintf("%s: unknown role %q (valid: %s)",
@@ -288,12 +294,46 @@ func countRole(m Manifest, role Role) int {
 // the moment the manifest is committed. git keeps credentials in a helper for
 // exactly this reason, and the manifest records identity, not access.
 func HasEmbeddedCredential(url string) bool {
-	_, rest, ok := strings.Cut(strings.TrimSpace(url), "://")
+	scheme, rest, ok := strings.Cut(strings.TrimSpace(url), "://")
 	if !ok {
+		// The scp-like form, git@host:path. The user there is a login name and
+		// there is nowhere in it to put a password.
 		return false
 	}
 	authority, _, _ := strings.Cut(rest, "/")
-	return strings.Contains(authority, "@")
+	userinfo, _, hasUser := cutLast(authority, "@")
+	if !hasUser {
+		return false
+	}
+	// A password is a credential whatever the scheme.
+	if strings.Contains(userinfo, ":") {
+		return true
+	}
+	// A bare user name over SSH is an address: `ssh://git@github.com/acme/x.git`
+	// is the URL every forge publishes, and `git` there is the login. Refusing
+	// it made vat unusable for anybody cloning over SSH — and worse, `vat repo
+	// adopt` strips userinfo rather than refusing, so adopting such a
+	// repository recorded an origin with the login name removed, which does not
+	// authenticate.
+	//
+	// Over http a bare user name is how a token is carried, so it stays a
+	// credential there.
+	switch strings.ToLower(scheme) {
+	case "ssh", "git+ssh", "git":
+		return false
+	default:
+		return true
+	}
+}
+
+// cutLast splits around the final occurrence of sep, so a userinfo carrying an
+// at sign is still separated from the host.
+func cutLast(value, sep string) (before, after string, found bool) {
+	at := strings.LastIndex(value, sep)
+	if at < 0 {
+		return value, "", false
+	}
+	return value[:at], value[at+len(sep):], true
 }
 
 // ValidateRepoName reports whether a name may be used for a repository.
@@ -327,6 +367,25 @@ func ValidateRepoName(name string) error {
 		return errors.New("name may contain only letters, digits, '.', '_', and '-'")
 	}
 	return fsx.PortableName(name)
+}
+
+// ValidateRepoOrigin reports why a value cannot be a remote, and nil when it
+// can.
+//
+// An origin is handed to git as an argument. A value beginning with a dash is
+// not a remote under any convention, and git reads it as an option wherever the
+// call has no `--` in front of it. The manifest is committed and shared, so such
+// a value arrives on every colleague's machine — it is refused where it enters
+// rather than defended at each of a dozen call sites.
+func ValidateRepoOrigin(origin string) error {
+	trimmed := strings.TrimSpace(origin)
+	if trimmed == "" {
+		return errors.New("origin is required")
+	}
+	if strings.HasPrefix(trimmed, "-") {
+		return fmt.Errorf("origin %q begins with '-', which git reads as an option", trimmed)
+	}
+	return nil
 }
 
 // ValidateRepoPath reports why a directory cannot hold a governed repository,

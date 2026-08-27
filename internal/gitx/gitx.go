@@ -237,7 +237,10 @@ func Clone(ctx context.Context, url, dir string) error {
 	if err := os.MkdirAll(parent, 0o755); err != nil {
 		return err
 	}
-	_, err := Run(ctx, parent, "clone", "--quiet", url, filepath.Base(dir))
+	// `--` before the values, so a URL or a directory name beginning with a dash
+	// is an argument rather than an option. The manifest refuses such an origin,
+	// and this is the second line of that defence at the point git is called.
+	_, err := Run(ctx, parent, "clone", "--quiet", "--", url, filepath.Base(dir))
 	return err
 }
 

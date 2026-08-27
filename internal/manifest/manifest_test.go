@@ -367,3 +367,96 @@ func TestReadingAnUnreadableManifestSaysThePathOnce(t *testing.T) {
 		t.Errorf("the error does not say what went wrong: %v", err)
 	}
 }
+
+// An origin and a branch are handed to git as arguments. A value beginning with
+// a dash is not a remote or a branch under any convention, and git reads it as
+// an option wherever the call site has no `--` in front of it — which is most of
+// them, and which the manifest is in no position to know.
+//
+// The manifest is committed and shared, so a value that reaches git as an option
+// arrives on every colleague's machine. Refused where it enters rather than
+// defended at each of a dozen call sites.
+func TestAnOriginOrBranchThatGitWouldReadAsAnOptionIsRefused(t *testing.T) {
+	// Arrange & Act & Assert
+	for _, origin := range []string{
+		"--upload-pack=touch /tmp/x",
+		"-o",
+		"--config=core.pager=x",
+	} {
+		m := manifest.Default("acme")
+		m = manifest.WithRepo(m, manifest.Repo{
+			Name: "payments", Origin: origin, Role: manifest.RoleProduct,
+		})
+		if err := manifest.Validate(m); err == nil {
+			t.Errorf("origin %q was accepted", origin)
+		}
+	}
+	for _, branch := range []string{"--upload-pack=x", "-b"} {
+		m := manifest.Default("acme")
+		m = manifest.WithRepo(m, manifest.Repo{
+			Name: "payments", Origin: "https://example.invalid/acme/payments.git",
+			Role: manifest.RoleProduct, DefaultBranch: branch,
+		})
+		if err := manifest.Validate(m); err == nil {
+			t.Errorf("branch %q was accepted", branch)
+		}
+	}
+}
+
+// Real origins and branches keep working, including the local placeholder and
+// the scp-like form.
+func TestOrdinaryOriginsAndBranchesAreAccepted(t *testing.T) {
+	// Arrange & Act & Assert
+	for _, origin := range []string{
+		"https://example.invalid/acme/payments.git",
+		"git@example.invalid:acme/payments.git",
+		"ssh://git@example.invalid/acme/payments.git",
+		"/srv/git/payments.git",
+		"../payments.git",
+		manifest.LocalOrigin("payments"),
+	} {
+		m := manifest.Default("acme")
+		m = manifest.WithRepo(m, manifest.Repo{
+			Name: "payments", Origin: origin, Role: manifest.RoleProduct,
+			DefaultBranch: "release-1.0",
+		})
+		if err := manifest.Validate(m); err != nil {
+			t.Errorf("origin %q was refused: %v", origin, err)
+		}
+	}
+}
+
+// `ssh://git@github.com/acme/x.git` is the SSH URL every forge publishes, and
+// `git` there is the login name, not a credential. It was refused as one — while
+// `git@github.com:acme/x.git`, which means exactly the same thing, was accepted.
+//
+// Worse than the refusal: `vat repo adopt` strips userinfo rather than refusing,
+// so adopting a repository cloned over SSH recorded an origin with the login
+// name removed. That URL does not authenticate.
+//
+// A credential is a secret. A bare user name over SSH is an address.
+func TestAnSSHLoginNameIsNotACredential(t *testing.T) {
+	// Act & Assert
+	for _, url := range []string{
+		"ssh://git@github.com/acme/payments.git",
+		"ssh://git@gitlab.example.invalid:2222/acme/payments.git",
+		"git+ssh://git@example.invalid/acme/payments.git",
+	} {
+		if manifest.HasEmbeddedCredential(url) {
+			t.Errorf("%q was read as embedding a credential", url)
+		}
+	}
+
+	// A password is a credential whatever the scheme, and userinfo over http is
+	// a token however it is spelled.
+	for _, url := range []string{
+		"ssh://git:hunter2@example.invalid/acme/payments.git",
+		"https://token@github.com/acme/payments.git",
+		"https://user:token@github.com/acme/payments.git",
+		"http://user:token@example.invalid/acme/payments.git",
+	} {
+		if !manifest.HasEmbeddedCredential(url) {
+			t.Errorf("%q was not read as embedding a credential", url)
+		}
+	}
+}

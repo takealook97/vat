@@ -404,6 +404,15 @@ them running together otherwise leave only the later one's work — and both
 report success. The conflict **MUST** be reported and the write refused; merging
 is a guess about whether the other change belongs beside this one.
 
+An origin or a branch handed to git **MUST NOT** begin with `-`: git reads such
+a value as an option, and the manifest that carries it is committed and reaches
+every colleague.
+
+An implementation **MUST NOT** treat a bare user name in an SSH URL as a
+credential. `ssh://git@host/path` is the form every forge publishes and the user
+there is a login name; a credential is a password, or userinfo over http where
+that is how a token is carried.
+
 A name that becomes a directory or a file — a repository, a role, a skill —
 **MUST NOT** be one a supported platform cannot create. An implementation
 **MUST** refuse the Windows device names (`con`, `prn`, `aux`, `nul`, `com0`

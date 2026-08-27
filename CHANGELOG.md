@@ -519,6 +519,19 @@ Notable changes to `vat`. The format follows
 - An unknown flag is reported as a flag. `vat --nope status` answered "unknown
   command" and offered to suggest a verb, which sends somebody looking through
   the command list for something they never typed.
+- `ssh://git@github.com/acme/x.git` is accepted. It is the SSH URL every forge
+  publishes and `git` there is the login name, not a credential — and the
+  scp-like form meaning exactly the same thing was accepted all along. Worse
+  than the refusal: `vat repo adopt` strips userinfo rather than refusing, so
+  adopting a repository cloned over SSH recorded an origin with the login name
+  removed, and that URL does not authenticate. A password is still a credential
+  whatever the scheme, and userinfo over http still is, because that is how a
+  token is carried.
+- An origin or a branch beginning with `-` is refused. git reads such a value as
+  an option wherever the call has no `--` in front of it, and the manifest that
+  carries it is committed and reaches every colleague's machine. Refused where it
+  enters rather than defended at each of a dozen call sites, and `git clone` now
+  passes `--` as the second line of that.
 - Nothing writes to the terminal around the printer, which is where a control
   character stops being executed and starts being shown. A source check holds it
   there.

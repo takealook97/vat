@@ -61,6 +61,9 @@ func runRepoAdd(ctx context.Context, env *Env, args []string) error {
 	if err := manifest.ValidateRepoName(name); err != nil {
 		return usageErrorf("%v", err)
 	}
+	if err := manifest.ValidateRepoOrigin(*origin); err != nil {
+		return usageErrorf("%v", err)
+	}
 	if *path != "" {
 		if err := manifest.ValidateRepoPath(*path); err != nil {
 			return usageErrorf("%v", err)
