@@ -307,6 +307,7 @@ role that may decide something is not having the capability to do it.
 ## Commands
 
 ```bash
+vat harness adopt [--apply]               # bring hand-written agent files under the contract
 vat harness render                        # regenerate every region and adapter
 vat harness check                         # report drift, write nothing
 vat harness roles                         # list roles, models, write scope, runtimes
@@ -317,3 +318,30 @@ vat harness skill new <name> [--description ...] # create a runtime-neutral proc
 
 `vat repo add|new|adopt|rename|archive` re-renders automatically, so a new
 repository arrives with a contract already in it.
+
+## Adopting what you already have
+
+Nobody starts empty. If `.claude/agents/` or `.claude/skills/` already holds
+files somebody wrote by hand, `vat harness adopt` moves each body into
+`.agents/` and regenerates the adapter from it. It reports first and writes
+nothing until `--apply`.
+
+```console
+$ vat harness adopt
+INFO  .claude/agents/reviewer.md      would become .agents/roles/reviewer.md
+INFO  .claude/skills/deploy/SKILL.md  would become .agents/skills/deploy/SKILL.md
+
+2 definitions to adopt. Re-run with --apply to write them.
+```
+
+A file vat generated is skipped, and so is one whose canonical definition
+already exists — that is drift, and the canonical copy is the one file vat will
+not overwrite. An adopted role records the runtime it came from and no other: a
+bare `model` is honoured only by a role targeting one runtime, so claiming a
+second would name a model that runtime cannot resolve. It grants no write
+access, because adoption must not hand a definition a capability it never
+stated.
+
+Only the Markdown adapters are candidates. A Codex adapter keeps its prose
+inside a TOML string, and turning that back into a body is a conversion with
+judgement in it.

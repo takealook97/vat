@@ -288,6 +288,7 @@ vat harness skills
 vat harness role new  <name> [--writes <repos>] [--reads <repos>] [--model <m>]
                              [--effort <e>] [--description <text>] [--runtimes <list>]
 vat harness skill new <name> [--description <text>] [--runtimes <list>]
+vat harness adopt [--apply]
 ```
 
 `render` writes the generated region of every `AGENTS.md` and every runtime
@@ -312,6 +313,23 @@ what a runtime advertises, and one invented here would satisfy
 `skills` lists what is defined, reporting the runtimes that actually render an
 adapter rather than the `runtimes:` field, because those differ exactly where it
 matters.
+
+`adopt` moves a runtime's hand-written agent files into `.agents/` and generates
+the adapters from them. Anybody who would benefit from vat's harness already has
+agent files, written by hand into one runtime's directory, and copying them
+across is where adoption usually stops.
+
+It reports and writes nothing until `--apply`. A file vat generated is skipped,
+and so is one whose canonical definition already exists — that is drift, which
+`harness/adapter-drift` reports, and the canonical copy is the one file vat will
+not overwrite. An adopted role records the runtime it came from and no other,
+because a bare `model` is honoured only by a role targeting one runtime and
+claiming a second would name a model that runtime cannot resolve. It grants no
+write access, matching what a role with no declared write target gets.
+
+Only the Markdown adapters are candidates. A Codex adapter keeps its prose
+inside a TOML string, and turning that back into a body is a conversion with
+judgement in it.
 
 A role or skill name may hold only letters, digits, `-`, and `_`. It is pasted
 into a path in `.agents/roles/`, in `.agents/skills/`, and in every runtime's

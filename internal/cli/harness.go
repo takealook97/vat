@@ -16,7 +16,7 @@ func harnessCommand() *Command {
 	return &Command{
 		Name:    "harness",
 		Summary: "Generate and check the agent contracts across the workspace",
-		Usage:   "vat harness <render|check|roles|skills|role|skill>",
+		Usage:   "vat harness <render|check|roles|skills|role|skill|adopt>",
 		Long: `Keep every agent contract consistent with the manifest.
 
 The workspace AGENTS.md and each repository's AGENTS.md carry a generated
@@ -34,6 +34,7 @@ behaves differently depending on which tool opened the session.`,
 			harnessSkillsCommand(),
 			harnessRoleCommand(),
 			harnessSkillCommand(),
+			harnessAdoptCommand(),
 		},
 	}
 }

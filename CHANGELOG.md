@@ -8,6 +8,17 @@ Notable changes to `vat`. The format follows
 
 ### Added
 
+- `vat harness adopt`, which moves a runtime's hand-written agent files into
+  `.agents/` and generates the adapters from them. Nobody starts empty: anybody
+  who would benefit from a harness that keeps one body per definition already
+  has agent files, written by hand into one runtime's directory, and copying
+  them across is where adoption stopped. It reports first and writes nothing
+  until `--apply`. A file vat generated is skipped, and so is one whose
+  canonical definition already exists — that is drift, and the canonical copy is
+  the one file this tool will not overwrite. An adopted role records the runtime
+  it came from and no other, because a bare `model` is honoured only by a role
+  targeting one runtime, and it grants no write access, because adoption must
+  not hand a definition a capability it never stated.
 - `harness/adapter-orphaned`, for a generated adapter left behind by a deleted
   definition. Drift compares an adapter with the definition it came from and
   cannot see the case where there is none left to compare against: delete
