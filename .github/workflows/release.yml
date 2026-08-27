@@ -25,11 +25,11 @@ jobs:
       TARGETS: darwin/amd64 darwin/arm64 linux/amd64 linux/arm64 windows/amd64
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
 
-      - uses: actions/setup-go@v5
+      - uses: actions/setup-go@v7
         with:
           go-version: stable
           cache: true
@@ -126,6 +126,10 @@ jobs:
             dist/*.cdx.json
             dist/checksums.txt
 
+      # Held at v2 deliberately. v3 exists, but this is the step that creates
+      # the release itself and nothing short of an actual tag proves a change to
+      # it — and a published tag can never be moved. It is bumped as part of a
+      # release, with the run watched, not ahead of one.
       - uses: softprops/action-gh-release@v2
         with:
           files: dist/*

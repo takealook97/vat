@@ -359,6 +359,11 @@ Notable changes to `vat`. The format follows
   shows, and nothing checked that — in the one asset a reader takes as evidence
   the tool does what the page claims. A contract test now holds it to naming
   every file `vat init` writes unconditionally, the seeded procedures included.
+- The CI and release workflows use current actions. Every one was several
+  majors behind and three pinned a Node 20 runtime the runners have already
+  begun forcing onto Node 24. `softprops/action-gh-release` is held at v2 on
+  purpose: it is the step that creates the release, nothing short of an actual
+  tag proves a change to it, and a published tag can never be moved.
 - CI refuses a commit whose author or committer address cannot route. Two
   reached `main` as `t <t@e>` — a shell that had exported `GIT_COMMITTER_EMAIL`
   to build a throwaway git fixture went on to commit here, and the environment

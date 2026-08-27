@@ -22,9 +22,9 @@ jobs:
       matrix:
         os: [ubuntu-latest, macos-latest, windows-latest]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-go@v5
+      - uses: actions/setup-go@v7
         with:
           go-version: stable
           cache: true
@@ -50,11 +50,11 @@ jobs:
       # Full history: the authorship check below reads the commits a push
       # brought, and a shallow clone leaves it looking at the tip alone — a
       # check that passes because it cannot see, which is worse than none.
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
 
-      - uses: actions/setup-go@v5
+      - uses: actions/setup-go@v7
         with:
           go-version: stable
           cache: true
@@ -105,9 +105,10 @@ jobs:
           go mod tidy
           git diff --exit-code -- go.mod go.sum
 
-      # v7 is the first release that runs golangci-lint v2, which this
-      # repository's .golangci.yml targets and which supports Go 1.25.
-      - uses: golangci/golangci-lint-action@v7
+      # v7 was the first release to run golangci-lint v2, which this
+      # repository's .golangci.yml targets. v9 still does, and v7 pins a Node 20
+      # runtime the runners have already begun forcing onto Node 24.
+      - uses: golangci/golangci-lint-action@v9
         with:
           version: latest
 
@@ -115,9 +116,9 @@ jobs:
     name: coverage
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-go@v5
+      - uses: actions/setup-go@v7
         with:
           go-version: stable
           cache: true
@@ -135,7 +136,7 @@ jobs:
       - name: Measure coverage
         run: make cover
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: coverage
           path: coverage.out
