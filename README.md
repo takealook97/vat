@@ -382,7 +382,7 @@ OK    workspace                 adopt — 4 repositories: knowing what to clone,
       start with: vat init
 SKIP  harness                   not yet — without agents in the loop, a written contract per repository is enough
       threshold: agents work across more than one repository
-SKIP  changesets                not yet — with no shared contracts, each repository's own history is a complete record
+SKIP  changesets                not yet — nothing here says an interface crosses a repository boundary; count them with --contracts
       threshold: 2 or more interfaces cross a repository boundary
 SKIP  brain                     not yet — one person across a few repositories still remembers why
       threshold: a decision has already been lost, or 2+ people across 4+ repositories

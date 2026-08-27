@@ -184,3 +184,50 @@ func TestNoAgentsMeansNoHarnessRecommendation(t *testing.T) {
 		t.Error("the harness was recommended with no agents in the loop")
 	}
 }
+
+// Signals says anything left at zero is unknown and "the recommendation says so
+// rather than guessing". Two of the reasons guessed: a workspace nobody had
+// described was told "with no agents in the loop" and "with no shared
+// contracts", which are claims about their situation made from a flag default.
+//
+// The verdict is right either way — an advisor cannot recommend a layer nobody
+// has given it a reason for. What it must not do is tell somebody a fact about
+// themselves it has no way of knowing, and leave out the thing that would change
+// the answer.
+func TestAnUndeclaredSignalIsReportedAsUnknownRatherThanAsAbsence(t *testing.T) {
+	// Arrange: nothing declared at all.
+	verdicts := fit.Assess(fit.Signals{})
+
+	// Act & Assert
+	for _, verdict := range verdicts {
+		switch verdict.Layer {
+		case fit.LayerHarness, fit.LayerChangesets:
+			if verdict.Adopt {
+				t.Errorf("%s was recommended with nothing declared", verdict.Layer)
+			}
+			if !strings.Contains(verdict.Because, "--") {
+				t.Errorf("%s says %q, which states a fact about the reader instead of naming what would settle it",
+					verdict.Layer, verdict.Because)
+			}
+		}
+	}
+}
+
+// Declared signals still produce the reason that names them.
+func TestADeclaredSignalStillProducesItsOwnReason(t *testing.T) {
+	// Arrange
+	verdicts := fit.Assess(fit.Signals{AgentSessions: 3, Contracts: 4, Repositories: 5})
+
+	// Act & Assert
+	for _, verdict := range verdicts {
+		switch verdict.Layer {
+		case fit.LayerHarness, fit.LayerChangesets:
+			if !verdict.Adopt {
+				t.Errorf("%s was not recommended with the signal declared", verdict.Layer)
+			}
+			if strings.Contains(verdict.Because, "--") {
+				t.Errorf("%s names a flag when the signal was given: %q", verdict.Layer, verdict.Because)
+			}
+		}
+	}
+}

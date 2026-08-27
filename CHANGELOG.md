@@ -434,6 +434,14 @@ Notable changes to `vat`. The format follows
   none. That text is committed into the repository of everybody adopting the
   harness on its own, where it reads as a defect in the generated file rather
   than as the state it describes.
+- `vat fit` stated a fact about the reader from a flag default. `Signals` says
+  anything left at zero is unknown and that the recommendation says so rather
+  than guessing; two of the reasons guessed, telling a workspace nobody had
+  described "with no agents in the loop" and "with no shared contracts". Neither
+  is something vat can see — an interface crossing a boundary is not in any
+  manifest — and an advisor that asserts your situation from its own defaults
+  has stopped advising. The verdict is unchanged; the reason names what would
+  settle it.
 - `vat repo list` and `vat sync` printed a bare table header in a workspace that
   governs nothing. An empty table and a silent success look identical, which is
   what the existing guard on the other listings says — it just did not cover

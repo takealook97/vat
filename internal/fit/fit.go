@@ -80,7 +80,11 @@ func Assess(signals Signals) []Verdict {
 			Threshold: "coding agents work in this code at all",
 			Because: because(signals.AgentSessions >= 1,
 				harnessReason(signals),
-				"with no agents in the loop, a contract you wrote by hand is enough"),
+				// Not "there are no agents": nothing here can see that. Zero is
+				// what Signals calls unknown, and an advisor that states a fact
+				// about somebody's situation from a flag default has stopped
+				// advising. Name what would settle it instead.
+				"nothing here says agents work in this code; if any do, this layer pays from the first one — pass --agent-sessions"),
 			Command: "vat harness render",
 		},
 		{
@@ -90,7 +94,10 @@ func Assess(signals Signals) []Verdict {
 			Because: because(signals.Contracts >= 2,
 				fmt.Sprintf("%d cross-repository contracts: you already cannot say which revisions were verified together",
 					signals.Contracts),
-				"with no shared contracts, each repository's own history is a complete record"),
+				// Contracts is never read from the workspace — an interface that
+				// crosses a boundary is not something a manifest records — so
+				// zero here is always "you have not said".
+				"nothing here says an interface crosses a repository boundary; count them with --contracts"),
 			Command: "vat changeset new",
 		},
 		{
