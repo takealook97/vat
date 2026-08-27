@@ -52,9 +52,12 @@ func Parse(data []byte) (Manifest, error) {
 // mutates its argument.
 func withDefaults(m Manifest) Manifest {
 	out := m
-	if out.Version == 0 {
-		out.Version = SchemaVersion
-	}
+	// Version is not defaulted. SPEC §4 lists it as required and the published
+	// schema puts it in "required", so filling it in silently meant vat read a
+	// file its own schema rejects — and every future version of this format
+	// would then be reading an unversioned file as whatever it happens to
+	// understand, which is what the field exists to prevent.
+
 	if out.Workspace.DefaultBranch == "" {
 		out.Workspace.DefaultBranch = "main"
 	}
@@ -97,10 +100,20 @@ func withDefaults(m Manifest) Manifest {
 // editing vat.yaml by hand sees the full list rather than one error per run.
 func Validate(m Manifest) error {
 	var problems []string
-	if m.Version > SchemaVersion {
+	switch {
+	case m.Version > SchemaVersion:
 		problems = append(problems, fmt.Sprintf(
 			"version %d is newer than this vat understands (%d); upgrade vat",
 			m.Version, SchemaVersion))
+	case m.Version < 1:
+		// SPEC §4 lists version as required, and the published schema puts it
+		// in "required" with minimum 1. Accepting its absence meant anyone
+		// validating vat.yaml against vat's own schema got a different answer
+		// from vat, out of a contract other tools build against. An absent key
+		// reads as zero, so both cases are the same refusal.
+		problems = append(problems, fmt.Sprintf(
+			"version is missing or not a version this format has (%d); write `version: 1`",
+			m.Version))
 	}
 	if strings.TrimSpace(m.Workspace.Name) == "" {
 		problems = append(problems, "workspace.name is required")

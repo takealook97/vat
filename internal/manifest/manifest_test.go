@@ -460,3 +460,36 @@ func TestAnSSHLoginNameIsNotACredential(t *testing.T) {
 		}
 	}
 }
+
+// SPEC §4 lists version as required and the published schema puts it in
+// "required" with minimum 1, so anyone validating vat.yaml against vat's own
+// schema got a different answer from vat — from a contract other tools build
+// against.
+func TestAManifestWithNoVersionIsRefused(t *testing.T) {
+	// Arrange
+	cases := []struct {
+		name    string
+		version int
+	}{
+		{"absent, which yaml reads as zero", 0},
+		{"negative", -5},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			m := manifest.Default("acme")
+			m.Version = tc.version
+
+			// Act
+			err := manifest.Validate(m)
+
+			// Assert
+			if err == nil {
+				t.Fatalf("version %d was accepted", tc.version)
+			}
+			if !strings.Contains(err.Error(), "version: 1") {
+				t.Errorf("the refusal does not say what to write: %v", err)
+			}
+		})
+	}
+}

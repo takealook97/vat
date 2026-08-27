@@ -359,6 +359,12 @@ Notable changes to `vat`. The format follows
   shows, and nothing checked that — in the one asset a reader takes as evidence
   the tool does what the page claims. A contract test now holds it to naming
   every file `vat init` writes unconditionally, the seeded procedures included.
+- A `vat.yaml` with no `version:` is refused instead of silently read as
+  version 1. SPEC §4 lists the key as required and the published schema puts it
+  in `required` with `minimum: 1`, so anyone validating a manifest against vat's
+  own schema got a different answer from vat — out of a contract other tools
+  build against. A test now drives every key the schema calls required through
+  the validator.
 - `vat lint` reports a submodule a repository declares but has never checked out
   (`repo/submodule-uninitialised`). vat clones without recursing, so the
   directory is empty, every build reads it as a missing dependency, and until now

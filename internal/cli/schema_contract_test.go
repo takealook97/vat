@@ -222,6 +222,42 @@ func TestThePublishedManifestSchemaPinsTheVersionVatWrites(t *testing.T) {
 	}
 }
 
+// A schema is a promise to other tools. Where it says a key is required, vat
+// must refuse a file without it — otherwise anyone validating vat.yaml against
+// vat's own schema gets a different answer from vat, and the file that passes
+// one fails the other.
+func TestVatRefusesWhatItsOwnSchemaCallsRequired(t *testing.T) {
+	// Arrange
+	schema := loadSchema(t, manifestSchema)
+	required, ok := schema["required"].([]any)
+	if !ok || len(required) == 0 {
+		t.Fatal("the manifest schema requires nothing at all")
+	}
+	valid := manifest.Default("acme")
+
+	for _, key := range required {
+		name, _ := key.(string)
+		t.Run(name, func(t *testing.T) {
+			// Act: clear that key and nothing else.
+			missing := valid
+			switch name {
+			case "version":
+				missing.Version = 0
+			case "workspace":
+				missing.Workspace.Name = ""
+			default:
+				t.Skipf("no case for required key %q; add one when the schema grows it", name)
+			}
+			err := manifest.Validate(missing)
+
+			// Assert
+			if err == nil {
+				t.Errorf("the schema requires %q but vat accepts a manifest without it", name)
+			}
+		})
+	}
+}
+
 // The caps are not decoration. Each identifier is pasted into a path, and
 // without a bound the failure was left to the filesystem.
 func TestPublishedSchemasCapIdentifiersWhereVatDoes(t *testing.T) {
