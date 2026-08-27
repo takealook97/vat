@@ -344,3 +344,57 @@ func TestReadFileIfExistsSeparatesAbsentFromUnreadable(t *testing.T) {
 		t.Errorf("error %q does not name the path it could not read", err)
 	}
 }
+
+// Four packages join a name to a path, and every one of them writes a file
+// somebody else checks out. A name that works where it was typed and cannot
+// exist on a colleague's machine makes the workspace unshareable, so the rule
+// holds on every platform rather than on whichever one runs it.
+func TestPortableNameRefusesWhatWindowsCannotCreate(t *testing.T) {
+	// Act & Assert
+	refused := []struct{ name, because string }{
+		{"con", "device"},
+		{"CON", "device, whatever the case"},
+		{"nul", "device"},
+		{"prn", "device"},
+		{"aux", "device"},
+		{"com0", "the lowest serial device"},
+		{"com9", "the highest serial device"},
+		{"lpt0", "the lowest printer device"},
+		{"lpt9", "the highest printer device"},
+		{"con.api", "Windows matches the device before the first dot"},
+		{"NUL.service", "the same, whatever the case"},
+		{"trailing.", "Windows strips a trailing dot"},
+		{"trailing ", "Windows strips a trailing space"},
+	}
+	for _, testCase := range refused {
+		if err := fsx.PortableName(testCase.name); err == nil {
+			t.Errorf("%q was accepted (%s)", testCase.name, testCase.because)
+		}
+	}
+
+	// A rule that fires on a correct name is a rule somebody works around.
+	for _, name := range []string{
+		"console", "connect", "com", "com10", "lpt", "lpt10", "auxiliary",
+		"printer", "nullable", "payments", "payments-api", "D-0001", "v1.2.3",
+		"a.b.c", ".hidden", "",
+	} {
+		if err := fsx.PortableName(name); err != nil {
+			t.Errorf("%q is usable on every platform and was refused: %v", name, err)
+		}
+	}
+}
+
+// The refusal is read by somebody who has just been told their name is wrong.
+func TestPortableNameSaysWhichRuleWasBroken(t *testing.T) {
+	// Act
+	device := fsx.PortableName("con")
+	trailing := fsx.PortableName("foo.")
+
+	// Assert
+	if device == nil || !strings.Contains(device.Error(), "Windows") {
+		t.Errorf("the device refusal does not name the platform: %v", device)
+	}
+	if trailing == nil || !strings.Contains(trailing.Error(), "'.'") {
+		t.Errorf("the trailing refusal does not name the character: %v", trailing)
+	}
+}

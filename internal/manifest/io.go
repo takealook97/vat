@@ -323,40 +323,7 @@ func ValidateRepoName(name string) error {
 	if strings.HasPrefix(name, ".") {
 		return errors.New("name may contain only letters, digits, '.', '_', and '-'")
 	}
-	return PortableName(name)
-}
-
-// windowsDevices are the names Windows reserves for devices. A directory cannot
-// be created with any of them, with or without an extension.
-var windowsDevices = map[string]bool{
-	"con": true, "prn": true, "aux": true, "nul": true,
-	"com0": true, "com1": true, "com2": true, "com3": true, "com4": true,
-	"com5": true, "com6": true, "com7": true, "com8": true, "com9": true,
-	"lpt0": true, "lpt1": true, "lpt2": true, "lpt3": true, "lpt4": true,
-	"lpt5": true, "lpt6": true, "lpt7": true, "lpt8": true, "lpt9": true,
-}
-
-// PortableName reports why a name cannot become a directory on every platform
-// vat supports, and nil when it can.
-//
-// vat ships Windows binaries and runs Windows CI, and a manifest or a role
-// definition is committed and shared. A name that works on the machine it was
-// typed on and cannot exist on a colleague's is not a name a shared file may
-// carry, so it is refused everywhere rather than on whichever machine happens
-// to hit it first — a rule that depends on who ran it is not a rule.
-func PortableName(name string) error {
-	// Windows matches the device before the first dot, so "con.api" is the CON
-	// device too.
-	stem, _, _ := strings.Cut(strings.ToLower(name), ".")
-	if windowsDevices[stem] {
-		return fmt.Errorf("%q is a reserved device name on Windows and cannot be a directory there", stem)
-	}
-	// Windows strips a trailing dot or space silently, so the name on disk is
-	// not the name in the file — and it collides with whatever it strips to.
-	if strings.HasSuffix(name, ".") || strings.HasSuffix(name, " ") {
-		return errors.New("name may not end in '.' or a space; Windows strips both, so the directory would not be the one named here")
-	}
-	return nil
+	return fsx.PortableName(name)
 }
 
 // Save validates and writes the manifest atomically, with a header comment

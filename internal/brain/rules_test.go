@@ -86,3 +86,21 @@ func rulesInSource(t *testing.T) []string {
 	sort.Strings(names)
 	return names
 }
+
+// A record identifier becomes a filename. `con` and `nul` are device names on
+// Windows and `D-0001.` is stripped to `D-0001` there, so a knowledge layer
+// carrying either is one only its author can check out — which is the opposite
+// of what this layer is for.
+func TestARecordIdentifierIsHeldToWhatEveryPlatformCanWrite(t *testing.T) {
+	// Act & Assert
+	for _, id := range []string{"con", "NUL", "aux.note", "D-0001.", "com1"} {
+		if err := ValidateID(id); err == nil {
+			t.Errorf("%q was accepted as a record identifier", id)
+		}
+	}
+	for _, id := range []string{"D-0001", "G-0014", "console-notes", "com10"} {
+		if err := ValidateID(id); err != nil {
+			t.Errorf("%q is a usable identifier and was refused: %v", id, err)
+		}
+	}
+}

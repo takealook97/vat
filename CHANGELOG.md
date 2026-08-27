@@ -229,6 +229,14 @@ Notable changes to `vat`. The format follows
 
 ### Fixed
 
+- Brain record and evidence identifiers are held to the same rule, from the same
+  definition. Both become filenames, so a knowledge layer carrying `con` or
+  `D-0001.` is one only its author can check out — the opposite of what a layer
+  whose whole claim is that it outlives the tool exists to be. The definition
+  moved to `internal/fsx`, which every package that joins a name to a path
+  already imports, because `internal/brain` deliberately imports neither
+  `manifest` nor `gitx` and that seam outranks putting the rule where the first
+  caller happened to be.
 - Two role or skill definitions whose names differ only in case are refused at
   load. They are one file on macOS and on Windows, so a pair authored on Linux
   reaches a colleague's checkout as one silently overwriting the other, and the

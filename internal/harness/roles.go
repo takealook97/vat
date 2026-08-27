@@ -10,7 +10,6 @@ import (
 
 	"github.com/takealook97/vat/internal/frontmatter"
 	"github.com/takealook97/vat/internal/fsx"
-	"github.com/takealook97/vat/internal/manifest"
 )
 
 // Directory layout for agent assets. The role body is canonical; everything
@@ -297,7 +296,7 @@ func ValidRoleName(name string) bool {
 	// The same portability rule a repository name is held to, from the one
 	// definition of it: `.claude/agents/con.md` cannot exist on Windows, and
 	// this definition is committed for everybody.
-	return manifest.PortableName(name) == nil
+	return fsx.PortableName(name) == nil
 }
 
 // ValidateDefinitionName reports why a role or skill name cannot be used, and
@@ -322,7 +321,7 @@ func ValidateDefinitionName(kind, name string) error {
 			return fmt.Errorf("a %s name may hold only letters, digits, '-', and '_'", kind)
 		}
 	}
-	return manifest.PortableName(name)
+	return fsx.PortableName(name)
 }
 
 // LoadRole reads one role definition.

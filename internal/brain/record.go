@@ -11,6 +11,7 @@ package brain
 import (
 	"errors"
 	"fmt"
+	"github.com/takealook97/vat/internal/fsx"
 	"path"
 	"regexp"
 	"sort"
@@ -297,6 +298,12 @@ func ValidateID(id string) error {
 	}
 	if strings.HasPrefix(id, ".") {
 		return fmt.Errorf("identifier %q may not begin with '.'", id)
+	}
+	// The identifier becomes a filename, so it is held to the rule every name
+	// that becomes one is: a workspace whose records only its author can check
+	// out is not the shared account this layer exists to be.
+	if err := fsx.PortableName(id); err != nil {
+		return fmt.Errorf("identifier %q: %w", id, err)
 	}
 	return nil
 }
