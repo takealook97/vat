@@ -117,3 +117,32 @@ func TestAdapterRootsAreTheDirectoriesAdaptersAreWrittenInto(t *testing.T) {
 		}
 	}
 }
+
+func TestTheMarkerScanDoesNotReadAWholeAssetToRejectIt(t *testing.T) {
+	// Arrange: a skill directory holds references and scripts beside its
+	// procedure, and this walk visits all of them on every lint. A large asset
+	// must not be read in full to decide it is not a generated adapter.
+	root := t.TempDir()
+	writeAt(t, root, ".claude/skills/deploy/SKILL.md",
+		"---\nname: deploy\n---\n\n<!-- "+harness.GeneratedMarker+" -->\n")
+	// The marker sits far past any sane header, so a bounded read must miss it —
+	// and missing it is correct: this is not an adapter.
+	asset := strings.Repeat("a", 4<<20) + harness.GeneratedMarker
+	writeAt(t, root, ".claude/skills/deploy/references/asset.bin", asset)
+
+	// Act
+	orphans, err := harness.OrphanedAdapters(root, nil, nil)
+	if err != nil {
+		t.Fatalf("OrphanedAdapters: %v", err)
+	}
+
+	// Assert
+	for _, path := range orphans {
+		if strings.Contains(path, "asset.bin") {
+			t.Errorf("a reference file was scanned in full and reported: %v", orphans)
+		}
+	}
+	if len(orphans) != 1 || orphans[0] != ".claude/skills/deploy/SKILL.md" {
+		t.Errorf("the adapter itself was not reported: %v", orphans)
+	}
+}

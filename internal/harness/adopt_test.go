@@ -241,3 +241,53 @@ func TestAdoptableRefusesTwoAdaptersThatWouldBecomeOneFile(t *testing.T) {
 		t.Errorf("the definition written is not the one that claimed the name:\n%s", body)
 	}
 }
+
+func TestAdoptionSaysWhichMetadataItCannotCarryOver(t *testing.T) {
+	// Arrange: a Claude agent file carries keys vat's role has no place for.
+	// Rewriting somebody's file and dropping half its header without saying so
+	// is the quiet kind of data loss.
+	root := t.TempDir()
+	writeAt(t, root, ".claude/agents/reviewer.md",
+		"---\nname: reviewer\ndescription: Reviews a diff.\nmodel: opus\n"+
+			"tools: Read, Grep\ncolor: blue\n---\n\nBody.\n")
+
+	// Act
+	found, err := harness.Adoptable(root)
+	if err != nil {
+		t.Fatalf("Adoptable: %v", err)
+	}
+
+	// Assert
+	if len(found) != 1 {
+		t.Fatalf("expected one candidate, got %+v", found)
+	}
+	dropped := strings.Join(found[0].Dropped, ",")
+	for _, key := range []string{"tools", "color"} {
+		if !strings.Contains(dropped, key) {
+			t.Errorf("adoption drops %q and does not say so: %v", key, found[0].Dropped)
+		}
+	}
+	for _, kept := range []string{"name", "description", "model"} {
+		if strings.Contains(dropped, kept) {
+			t.Errorf("%q is carried over and was reported as dropped: %v", kept, found[0].Dropped)
+		}
+	}
+}
+
+func TestAdoptionReportsNothingDroppedWhenItCarriesEverything(t *testing.T) {
+	// Arrange
+	root := t.TempDir()
+	writeAt(t, root, ".claude/skills/deploy/SKILL.md",
+		"---\nname: deploy\ndescription: Ships one service.\n---\n\nBody.\n")
+
+	// Act
+	found, err := harness.Adoptable(root)
+	if err != nil {
+		t.Fatalf("Adoptable: %v", err)
+	}
+
+	// Assert
+	if len(found[0].Dropped) != 0 {
+		t.Errorf("nothing was lost and adoption reported %v", found[0].Dropped)
+	}
+}

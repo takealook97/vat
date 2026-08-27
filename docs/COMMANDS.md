@@ -344,6 +344,11 @@ because a bare `model` is honoured only by a role targeting one runtime and
 claiming a second would name a model that runtime cannot resolve. It grants no
 write access, matching what a role with no declared write target gets.
 
+A header key the canonical format has no field for is reported rather than
+discarded in silence — the runtime the file was written for may well honour it,
+and rewriting somebody's file while dropping half its header is the quiet kind
+of data loss. It is said before `--apply` as well as after.
+
 Only the Markdown adapters are candidates. A Codex adapter keeps its prose
 inside a TOML string, and turning that back into a body is a conversion with
 judgement in it.

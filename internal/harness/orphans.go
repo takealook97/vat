@@ -1,6 +1,8 @@
 package harness
 
 import (
+	"errors"
+	"io"
 	"io/fs"
 	"os"
 	"path/filepath"
@@ -67,14 +69,11 @@ func OrphanedAdapters(root string, roles []Role, skills []Skill) ([]string, erro
 			if expected[slashed] {
 				return nil
 			}
-			content, err := os.ReadFile(path)
+			marked, err := carriesMarker(path)
 			if err != nil {
-				if os.IsPermission(err) {
-					return nil
-				}
 				return err
 			}
-			if strings.Contains(string(content), GeneratedMarker) {
+			if marked {
 				orphans = append(orphans, slashed)
 			}
 			return nil
@@ -85,4 +84,30 @@ func OrphanedAdapters(root string, roles []Role, skills []Skill) ([]string, erro
 	}
 	sort.Strings(orphans)
 	return orphans, nil
+}
+
+// markerWindow bounds how much of a file is read looking for the marker.
+//
+// A skill directory holds references and scripts beside its procedure, and this
+// walk visits all of them on every lint. The marker is written into the first
+// lines of a generated file by construction, so reading a whole 100MB asset to
+// decide it is not one is work nobody asked for.
+const markerWindow = 8 << 10
+
+func carriesMarker(path string) (bool, error) {
+	file, err := os.Open(path)
+	if err != nil {
+		if os.IsPermission(err) {
+			return false, nil
+		}
+		return false, err
+	}
+	defer func() { _ = file.Close() }()
+
+	window := make([]byte, markerWindow)
+	read, err := io.ReadFull(file, window)
+	if err != nil && !errors.Is(err, io.EOF) && !errors.Is(err, io.ErrUnexpectedEOF) {
+		return false, err
+	}
+	return strings.Contains(string(window[:read]), GeneratedMarker), nil
 }

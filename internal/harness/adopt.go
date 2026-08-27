@@ -34,6 +34,11 @@ type Adoption struct {
 	Name string
 	// Refusal says why this cannot be adopted, and is empty when it can.
 	Refusal string
+	// Dropped names header keys the canonical format has no place for.
+	// Rewriting somebody's file and discarding half its header without saying
+	// so is the quiet kind of data loss, and the runtime may well honour a key
+	// vat does not model.
+	Dropped []string
 	// content is the canonical file that would be written.
 	content string
 }
@@ -134,9 +139,11 @@ func planAdoption(root, adapter, kind, content string) Adoption {
 	if kind == "role" {
 		adoption.Canonical = filepath.ToSlash(filepath.Join(RolesDir, name+".md"))
 		adoption.content = adoptedRole(name, doc)
+		adoption.Dropped = droppedKeys(doc, "name", "description", "model")
 	} else {
 		adoption.Canonical = filepath.ToSlash(filepath.Join(SkillsDir, name, SkillFile))
 		adoption.content = adoptedSkill(name, doc)
+		adoption.Dropped = droppedKeys(doc, "name", "description")
 	}
 	if _, err := os.Stat(filepath.Join(root, filepath.FromSlash(adoption.Canonical))); err == nil {
 		adoption.Refusal = adoption.Canonical + " already exists"
@@ -227,4 +234,29 @@ func Adopt(root string, adoptions []Adoption) ([]Adoption, error) {
 		written = append(written, adoption)
 	}
 	return written, nil
+}
+
+// droppedKeys returns the header keys adoption does not carry over, sorted.
+//
+// A header key vat has no field for is not necessarily meaningless: the runtime
+// that file was written for may honour it. Adoption cannot keep what the
+// canonical format does not model, so it says what it is leaving behind rather
+// than deciding on somebody's behalf that it did not matter.
+func droppedKeys(doc frontmatter.Document, carried ...string) []string {
+	fields, err := doc.Fields()
+	if err != nil {
+		return nil
+	}
+	kept := map[string]bool{}
+	for _, key := range carried {
+		kept[key] = true
+	}
+	var dropped []string
+	for key := range fields {
+		if !kept[key] {
+			dropped = append(dropped, key)
+		}
+	}
+	sort.Strings(dropped)
+	return dropped
 }

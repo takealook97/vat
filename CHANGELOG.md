@@ -19,6 +19,16 @@ Notable changes to `vat`. The format follows
   it came from and no other, because a bare `model` is honoured only by a role
   targeting one runtime, and it grants no write access, because adoption must
   not hand a definition a capability it never stated.
+- `vat harness adopt` reports the front-matter keys it cannot carry over. A
+  Claude agent file may declare `tools:` or `color:`, which vat's role has no
+  field for, and rewriting somebody's file while discarding half its header
+  without saying so is the quiet kind of data loss — the runtime that file was
+  written for may well honour the key. Reported before `--apply`, so it is read
+  before the move rather than discovered after it.
+- The scan for abandoned adapters read every file under a runtime directory in
+  full. A skill directory holds references and scripts beside its procedure, so
+  a large asset was read end to end on every lint to decide it was not a
+  generated pointer; the marker is in the first lines by construction.
 - `harness/adapter-orphaned`, for a generated adapter left behind by a deleted
   definition. Drift compares an adapter with the definition it came from and
   cannot see the case where there is none left to compare against: delete

@@ -2,6 +2,7 @@ package cli
 
 import (
 	"context"
+	"strings"
 
 	"github.com/takealook97/vat/internal/harness"
 	"github.com/takealook97/vat/internal/lint"
@@ -78,7 +79,8 @@ func runHarnessAdopt(ctx context.Context, env *Env, args []string) error {
 			listed = append(listed, adoptionSummary{
 				Adapter: adoption.Adapter, Canonical: adoption.Canonical,
 				Kind: adoption.Kind, Name: adoption.Name,
-				Refusal: adoption.Refusal, Adopted: adopted[adoption.Adapter],
+				Refusal: adoption.Refusal, Dropped: adoption.Dropped,
+				Adopted: adopted[adoption.Adapter],
 			})
 		}
 		return emitJSON(env, listed)
@@ -97,6 +99,13 @@ func runHarnessAdopt(ctx context.Context, env *Env, args []string) error {
 		default:
 			adoptable++
 			env.Printer.Status(ui.LevelInfo, adoption.Adapter, "would become "+adoption.Canonical)
+		}
+		// Said whether or not --apply was passed, so it is read before the move
+		// rather than discovered after it. A key vat has no field for may still
+		// be one the runtime honours.
+		if len(adoption.Dropped) > 0 && adoption.Refusal == "" {
+			env.Printer.Status(ui.LevelWarn, adoption.Adapter,
+				"front matter not carried over: "+strings.Join(adoption.Dropped, ", "))
 		}
 	}
 	if adoptable == 0 {
@@ -118,10 +127,11 @@ func runHarnessAdopt(ctx context.Context, env *Env, args []string) error {
 
 // adoptionSummary is the shape `vat harness adopt --json` reports.
 type adoptionSummary struct {
-	Adapter   string `json:"adapter"`
-	Canonical string `json:"canonical,omitempty"`
-	Kind      string `json:"kind"`
-	Name      string `json:"name"`
-	Refusal   string `json:"refusal,omitempty"`
-	Adopted   bool   `json:"adopted"`
+	Adapter   string   `json:"adapter"`
+	Canonical string   `json:"canonical,omitempty"`
+	Kind      string   `json:"kind"`
+	Name      string   `json:"name"`
+	Refusal   string   `json:"refusal,omitempty"`
+	Dropped   []string `json:"dropped,omitempty"`
+	Adopted   bool     `json:"adopted"`
 }
