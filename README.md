@@ -257,7 +257,7 @@ Run `vat sync` to fast-forward what can be advanced safely.
 $ vat sync
 REPOSITORY  STATE    BRANCH   REV      DETAIL
 brain       CURRENT  main     9af189c
-console     DIRTY    feature  772418c  uncommitted changes; nothing advanced
+console     DIRTY    feature  772418c  uncommitted changes to tracked files; nothing advanced
 docs        UPDATED  master   1e5b9a0
 payments    CURRENT  main     3bebc3c
 

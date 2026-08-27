@@ -136,6 +136,21 @@ func IsDirty(ctx context.Context, dir string) (bool, error) {
 	return out != "", nil
 }
 
+// HasLocalModifications reports whether tracked files differ from HEAD or the
+// index. It excludes untracked files on purpose: a fast-forward cannot destroy
+// one, because git refuses the merge and errors rather than overwriting it.
+//
+// IsDirty is the question the commands that delete or move a tree ask, where an
+// untracked file is exactly the thing at risk. This is the question a
+// fast-forward asks.
+func HasLocalModifications(ctx context.Context, dir string) (bool, error) {
+	out, err := Run(ctx, dir, "status", "--porcelain", "--untracked-files=no")
+	if err != nil {
+		return false, err
+	}
+	return out != "", nil
+}
+
 // HasRef reports whether a ref such as refs/remotes/origin/main resolves.
 func HasRef(ctx context.Context, dir, ref string) bool {
 	_, err := Run(ctx, dir, "show-ref", "--verify", "--quiet", ref)

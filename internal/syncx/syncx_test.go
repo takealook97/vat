@@ -501,3 +501,51 @@ func TestTheBranchReportedIsTheOneTheRepositoryIsActuallyOn(t *testing.T) {
 		t.Errorf("branch = %q, want the branch the clone is on", result.Branch)
 	}
 }
+
+// A fast-forward cannot destroy an untracked file: git refuses the merge and
+// errors, which this package reports. Gating on untracked files instead made
+// the first sync of a new workspace report every repository as DIRTY — the only
+// uncommitted change being the AGENTS.md vat had just rendered into it.
+func TestUntrackedFilesAloneDoNotBlockAFastForward(t *testing.T) {
+	// Arrange
+	ws, upstream, clone := fixture(t)
+	commit(t, upstream, "README.md", "two\n")
+	if err := os.WriteFile(filepath.Join(clone, "AGENTS.md"), []byte("# service\n"), 0o644); err != nil {
+		t.Fatalf("write: %v", err)
+	}
+
+	// Act
+	result := runSync(t, ws, syncx.Options{})
+
+	// Assert
+	if result.State != syncx.StateUpdated {
+		t.Fatalf("state = %s, want UPDATED (detail: %s)", result.State, result.Detail)
+	}
+	if got := readNormalised(t, filepath.Join(clone, "AGENTS.md")); got != "# service\n" {
+		t.Errorf("the untracked file was not left alone: %q", got)
+	}
+}
+
+// The gate still holds for the case it exists for.
+func TestAModifiedTrackedFileStillBlocksAFastForward(t *testing.T) {
+	// Arrange
+	ws, upstream, clone := fixture(t)
+	commit(t, upstream, "README.md", "two\n")
+	if err := os.WriteFile(filepath.Join(clone, "README.md"), []byte("mine\n"), 0o644); err != nil {
+		t.Fatalf("write: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(clone, "AGENTS.md"), []byte("# service\n"), 0o644); err != nil {
+		t.Fatalf("write: %v", err)
+	}
+
+	// Act
+	result := runSync(t, ws, syncx.Options{})
+
+	// Assert
+	if result.State != syncx.StateDirty {
+		t.Fatalf("state = %s, want DIRTY (detail: %s)", result.State, result.Detail)
+	}
+	if got := readNormalised(t, filepath.Join(clone, "README.md")); got != "mine\n" {
+		t.Errorf("uncommitted work was overwritten: %q", got)
+	}
+}

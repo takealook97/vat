@@ -111,7 +111,7 @@ Fetches, then fast-forwards only what can be advanced without losing anything.
 | `CURRENT` | already matches upstream | |
 | `UPDATED` | clean default branch fast-forwarded | |
 | `CLONED` | was absent, cloned from origin | |
-| `DIRTY` | uncommitted work; nothing advanced | |
+| `DIRTY` | uncommitted changes to tracked files; nothing advanced | |
 | `BRANCH` | on another branch; nothing advanced | |
 | `DETACHED` | HEAD is not on a branch | |
 | `AHEAD` | local commits not pushed | |
@@ -124,6 +124,13 @@ Fetches, then fast-forwards only what can be advanced without losing anything.
 | `FETCH_FAILED` | the network step failed | yes |
 | `DIVERGED` | both sides hold commits the other does not | yes |
 | `NO_UPSTREAM` | the default branch has no remote-tracking ref | yes |
+
+Untracked files alone are not `DIRTY`. A fast-forward cannot destroy one: git
+refuses the merge and errors, which sync reports. Counting them made the first
+sync of a new workspace report every repository as dirty, the only uncommitted
+change being the `AGENTS.md` vat had just rendered into it. The commands that
+delete or move a tree still count untracked files, because there the untracked
+file is exactly what is at risk.
 
 A repository left part of the way through a merge, rebase, cherry-pick, revert,
 or bisect is dirty, and `DIRTY` says which — because the obvious reaction to an

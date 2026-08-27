@@ -252,7 +252,12 @@ func syncOne(ctx context.Context, ws *workspace.Workspace, repo manifest.Repo, r
 		return Result{Repo: name, State: StateFetchFailed, Revision: revision, Detail: gitErrorDetail(err)}
 	}
 
-	dirty, err := gitx.IsDirty(ctx, dir)
+	// Tracked modifications only. Rendering the per-repository contract leaves
+	// an untracked AGENTS.md behind, so gating on untracked files made the very
+	// first sync of a new workspace report every repository as DIRTY and
+	// advance nothing — teaching people to ignore the one signal that protects
+	// uncommitted work.
+	dirty, err := gitx.HasLocalModifications(ctx, dir)
 	if err != nil {
 		return Result{Repo: name, State: StateFetchFailed, Revision: revision, Detail: gitErrorDetail(err)}
 	}
@@ -346,5 +351,5 @@ func dirtyDetail(dir string) string {
 	if operation := gitx.InterruptedOperation(dir); operation != "" {
 		return "unfinished " + operation + "; resolve or abort it before committing"
 	}
-	return "uncommitted changes; nothing advanced"
+	return "uncommitted changes to tracked files; nothing advanced"
 }

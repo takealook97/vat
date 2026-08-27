@@ -359,6 +359,13 @@ Notable changes to `vat`. The format follows
   shows, and nothing checked that — in the one asset a reader takes as evidence
   the tool does what the page claims. A contract test now holds it to naming
   every file `vat init` writes unconditionally, the seeded procedures included.
+- Untracked files alone no longer make `vat sync` report `DIRTY`. Rendering the
+  per-repository contract leaves an untracked `AGENTS.md` behind, so the very
+  first sync of a new workspace reported every repository as dirty and advanced
+  nothing — the whole first-run loop, blocked by a file vat had just written. A
+  fast-forward cannot destroy an untracked file: git refuses the merge and
+  errors, which sync reports. The commands that delete or move a tree still
+  count untracked files, because there the untracked file is what is at risk.
 - `vat repo add` refuses a directory that resolves outside the workspace, and
   the harness render writes nothing through one. A symlink inside the workspace
   pointing out of it satisfies every string comparison vat makes about the path.
