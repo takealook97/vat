@@ -272,6 +272,32 @@ yet.
 
 ---
 
+## A colleague joins
+
+The manifest is committed, so the workspace is reproducible from it. Two
+commands, and `vat sync` clones every repository the manifest names.
+
+```console
+$ git clone git@github.com:acme/workspace.git ~/work && cd ~/work
+$ vat sync
+REPOSITORY  STATE   BRANCH  REV      DETAIL
+brain       CLONED  main    9af189c
+console     CLONED  main    772418c
+docs        CLONED  main    1e5b9a0
+payments    CLONED  main    3bebc3c
+
+4 advanced · 0 already current · 0 left alone on purpose · 0 need attention
+```
+
+They now have the same repositories, on the same branches, with the same
+contracts an agent will read — including the ones written for a runtime they do
+not use, because the adapters are generated from one body rather than copied.
+
+`vat doctor` tells them what their machine is missing before they find out the
+slow way.
+
+---
+
 ## One change, three repositories
 
 The commands above are the floor. This is the arc they exist for: one contract

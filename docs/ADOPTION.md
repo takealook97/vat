@@ -76,6 +76,12 @@ nothing else; they are yours from the moment they land, so edit or delete them.
 Deleting one is without consequence and nothing puts it back — re-seeding on a
 later run would undo a removal somebody meant.
 
+Commit the workspace repository and push it. That is what makes the workspace
+reproducible: a colleague runs `git clone` and then `vat sync`, and every
+repository the manifest names is cloned onto their machine, on the branch it
+records, with the contracts already in place. `vat doctor` tells them what their
+machine is missing before they find out the slow way.
+
 Replace whatever loop you were using with `vat sync`. That alone stops the
 category of accident where an update destroys uncommitted work.
 

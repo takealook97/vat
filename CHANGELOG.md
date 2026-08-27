@@ -345,6 +345,11 @@ Notable changes to `vat`. The format follows
   thing — the buckets are checked and not the numbers, because the numbers
   belong to a scenario and asserting those would fail for reasons nobody should
   have to fix.
+- The README and the adoption guide say how a colleague gets the workspace.
+  `git clone` and then `vat sync` reconstructs every repository the manifest
+  names, on the branch it records, with the contracts already in place — the
+  single most common question a multi-repository tool is asked, and it was
+  answered nowhere.
 - The README's own `vat init` transcript showed a run that no longer happens.
   The guard added for the demo covered the recording alone, so the sample twenty
   lines below it went stale for exactly as long as nobody read it; every file
