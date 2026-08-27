@@ -915,3 +915,28 @@ func rewriteEveryGeneratedFileToCRLF(t *testing.T, root string) int {
 	}
 	return touched
 }
+
+// A dry run reports what it would do. Counting those rows as "already current"
+// says the opposite of what they mean — the repository is absent and would be
+// cloned — in the summary somebody reads to decide whether to run it for real.
+func TestADryRunSummarisesThePlanRatherThanAnOutcome(t *testing.T) {
+	// Arrange
+	h := newFixture(t)
+	h.mustRun("init", "--name", "acme")
+	h.mustRun("repo", "add", "absent",
+		"--origin", "https://example.invalid/acme/absent.git", "--no-clone")
+
+	// Act
+	output := h.mustRun("sync", "--dry-run")
+
+	// Assert
+	if strings.Contains(output, "already current") {
+		t.Errorf("a dry run counted a repository it would clone as already current:\n%s", output)
+	}
+	if !strings.Contains(output, "would") {
+		t.Errorf("the summary does not say the run was a plan:\n%s", output)
+	}
+	if !strings.Contains(output, "Nothing was written") {
+		t.Errorf("the summary does not say nothing happened:\n%s", output)
+	}
+}

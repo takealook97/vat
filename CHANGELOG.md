@@ -359,6 +359,10 @@ Notable changes to `vat`. The format follows
   shows, and nothing checked that — in the one asset a reader takes as evidence
   the tool does what the page claims. A contract test now holds it to naming
   every file `vat init` writes unconditionally, the seeded procedures included.
+- `vat sync --dry-run` summarises the plan rather than an outcome. A repository
+  it would clone was counted as "already current", which says the opposite of
+  what the row means, in the line somebody reads to decide whether to run it for
+  real.
 - The summary under `vat sync` counted what advanced, what was left alone, and
   what needed attention, and nothing else — so a workspace where every
   repository was already current printed three zeros under a table of rows. A

@@ -98,13 +98,15 @@ func renderSyncReport(env *Env, report syncx.Report) {
 	}
 	env.Printer.Table([]string{"REPOSITORY", "STATE", "BRANCH", "REV", "DETAIL"}, rows)
 
-	updated, skipped, current := 0, 0, 0
+	updated, skipped, current, planned := 0, 0, 0, 0
 	for _, result := range report.Results {
 		switch result.State {
 		case syncx.StateUpdated, syncx.StateCloned:
 			updated++
-		case syncx.StateCurrent, syncx.StateArchived, syncx.StatePlanned:
+		case syncx.StateCurrent, syncx.StateArchived:
 			current++
+		case syncx.StatePlanned:
+			planned++
 		case syncx.StateDirty, syncx.StateBranch, syncx.StateAhead, syncx.StateDetached,
 			syncx.StateNoRemote:
 			skipped++
@@ -113,6 +115,14 @@ func renderSyncReport(env *Env, report syncx.Report) {
 	needs := "need attention"
 	if report.Failures == 1 {
 		needs = "needs attention"
+	}
+	// A dry run reports a plan, not an outcome. Counting a repository it would
+	// clone as "already current" says the opposite of what the row means, in the
+	// line somebody reads to decide whether to run it for real.
+	if planned > 0 {
+		env.Printer.Hint("\n%s would change · %d left alone on purpose · %d %s. Nothing was written.",
+			pluralise(planned, "repository", "repositories"), skipped, report.Failures, needs)
+		return
 	}
 	// Every row above is accounted for. A summary whose numbers do not add up to
 	// the table it sits under is the state this tool reports in other people's
