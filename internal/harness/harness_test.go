@@ -505,3 +505,95 @@ func TestRenderingIsIdempotentAcrossLineEndings(t *testing.T) {
 		t.Errorf("adapters were rewritten for their line endings: %v", written)
 	}
 }
+
+// The roster is what tells a session which repository owns what and which
+// branch it ships from. A description carrying a pipe split the row into six
+// cells, so the Branch column showed the tail of somebody's sentence — an agent
+// reading it is told the wrong branch for that repository. A newline split the
+// row across two lines and ended the table there.
+func TestADescriptionCannotBreakTheRosterRow(t *testing.T) {
+	// Arrange
+	m := manifest.Default("acme")
+	m = manifest.WithRepo(m, manifest.Repo{
+		Name: "payments", Origin: "https://example.invalid/acme/payments.git",
+		Role: manifest.RoleProduct, Description: "Owns orders | and refunds",
+	})
+	m = manifest.WithRepo(m, manifest.Repo{
+		Name: "orders", Origin: "https://example.invalid/acme/orders.git",
+		Role: manifest.RoleProduct, Description: "line one\nline two",
+	})
+
+	// Act
+	rendered := harness.RenderWorkspace(m)
+
+	// Assert: every row of the roster has exactly the columns its header does.
+	var inRoster bool
+	for _, line := range strings.Split(rendered, "\n") {
+		switch {
+		case strings.HasPrefix(line, "| Repository |"):
+			inRoster = true
+			continue
+		case inRoster && !strings.HasPrefix(line, "|"):
+			inRoster = false
+			continue
+		case !inRoster:
+			continue
+		}
+		if cells := unescapedPipes(line); cells != 5 {
+			t.Errorf("a roster row has %d separators, not 5: %s", cells, line)
+		}
+	}
+	for _, repo := range []string{"payments", "orders"} {
+		if !strings.Contains(rendered, "`"+repo+"`") {
+			t.Errorf("%s is missing from the roster", repo)
+		}
+	}
+	// The branch is the last cell of every row, and it is the one an agent acts
+	// on.
+	if strings.Count(rendered, "| `main` |") != 2 {
+		t.Errorf("a row lost its branch column:\n%s", rendered)
+	}
+}
+
+// unescapedPipes counts the separators a Markdown parser would see, which is
+// every pipe not preceded by a backslash.
+func unescapedPipes(line string) int {
+	count := 0
+	for i := 0; i < len(line); i++ {
+		if line[i] != '|' {
+			continue
+		}
+		if i > 0 && line[i-1] == '\\' {
+			continue
+		}
+		count++
+	}
+	return count
+}
+
+// The trust table is the boundary this whole layer exists to state, and its
+// cells come from lists a user edits in vat.yaml. A pipe in one of them breaks
+// the row that says what untrusted content may do.
+func TestATrustSourceCannotBreakItsRow(t *testing.T) {
+	// Arrange
+	m := manifest.Default("acme")
+	m.Policy.Trust.Untrusted = []string{"web | anything", "model\noutput"}
+
+	// Act
+	rendered := harness.RenderWorkspace(m)
+
+	// Assert
+	for _, line := range strings.Split(rendered, "\n") {
+		if !strings.HasPrefix(line, "| Untrusted |") {
+			continue
+		}
+		if cells := unescapedPipes(line); cells != 4 {
+			t.Errorf("the untrusted row has %d separators, not 4: %s", cells, line)
+		}
+		if !strings.Contains(line, "never instruction") {
+			t.Errorf("the row lost the statement it exists to make: %s", line)
+		}
+		return
+	}
+	t.Fatalf("no untrusted row was rendered:\n%s", rendered)
+}

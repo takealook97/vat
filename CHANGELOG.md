@@ -458,6 +458,14 @@ Notable changes to `vat`. The format follows
   `vat brain build` rewriting both files every run, and every command that
   touches the manifest reporting ".gitignore updated" on a file nobody had
   changed.
+- A description cannot break the roster it is rendered into. The generated
+  contract's table is what tells a session which repository owns what and which
+  branch it ships from, and a description carrying a pipe split the row into six
+  cells — so the branch column showed the tail of somebody's sentence and an
+  agent reading it was told the wrong branch. A newline split the row across two
+  lines and ended the table there. The trust table, whose cells come from lists a
+  user edits, had the same hole in the row that states what untrusted content may
+  do.
 - A generated adapter's front matter survives whatever a description contains.
   Quoting without escaping produced `description: "a back\slash"`, and `\s` is
   not a YAML escape — the header did not parse, so the role was invisible to the
