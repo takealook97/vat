@@ -319,7 +319,9 @@ Notable changes to `vat`. The format follows
   would be a guess about whether the other change belongs beside this one, and a
   state that cannot be resolved safely is reported. Sequential use is unchanged;
   the lock is held for one read and one write, so a clone or a commit elsewhere
-  in a command never blocks anybody.
+  in a command never blocks anybody, and one left behind by something that died
+  inside that window is taken after a minute rather than locking the workspace
+  until somebody knows to delete a file.
 - A filesystem error is reported with its path once. Twenty places wrapped an
   error that already carried the path with the path again, and two layers doing
   it printed it three times: a directory where a `SKILL.md` belongs reported

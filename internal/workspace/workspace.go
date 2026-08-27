@@ -221,6 +221,16 @@ func lockManifest(root string) (func(), error) {
 		if !errors.Is(err, fs.ErrExist) {
 			return nil, err
 		}
+		// A lock is held for one read and one write. One older than lockStale
+		// belongs to something that died holding it, and a workspace nobody can
+		// write to until they know to delete a file is a worse failure than the
+		// one the lock prevents.
+		if info, statErr := os.Stat(path); statErr == nil && time.Since(info.ModTime()) > lockStale {
+			if err := os.Remove(path); err != nil && !errors.Is(err, fs.ErrNotExist) {
+				return nil, err
+			}
+			continue
+		}
 		if time.Now().After(deadline) {
 			return nil, fmt.Errorf(
 				"another vat command is changing %s and has not finished.\n"+
@@ -237,4 +247,7 @@ func lockManifest(root string) (func(), error) {
 const (
 	lockWait = 5 * time.Second
 	lockPoll = 5 * time.Millisecond
+	// lockStale is four orders of magnitude longer than the critical section,
+	// so nothing alive is ever mistaken for something that died.
+	lockStale = 60 * time.Second
 )

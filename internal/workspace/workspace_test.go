@@ -2,10 +2,12 @@ package workspace_test
 
 import (
 	"fmt"
+	"os"
 	"path/filepath"
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/takealook97/vat/internal/manifest"
 	"github.com/takealook97/vat/internal/workspace"
@@ -151,5 +153,79 @@ func TestConcurrentSavesLoseNothingAndSayWhichWereRefused(t *testing.T) {
 	if len(after.Repos) != wrote {
 		t.Errorf("%d writers were told they succeeded and the manifest holds %d entries",
 			wrote, len(after.Repos))
+	}
+}
+
+// The lock is held for one read and one write — milliseconds. A process killed
+// inside that window used to leave a file that made every later command wait
+// five seconds and then refuse, and the only repair was knowing to delete it.
+// A workspace bricked by a Ctrl-C is a worse failure than the one the lock
+// prevents.
+func TestALockLeftBySomethingThatDiedIsNotPermanent(t *testing.T) {
+	// Arrange
+	root := t.TempDir()
+	if err := manifest.Save(filepath.Join(root, manifest.FileName), manifest.Default("acme")); err != nil {
+		t.Fatalf("seed: %v", err)
+	}
+	ws, err := workspace.OpenAt(root)
+	if err != nil {
+		t.Fatalf("OpenAt: %v", err)
+	}
+	lock := filepath.Join(root, ".vat", "manifest.lock")
+	if err := os.MkdirAll(filepath.Dir(lock), 0o755); err != nil {
+		t.Fatalf("mkdir: %v", err)
+	}
+	if err := os.WriteFile(lock, nil, 0o644); err != nil {
+		t.Fatalf("write lock: %v", err)
+	}
+	// Older than anything a read and a write could take.
+	old := time.Now().Add(-time.Hour)
+	if err := os.Chtimes(lock, old, old); err != nil {
+		t.Fatalf("age the lock: %v", err)
+	}
+
+	// Act
+	err = ws.SaveManifest(manifest.WithRepo(ws.Manifest, manifest.Repo{
+		Name: "payments", Origin: "https://example.invalid/acme/payments.git",
+		Role: manifest.RoleProduct,
+	}))
+
+	// Assert
+	if err != nil {
+		t.Fatalf("a lock left behind an hour ago blocked a save: %v", err)
+	}
+	if _, err := os.Stat(lock); err == nil {
+		t.Error("the lock was not released")
+	}
+}
+
+// A lock somebody is actually holding is still waited on and then reported.
+func TestALockSomebodyIsHoldingIsWaitedOnAndThenReported(t *testing.T) {
+	// Arrange
+	root := t.TempDir()
+	if err := manifest.Save(filepath.Join(root, manifest.FileName), manifest.Default("acme")); err != nil {
+		t.Fatalf("seed: %v", err)
+	}
+	ws, err := workspace.OpenAt(root)
+	if err != nil {
+		t.Fatalf("OpenAt: %v", err)
+	}
+	lock := filepath.Join(root, ".vat", "manifest.lock")
+	if err := os.MkdirAll(filepath.Dir(lock), 0o755); err != nil {
+		t.Fatalf("mkdir: %v", err)
+	}
+	if err := os.WriteFile(lock, nil, 0o644); err != nil {
+		t.Fatalf("write lock: %v", err)
+	}
+
+	// Act
+	err = ws.SaveManifest(ws.Manifest)
+
+	// Assert
+	if err == nil {
+		t.Fatal("a save went through a lock somebody is holding")
+	}
+	if !strings.Contains(err.Error(), "another vat command") {
+		t.Errorf("the refusal does not say what is in the way: %v", err)
 	}
 }
