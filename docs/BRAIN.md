@@ -575,6 +575,9 @@ in a week.
 ```console
 $ vat brain adopt cortex
 OK    cortex        adopted as the brain repository
+OK    cortex/.brain  written
+OK    cortex/CURRENT.md  generated
+OK    cortex/graph.json  generated
 INFO  records       178 found
 WARN  schema        12 records need attention; run `vat brain check` for the list
       → Nothing was rewritten. Bring them up one at a time.
@@ -583,6 +586,11 @@ WARN  schema        12 records need attention; run `vat brain check` for the lis
 `vat` reads what is there and reports what does not meet the schema. It never
 rewrites a record, so an existing repository can be brought under the rules
 gradually rather than converted in one pass.
+
+Two files are written: the marker that makes the directory a brain, and the
+generated projections whose absence that marker turns into drift. Nothing else.
+Adoption that reported success and left `vat lint` answering "run vat brain
+init" about the same directory had not finished.
 
 ---
 
