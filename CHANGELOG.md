@@ -306,9 +306,147 @@ Notable changes to `vat`. The format follows
   it — neither `gofmt` nor any linter this project runs reports the pattern, so
   it had recurred three times.
 
+## [0.1.7] - 2026-08-26
+
+### Retracted
+
+Every version before this one. `proxy.golang.org` freezes a version's content on
+first fetch and offers no deletion, so `go install` would keep serving code with
+a disclosed credential or a workspace escape in it forever. Retraction is the
+only thing that stops the toolchain offering them: `go get` refuses a retracted
+version, `go list -m -versions` hides it, and `@latest` skips past it. A
+retraction only takes effect once published in a version above the ones it
+names, which is why it ships here rather than in the release that fixed each
+defect.
+
+Upgrade to 0.1.7 or later. The reason for each is recorded under it below.
+
+## [0.1.6] - 2026-08-26
+
+### Fixed
+
+- `vat repo new --remote https://user:token@host/x.git` never checked the flag.
+  It created the directory, scaffolded it, committed, wrote the
+  credential-bearing URL into `.git/config`, pushed to it over the network, and
+  printed it on success — and only then had the manifest refuse. The check now
+  runs before the first directory is created, and the URL read back from
+  `.git/config` is redacted before it is printed. `workspace.remote_template`
+  was checked for `{name}` and nothing else, so a credential in it reached the
+  manifest too.
+- A credential in `--origin` exited 1, "found errors", when a credential typed
+  on the command line means the command was called wrong, which is 2. CI
+  branches on that.
+- Every workspace's committed `.gitignore` carried generated text with three
+  apostrophes in it, and a repository name had no length limit while role names
+  and record ids both capped at 64 — `vat repo new` accepted a 200-character
+  name and left the failure to the filesystem, which reports it as something
+  else entirely. The cap is 100, matching what a git host accepts rather than a
+  convention vat picked for its own artefacts.
+- Ctrl-C during `vat exec` printed "exit status -1" per repository, Go's
+  rendering of a process killed by a signal and a number that tells the reader
+  nothing about what happened. An interrupted run now says it was interrupted.
+
+## [0.1.5] - 2026-08-26
+
+### Retracted
+
+Discloses a credential. `vat repo new --remote https://user:token@host/x.git`
+wrote the URL into `.git/config`, pushed to it, and printed it before the
+manifest refused. Fixed in 0.1.6.
+
+### Fixed
+
+- Six findings from an external safety review, all real. `vat brain init
+  ../../outside` joined a user-supplied path to the root with no containment
+  check and scaffolded fourteen files outside the workspace. `repo add --origin`
+  stored a token verbatim into the committed `vat.yaml`, and adopt recorded
+  whatever the git remote held; the manifest now rejects an origin carrying
+  userinfo, and adopt strips it — recording what it found rather than what
+  somebody typed. Three paths bypassed redaction: the push failure in
+  `repo new`, git's own stderr in sync, and `CommandError.Error`.
+- A `remote_template` with no `{name}` is not a template: every repository
+  created from it was given the same origin, and they fetch and push over each
+  other. The manifest already refused two repositories resolving to one
+  directory and said nothing about two resolving to one remote, which is worse.
+- `vat status` printed "1 repositories", and suggested `vat sync` for a diverged
+  repository, which sync refuses outright.
+
+## [0.1.4] - 2026-08-26
+
+### Retracted
+
+Writes outside the workspace root, in the command 0.1.3 did not reach. Fixed in
+0.1.5.
+
+### Fixed
+
+- A malformed identifier exited 1 rather than 2. The check lives in the packages
+  that own the files, where no caller can bypass it, so it surfaced as a plain
+  error when what it means is that the command was called wrong.
+
+## [0.1.3] - 2026-08-26
+
+### Retracted
+
+Writes outside the workspace root. This release closed the name-to-path gaps in
+`repo new`, `harness role new`, `brain new --id`, and `evidence new`, and left
+`brain init` open; that one was not closed until 0.1.5.
+
+### Fixed
+
+- `vat harness role new ../../../pwned` wrote the role body outside the
+  workspace and exited 0. The check that would have caught it,
+  `harness.ValidRoleName`, already existed and was already exported for exactly
+  this reason; the command that creates the file was the one caller that never
+  asked. `vat repo new ../escaped` initialised a git repository outside the
+  workspace, scaffolded it, committed it, and only then failed validation on
+  save, leaving everything it had written behind.
+- `vat brain new --id ../../../pwned` and `vat evidence new ../../../pwned` each
+  wrote a file outside the workspace root and exited 0. The check now lives in
+  `brain.ValidateID` and `evidence.ValidateID`, called from Create, Save, and
+  Load rather than from the commands, so no caller can write a record to a path
+  of its own choosing.
+- `vat repo adopt` on a symlink pointing at a repository outside the workspace
+  adopted it and wrote a generated contract into the target. Textual containment
+  cannot see that; `strictlyBelow` already resolved both sides through symlinks,
+  and adopt was the command that never called it.
+- `vat evidence check EV-9999` printed nothing and exited 0 when no packet had
+  that id, so a merge gated on a packet that was never written passed.
+
+## [0.1.2] - 2026-08-26
+
+### Retracted
+
+Writes outside the workspace root, in five commands that turned an argument into
+a path without checking it first. Fixed across 0.1.3 and 0.1.5.
+
+### Fixed
+
+- Raising coverage from 67% to 80% turned up four defects. `changeset list
+  --open` applied the filter inside the table-rendering loop, so `--json`
+  returned every changeset ever closed — a CI job asking for open work was
+  handed the whole history with no way to tell. `changeset add` did not check
+  the status, so a repository could be enrolled into a closed changeset,
+  rewriting what had been verified together. `vat fit` had no json tags and
+  alone emitted Go field names. And `--dirty` covers unpushed commits and
+  stashes, not only uncommitted changes; its own help text said otherwise.
+
+## [0.1.1]
+
+### Retracted
+
+Frozen before the build stamps were right, so it reports its own version
+incorrectly. Its tag no longer exists on the forge, but the version had already
+been published to the module proxy and cannot be withdrawn from it — which is
+the whole reason retraction exists.
+
 ## [0.1.0] - 2026-08-25
 
 The first release.
+
+### Retracted
+
+Frozen before the build stamps were right: it reports its own version as `dev`.
 
 ### Added
 

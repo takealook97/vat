@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"flag"
+	"fmt"
 	"os"
 	"reflect"
 	"regexp"
@@ -397,4 +398,145 @@ func TestTheReleaseWorkflowProducesWhatTheDocsPromise(t *testing.T) {
 	if walks := strings.Count(workflow, "for target in $TARGETS"); walks != 3 {
 		t.Errorf("%d loops walk $TARGETS; build, SBOM, and packaging must each walk it", walks)
 	}
+}
+
+// A top-level command with no section is caught above. A subcommand with no
+// mention was not, and that is where the surface actually grows: `vat harness`
+// has had a section since the first release, so two commands could be added
+// under it and documented nowhere while every contract test stayed green.
+//
+// The reference writes subcommands into a fenced usage block rather than as
+// headings, so the check is for the invocation appearing at all. That is weaker
+// than the heading rule above and still forecloses the case that matters —
+// shipping a command nobody can find.
+func TestEverySubcommandIsNamedInTheReference(t *testing.T) {
+	// Arrange
+	reference := readReference(t)
+
+	// Act & Assert
+	walkCommands(Root(), nil, func(command *Command, path []string) {
+		if len(path) < 2 || command.Hidden {
+			return
+		}
+		invocation := "vat " + strings.Join(path, " ")
+		if !strings.Contains(reference, invocation) {
+			t.Errorf("%s exists and %s never names it", invocation, referencePath)
+		}
+	})
+}
+
+// go.mod's retract block is read by the Go toolchain and by nobody else. A
+// person deciding whether the version they installed is one of the unsafe ones
+// reads the release notes, and every version this module has retracted — for a
+// disclosed credential, for writes outside the workspace root, for a wrong
+// version stamp — was absent from them.
+//
+// A retraction is the one release fact that cannot be corrected later: the
+// version is frozen on the proxy, so the note explaining it is the whole of
+// what a reader will ever get.
+func TestEveryRetractedVersionIsExplainedInTheChangelog(t *testing.T) {
+	// Arrange
+	retracted := retractedVersions(t)
+	if len(retracted) == 0 {
+		t.Skip("nothing is retracted")
+	}
+	sections := changelogSections(t)
+
+	// Act & Assert
+	for _, version := range retracted {
+		// Its own section, and that section saying so. A bare mention is not
+		// enough: every retracted version was already named somewhere in this
+		// file, in prose about the release that fixed it, which tells a reader
+		// asking "is what I installed safe" nothing at all.
+		body, released := sections[strings.TrimPrefix(version, "v")]
+		if !released {
+			t.Errorf("go.mod retracts %s and %s has no section for it", version, changelogPath)
+			continue
+		}
+		if !strings.Contains(body, "Retracted") {
+			t.Errorf("%s documents %s without saying it was retracted", changelogPath, version)
+		}
+	}
+}
+
+// changelogSections maps each released version to the body of its section.
+func changelogSections(t *testing.T) map[string]string {
+	t.Helper()
+	content, err := os.ReadFile(changelogPath)
+	if err != nil {
+		t.Fatalf("read %s: %v", changelogPath, err)
+	}
+	sections := map[string]string{}
+	heading := regexp.MustCompile(`^## \[([^\]]+)]`)
+	var current string
+	var body strings.Builder
+	flush := func() {
+		if current != "" {
+			sections[current] = body.String()
+		}
+		body.Reset()
+	}
+	for _, line := range strings.Split(string(content), "\n") {
+		if match := heading.FindStringSubmatch(line); match != nil {
+			flush()
+			current = match[1]
+			continue
+		}
+		if current != "" {
+			body.WriteString(line + "\n")
+		}
+	}
+	flush()
+	return sections
+}
+
+const changelogPath = "../../CHANGELOG.md"
+
+// retractedVersions reads go.mod and returns every version the module retracts,
+// expanding a `[low, high]` range across its patch numbers so a version named
+// only by being inside one is still checked.
+func retractedVersions(t *testing.T) []string {
+	t.Helper()
+	content, err := os.ReadFile("../../go.mod")
+	if err != nil {
+		t.Fatalf("read go.mod: %v", err)
+	}
+	block := regexp.MustCompile(`(?s)retract\s*\((.*?)\n\)`).FindStringSubmatch(string(content))
+	if block == nil {
+		return nil
+	}
+	var versions []string
+	ranged := regexp.MustCompile(`\[\s*v(\d+)\.(\d+)\.(\d+)\s*,\s*v(\d+)\.(\d+)\.(\d+)\s*]`)
+	single := regexp.MustCompile(`^\s*(v\d+\.\d+\.\d+)\s*$`)
+	for _, line := range strings.Split(block[1], "\n") {
+		if bounds := ranged.FindStringSubmatch(line); bounds != nil {
+			numbers := make([]int, 6)
+			for i := range numbers {
+				numbers[i], _ = strconv.Atoi(bounds[i+1])
+			}
+			// Only a patch range is expanded. A range spanning a minor version
+			// cannot be enumerated from the text alone, so its endpoints stand
+			// rather than a guess at what lies between them.
+			if numbers[0] != numbers[3] || numbers[1] != numbers[4] {
+				versions = append(versions, "v"+bounds[1]+"."+bounds[2]+"."+bounds[3],
+					"v"+bounds[4]+"."+bounds[5]+"."+bounds[6])
+				continue
+			}
+			for patch := numbers[2]; patch <= numbers[5]; patch++ {
+				versions = append(versions, fmt.Sprintf("v%d.%d.%d", numbers[0], numbers[1], patch))
+			}
+			continue
+		}
+		if one := single.FindStringSubmatch(stripComment(line)); one != nil {
+			versions = append(versions, one[1])
+		}
+	}
+	return versions
+}
+
+func stripComment(line string) string {
+	if at := strings.Index(line, "//"); at >= 0 {
+		return line[:at]
+	}
+	return line
 }
