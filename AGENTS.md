@@ -23,6 +23,9 @@ so it has no `vat.yaml` of its own.
    owns and why it exists.
 4. `CONTRIBUTING.md` — the design rules this project holds itself to.
 
+Procedures that apply only sometimes live in `.agents/skills/`, not here. This
+file is the map and is always in context; a skill is read when its job comes up.
+
 ## Boundaries
 
 - Write only inside this repository.
@@ -85,14 +88,19 @@ Breaking one of these is a defect regardless of what the change achieves.
 
 A change to a command's output, exit code, or flags is a contract change. It
 needs, in the same commit: the code, its test, and the matching row in
-`docs/COMMANDS.md`.
+`docs/COMMANDS.md`. The steps, and the tests that catch each one you skip, are
+in `.agents/skills/change-a-command-contract/SKILL.md`.
 
 Adding a rule additionally requires its name in the list its package keeps —
 `lint.RuleNames()` for `vat lint`, `brain.RuleNames()` for `vat brain check` —
 and the matching row in the reference table, `docs/COMMANDS.md` for the first
 and `docs/BRAIN.md` for the second. A test asserts each list against both the
 code and its table, because an unlisted rule cannot be selected with `--only`
-and is a rule nobody knows to look for.
+and is a rule nobody knows to look for. The steps are in
+`.agents/skills/add-a-lint-rule/SKILL.md`.
+
+Releasing is `.agents/skills/cut-a-release/SKILL.md`. Read it before tagging:
+a published tag can never be moved.
 
 ## Completion
 

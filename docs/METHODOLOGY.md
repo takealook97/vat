@@ -139,9 +139,15 @@ docs/CONVENTIONS.md      code and documentation rules
 docs/DECISIONS.md        judgements that must not be reversed by accident
 tests/, fixtures/        expected behaviour, pinned mechanically
 Makefile or check script the canonical verification command
-.agents/roles/           runtime-neutral role contracts
+.agents/roles/           runtime-neutral role contracts: who is running
+.agents/skills/          runtime-neutral procedures, loaded on demand
 .claude/, .codex/        generated per-runtime adapters
 ```
+
+A contract is always in context and states what is true of the repository. A
+procedure is read only when it applies, and states how a particular job is done.
+Keeping them apart is what stops the always-loaded file from growing until it
+truncates the ones meant to load after it.
 
 A good harness answers: what is this repository responsible for; what does it
 never do; what must be read before editing; which files must change together

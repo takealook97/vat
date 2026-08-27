@@ -506,6 +506,23 @@ contract in one place and generates thin pointers:
 A role that declares no write target generates a **read-only** adapter. Being
 trusted to decide something is not the same as being able to act on it.
 
+**A role is who is running. A skill is a procedure loaded on demand.** They
+drift for the same reason, so they are kept in one place the same way.
+
+```
+.agents/skills/cut-a-release/SKILL.md   ← canonical. the procedure lives here.
+    ↓  vat harness render
+.claude/skills/cut-a-release/SKILL.md   ← generated adapter: front matter and a
+                                          pointer, never a copy of the procedure
+```
+
+Two copies of a release procedure that disagree by one step are worse than one
+copy nobody has read, because both look authoritative. Only Claude Code is given
+a skill adapter; Codex discovers a skill through the canonical directory itself.
+So `runtimes: [codex]` on a skill selects an adapter that does not exist, and
+`vat lint` says so — no adapter means no drift to report, and the definition
+would otherwise sit on disk generating nothing while every check reads green.
+
 **Contracts stay in step with reality.** Each `AGENTS.md` carries one generated
 region rendered from `vat.yaml`; everything you write above it is untouched.
 
