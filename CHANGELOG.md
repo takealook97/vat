@@ -8,6 +8,35 @@ Notable changes to `vat`. The format follows
 
 ### Added
 
+- `vat harness skills` and `vat harness skill new`, the counterparts roles have
+  had since skills existed. A format vat specifies, generates, and lints four
+  ways had no command that produced one, so the only way to add a skill was to
+  know the on-disk layout and write the directory by hand. `skill new` says at
+  creation what lint would say on the next run: that `--runtimes codex` selects
+  an adapter which does not exist, and that a skill with no description is one
+  no runtime can offer. The description is left empty rather than filled with a
+  placeholder, because an invented one would satisfy `harness/skill-metadata`
+  while telling the runtime nothing.
+- `vat init` seeds two procedures, `before-cross-repo-work` and
+  `consult-the-brain-first`. A workspace arrived with contracts and no
+  procedures: the generated `AGENTS.md` states boundaries, and when to open a
+  changeset or consult the knowledge layer is a sequence rather than a boundary.
+  Both seeds describe vat's own command sequences and nothing else, because a
+  procedure vat writes once and never maintains is the second source of truth
+  this tool exists to remove — and a test holds every command they name to
+  resolving in the command tree, matched whole rather than by prefix. A seeded
+  file is canonical from the moment it lands: an existing one is never
+  rewritten, and removing one is without consequence. Both are specified in
+  `docs/SPEC.md` and both are tested.
+- vat's own first three skills, under `.agents/skills/`. The tool generated
+  skill adapters, linted them four ways, and specified them normatively while
+  keeping none of its own, which is a poor argument from a tool whose whole
+  claim is that a contract nobody uses drifts. `add-a-lint-rule` and
+  `change-a-command-contract` were conditional prose in `AGENTS.md`;
+  `cut-a-release` was written down nowhere and carries the fact that costs most
+  to rediscover — a published tag is frozen, because the Go module proxy caches
+  a version on first fetch, so a bad release ships as the next patch rather than
+  as a moved tag.
 - `harness/runtime-unknown`, for a `runtimes:` value no adapter is generated
   for. A typo produced silence: no adapter meant no drift, the description was
   present so role-metadata passed, and a bare model bound to nothing so
@@ -166,6 +195,18 @@ Notable changes to `vat`. The format follows
   uncalled exported function has no possible user.
 
 ### Fixed
+
+- The self-contract test kept vat's own **role** adapters in step with their
+  definitions and did not do the same for skills. vat has no `vat.yaml` and runs
+  no lint on itself, so that test is the only thing standing where every other
+  workspace has `vat lint`, and a skill adapter could have drifted from its
+  canonical procedure with the suite green. It now also makes the two checks
+  `harness/skill-metadata` and `harness/runtime-unknown` would make elsewhere: a
+  skill with no description, and one that renders no adapter at all.
+- `docs/METHODOLOGY.md` listed `.agents/roles/` in the harness inventory and
+  stopped, and the README's harness section did not contain the word "skill" at
+  all. A format that is normative in `docs/SPEC.md` and absent from the two
+  documents that introduce the model is a format nobody adopts.
 
 - **`vat harness roles` reports the role files it could not read, and fails
   again.** Returning malformed definitions separately so the sound ones still
