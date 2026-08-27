@@ -219,6 +219,15 @@ func dispatch(ctx context.Context, env *Env, command *Command, args []string, pa
 			}
 		}
 		if command.Run == nil {
+			// A flag is not a command. Telling somebody their option is not one
+			// sends them looking through the command list for something they
+			// never typed, and the suggestion below would offer them a verb.
+			if strings.HasPrefix(name, "-") {
+				env.Printer.Errorf("unknown flag %q", name)
+				env.Printer.Hint("Run `%s --help` for the flags and commands that exist.",
+					strings.Join(path, " "))
+				return ExitUsage
+			}
 			full := strings.Join(append(path[1:], name), " ")
 			env.Printer.Errorf("unknown command %q", full)
 			suggest(env.Printer, command, name)

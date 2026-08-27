@@ -180,3 +180,24 @@ func TestCompletionRejectsAnUnknownShell(t *testing.T) {
 		t.Fatal("an unknown shell was accepted")
 	}
 }
+
+// `vat --nope status` answered `unknown command "--nope"`. It is a flag, and
+// telling somebody their flag is not a command sends them looking through the
+// command list for something they never typed.
+func TestAnUnknownFlagIsNotReportedAsAnUnknownCommand(t *testing.T) {
+	// Arrange & Act
+	var out bytes.Buffer
+	env := &Env{Printer: ui.NewWith(&out, &out, false), Cwd: t.TempDir()}
+	code := dispatch(t.Context(), env, Root(), []string{"--nope", "status"}, nil)
+
+	// Assert
+	if code == ExitOK {
+		t.Fatalf("an unknown flag was accepted:\n%s", out.String())
+	}
+	if strings.Contains(out.String(), "unknown command") {
+		t.Errorf("a flag was reported as a command:\n%s", out.String())
+	}
+	if !strings.Contains(out.String(), "--nope") {
+		t.Errorf("the refusal does not name what was passed:\n%s", out.String())
+	}
+}
