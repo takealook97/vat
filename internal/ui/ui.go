@@ -174,7 +174,51 @@ func (p *Printer) Status(level Level, subject, detail string) {
 		_, _ = fmt.Fprintf(p.out, "%s %s\n", label, oneLine(subject))
 		return
 	}
-	_, _ = fmt.Fprintf(p.out, "%s %s  %s\n", label, pad(oneLine(subject), 24), oneLine(detail))
+	_, _ = fmt.Fprintf(p.out, "%s %s  %s\n", label, pad(oneLine(subject), statusSubjectWidth), oneLine(detail))
+}
+
+// statusSubjectWidth is the column every single Status pads its subject to.
+// A group widens past it rather than below it, so a group of ordinary subjects
+// renders exactly as a run of Status calls does.
+const statusSubjectWidth = 24
+
+// StatusRow is one line of a group rendered together, with the indented hint
+// that belongs beneath it.
+type StatusRow struct {
+	Level   Level
+	Subject string
+	Detail  string
+	Hint    string
+}
+
+// StatusGroup renders rows with the subject column padded to the widest subject
+// among them.
+//
+// Status pads to a fixed width because it sees one line at a time, so any
+// subject past that width pushed its own detail out of line with the rest. In
+// `vat lint` that is most findings — rule and subject together run long — and
+// its output is meant to be scanned down a column.
+func (p *Printer) StatusGroup(rows []StatusRow) {
+	width := statusSubjectWidth
+	for _, row := range rows {
+		if got := displayWidth(oneLine(row.Subject)); got > width {
+			width = got
+		}
+	}
+	for _, row := range rows {
+		if p.quiet && (row.Level == LevelOK || row.Level == LevelInfo) {
+			continue
+		}
+		label := p.paint(row.Level.color(), pad(row.Level.Label(), 5))
+		if row.Detail == "" {
+			_, _ = fmt.Fprintf(p.out, "%s %s\n", label, oneLine(row.Subject))
+		} else {
+			_, _ = fmt.Fprintf(p.out, "%s %s  %s\n", label, pad(oneLine(row.Subject), width), oneLine(row.Detail))
+		}
+		if row.Hint != "" {
+			p.Hint("      → %s", row.Hint)
+		}
+	}
 }
 
 // Table renders rows under headers with columns padded to their widest cell.

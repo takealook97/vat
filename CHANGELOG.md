@@ -359,6 +359,12 @@ Notable changes to `vat`. The format follows
   shows, and nothing checked that — in the one asset a reader takes as evidence
   the tool does what the page claims. A contract test now holds it to naming
   every file `vat init` writes unconditionally, the seeded procedures included.
+- `vat lint` and `vat harness adopt` align every message to the widest subject
+  in the report. A single status line pads to a fixed width because it sees one
+  line at a time, so any finding whose rule and subject ran past it pushed its
+  own message out of line — which is most findings, in the command that runs
+  most often and whose output exists to be scanned down a column. Every subject
+  in an adoption report is a path, so that one was ragged by construction.
 - The README's brain walkthrough showed a record it had just created as
   `active`, and showed superseding leaving its replacement `active`. Both
   contradict the promotion gate the surrounding prose is written to explain, and

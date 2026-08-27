@@ -113,26 +113,33 @@ func applyAdoptions(ws *workspace.Workspace, adoptions []harness.Adoption) (map[
 // Every refusal is reported, not the first: these commands run in a loop while
 // somebody cleans a workspace up.
 func reportAdoptions(env *Env, adoptions []harness.Adoption, adopted map[string]bool) int {
+	// Every subject here is a path, so they are always longer than the width a
+	// single Status pads to and the report was ragged by construction.
 	var adoptable int
+	rows := make([]ui.StatusRow, 0, len(adoptions))
 	for _, adoption := range adoptions {
 		switch {
 		case adoption.Refusal != "":
-			env.Printer.Status(ui.LevelWarn, adoption.Adapter, "not adopted: "+adoption.Refusal)
+			rows = append(rows, ui.StatusRow{Level: ui.LevelWarn, Subject: adoption.Adapter,
+				Detail: "not adopted: " + adoption.Refusal})
 		case adopted[adoption.Adapter]:
 			adoptable++
-			env.Printer.Status(ui.LevelOK, adoption.Canonical, "adopted from "+adoption.Adapter)
+			rows = append(rows, ui.StatusRow{Level: ui.LevelOK, Subject: adoption.Canonical,
+				Detail: "adopted from " + adoption.Adapter})
 		default:
 			adoptable++
-			env.Printer.Status(ui.LevelInfo, adoption.Adapter, "would become "+adoption.Canonical)
+			rows = append(rows, ui.StatusRow{Level: ui.LevelInfo, Subject: adoption.Adapter,
+				Detail: "would become " + adoption.Canonical})
 		}
 		// Said whether or not --apply was passed, so it is read before the move
 		// rather than discovered after it. A key vat has no field for may still
 		// be one the runtime honours.
 		if len(adoption.Dropped) > 0 && adoption.Refusal == "" {
-			env.Printer.Status(ui.LevelWarn, adoption.Adapter,
-				"front matter not carried over: "+strings.Join(adoption.Dropped, ", "))
+			rows = append(rows, ui.StatusRow{Level: ui.LevelWarn, Subject: adoption.Adapter,
+				Detail: "front matter not carried over: " + strings.Join(adoption.Dropped, ", ")})
 		}
 	}
+	env.Printer.StatusGroup(rows)
 	return adoptable
 }
 

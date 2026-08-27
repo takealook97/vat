@@ -81,12 +81,12 @@ enforces it.
 
 ```console
 $ vat lint
-FAIL  workspace/gitignore-drift · console      1 governed repository is not excluded by .gitignore; a workspace commit would swallow it
+FAIL  workspace/gitignore-drift · console                 1 governed repository is not excluded by .gitignore; a workspace commit would swallow it
       → vat lint --fix
-FAIL  harness/adapter-drift · .codex/agents/planner.toml   runtime adapter no longer matches its role definition in .agents/roles
+FAIL  harness/adapter-drift · .codex/agents/planner.toml  runtime adapter no longer matches its role definition in .agents/roles
       → vat harness render
-WARN  brain/source-revision-drift · G-0014     payments has moved 47 commits since this was observed at 3f9a1c2; re-check, do not assume it broke
-WARN  changeset/open-too-long · CS-0007        open for 31 days, past the 14-day limit; repositories are mid-contract-change with no closing evidence
+WARN  brain/source-revision-drift · G-0014                payments has moved 47 commits since this was observed at 3f9a1c2; re-check, do not assume it broke
+WARN  changeset/open-too-long · CS-0007                   open for 31 days, past the 14-day limit; repositories are mid-contract-change with no closing evidence
 
 Result
 FAIL  lint                      2 errors, 2 warnings across 36 rules

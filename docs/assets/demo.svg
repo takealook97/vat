@@ -179,6 +179,6 @@
 <text x="22" y="502.0" class="t" fill="#e3b341">$ vat lint</text>
 <text x="22" y="521.0" class="t" fill="#f85149">FAIL  workspace/gitignore-drift · brain, console, payments  3 governed repositories are not excluded by .gitignore; a workspace commit would swallow them</text>
 <text x="22" y="540.0" class="t" fill="#8b949e">      → vat lint --fix</text>
-<text x="22" y="559.0" class="t" fill="#d29922">WARN  brain/not-initialised · brain  declared as the knowledge repository but has no records yet</text>
+<text x="22" y="559.0" class="t" fill="#d29922">WARN  brain/not-initialised · brain                         declared as the knowledge repository but has no records yet</text>
 </g>
 </svg>

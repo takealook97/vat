@@ -323,3 +323,85 @@ func TestColourIsStillAppliedAroundASanitisedValue(t *testing.T) {
 		t.Errorf("colour was stripped from the printer's own output: %q", out.String())
 	}
 }
+
+// Status pads the subject to a fixed width because it sees one line at a time.
+// So every finding whose rule and subject together run past that width pushed
+// its own message out of line with the rest — which is most of them in `vat
+// lint`, the command that runs most often and whose output is meant to be
+// scanned down a column.
+func TestAStatusGroupAlignsEveryDetailToTheWidestSubject(t *testing.T) {
+	// Arrange
+	printer, out, _ := newPrinter()
+	rows := []ui.StatusRow{
+		{Level: ui.LevelWarn, Subject: "harness/repo-missing · api", Detail: "has no AGENTS.md"},
+		{Level: ui.LevelWarn, Subject: "repo/checks-missing · api", Detail: "declares no checks"},
+		{Level: ui.LevelFail, Subject: "short", Detail: "still lines up"},
+	}
+
+	// Act
+	printer.StatusGroup(rows)
+
+	// Assert
+	lines := strings.Split(strings.TrimRight(out.String(), "\n"), "\n")
+	if len(lines) != 3 {
+		t.Fatalf("printed %d lines, want 3:\n%s", len(lines), out.String())
+	}
+	// Counted in runes, not bytes. The "·" separator is one column and two
+	// bytes, so a byte offset says two correctly aligned lines disagree.
+	columns := map[int]bool{}
+	for _, line := range lines {
+		for _, detail := range []string{"has no AGENTS.md", "declares no checks", "still lines up"} {
+			if at := strings.Index(line, detail); at >= 0 {
+				columns[len([]rune(line[:at]))] = true
+			}
+		}
+	}
+	if len(columns) != 1 {
+		t.Errorf("details start at %d different columns:\n%s", len(columns), out.String())
+	}
+}
+
+// A hint belongs to the row above it, so it is rendered by the same call rather
+// than left to a caller that no longer knows the width.
+func TestAStatusGroupRendersEachRowsHintBeneathIt(t *testing.T) {
+	// Arrange
+	printer, out, _ := newPrinter()
+
+	// Act
+	printer.StatusGroup([]ui.StatusRow{
+		{Level: ui.LevelWarn, Subject: "repo/checks-missing · api", Detail: "declares no checks",
+			Hint: "add checks: to api in vat.yaml"},
+		{Level: ui.LevelWarn, Subject: "short", Detail: "no hint here"},
+	})
+
+	// Assert
+	lines := strings.Split(strings.TrimRight(out.String(), "\n"), "\n")
+	if len(lines) != 3 {
+		t.Fatalf("printed %d lines, want 3:\n%s", len(lines), out.String())
+	}
+	if !strings.Contains(lines[1], "→ add checks:") {
+		t.Errorf("the hint is not under the row it belongs to:\n%s", out.String())
+	}
+}
+
+// A group of ordinary short subjects must look exactly as it did, or every
+// transcript in the documentation is wrong at once.
+func TestAStatusGroupOfShortSubjectsMatchesASingleStatus(t *testing.T) {
+	// Arrange
+	grouped, groupOut, _ := newPrinter()
+	single, singleOut, _ := newPrinter()
+
+	// Act
+	grouped.StatusGroup([]ui.StatusRow{
+		{Level: ui.LevelOK, Subject: "payments", Detail: "registered as product"},
+		{Level: ui.LevelOK, Subject: "AGENTS.md", Detail: "regenerated"},
+	})
+	single.Status(ui.LevelOK, "payments", "registered as product")
+	single.Status(ui.LevelOK, "AGENTS.md", "regenerated")
+
+	// Assert
+	if groupOut.String() != singleOut.String() {
+		t.Errorf("a group of short subjects renders differently:\ngroup:\n%s\nsingle:\n%s",
+			groupOut.String(), singleOut.String())
+	}
+}

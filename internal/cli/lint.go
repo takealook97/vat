@@ -122,6 +122,10 @@ func renderLintReport(env *Env, report lint.Report) {
 				pluralise(report.Checked, "rule", "rules")))
 		return
 	}
+	// Rendered as a group so every message starts in the same column. A rule
+	// name and a subject together usually run past the width a single Status
+	// pads to, and this output exists to be scanned down that column.
+	rows := make([]ui.StatusRow, 0, len(report.Findings))
 	for _, finding := range report.Findings {
 		level := ui.LevelWarn
 		if finding.Severity == lint.SeverityError {
@@ -131,11 +135,11 @@ func renderLintReport(env *Env, report lint.Report) {
 		if finding.Subject != "" {
 			subject = finding.Rule + " · " + finding.Subject
 		}
-		printer.Status(level, subject, finding.Message)
-		if finding.Fix != "" {
-			printer.Hint("      → %s", finding.Fix)
-		}
+		rows = append(rows, ui.StatusRow{
+			Level: level, Subject: subject, Detail: finding.Message, Hint: finding.Fix,
+		})
 	}
+	printer.StatusGroup(rows)
 	printer.Heading("Result")
 	errors := report.Errors()
 	warnings := len(report.Findings) - errors
