@@ -359,6 +359,12 @@ Notable changes to `vat`. The format follows
   shows, and nothing checked that — in the one asset a reader takes as evidence
   the tool does what the page claims. A contract test now holds it to naming
   every file `vat init` writes unconditionally, the seeded procedures included.
+- `vat metrics` prints `—` for a measurement with nothing to measure. A median
+  over no claims read as "0 days since the typical claim was verified" and a
+  rate over no checks read as "0% failed" — the most flattering possible reading
+  of a workspace that has verified nothing, in the numbers somebody quotes to
+  justify the tool. `--json` gains `claims_measured` and `checks_recorded` so a
+  consumer can tell an empty population from a genuine zero.
 - `vat brain check` reports a record whose date cannot be read
   (`brain/date-unreadable`). `brain/claim-stale` and `brain/review-overdue` both
   ask the record how old it is and skip it when it cannot say, so one unreadable

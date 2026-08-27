@@ -46,7 +46,12 @@ type Snapshot struct {
 	ReviewOverdue int `json:"review_overdue"`
 	// MedianClaimAgeDays is how old the typical current-state claim's evidence
 	// is. Rising means the repository is drifting away from reality.
+	//
+	// ClaimsMeasured is how many claims it was taken over. A median of nothing
+	// is not zero, and "0 days since the typical claim was verified" is the
+	// most flattering possible reading of a workspace that has verified none.
 	MedianClaimAgeDays int `json:"median_claim_age_days"`
+	ClaimsMeasured     int `json:"claims_measured"`
 
 	// ChangesetsOpen and ChangesetsStale measure unfinished cross-repository
 	// work — the cost multi-repo layouts pay and usually never count.
@@ -54,8 +59,17 @@ type Snapshot struct {
 	ChangesetsStale int `json:"changesets_stale"`
 	// ReworkRate is the share of recorded checks that failed: how often work
 	// reported as done did not survive verification.
-	ReworkRate float64 `json:"rework_rate"`
+	//
+	// ChecksRecorded is the denominator. Without it, no check having ever run
+	// and every check having passed are the same number.
+	ReworkRate     float64 `json:"rework_rate"`
+	ChecksRecorded int     `json:"checks_recorded"`
 }
+
+// noReading is what a measurement with an empty population prints. It is the
+// same dash the delta column uses for "nothing to compare against", because it
+// says the same thing: this is not a number yet.
+const noReading = "—"
 
 // Ledger is the append-only local history of snapshots. It lives in derived
 // state, never in the manifest, because it is regenerable and uninteresting to
@@ -102,7 +116,7 @@ func Collect(ctx context.Context, ws *workspace.Workspace, now time.Time) (Snaps
 				snapshot.ReviewOverdue++
 			}
 		}
-		snapshot.MedianClaimAgeDays = medianClaimAge(store, now)
+		snapshot.MedianClaimAgeDays, snapshot.ClaimsMeasured = medianClaimAge(store, now)
 	}
 
 	sets, err := changeset.LoadAll(ws.Root)
@@ -126,13 +140,16 @@ func Collect(ctx context.Context, ws *workspace.Workspace, now time.Time) (Snaps
 			}
 		}
 	}
+	snapshot.ChecksRecorded = totalChecks
 	if totalChecks > 0 {
 		snapshot.ReworkRate = float64(failedChecks) / float64(totalChecks)
 	}
 	return snapshot, nil
 }
 
-func medianClaimAge(store *brain.Store, now time.Time) int {
+// medianClaimAge returns the median and the number of claims it was taken over,
+// because a caller cannot tell an empty population from a population of zeroes.
+func medianClaimAge(store *brain.Store, now time.Time) (median, measured int) {
 	var ages []int
 	for _, record := range store.CurrentStateClaims() {
 		if age, ok := record.AgeDays(now); ok {
@@ -140,14 +157,14 @@ func medianClaimAge(store *brain.Store, now time.Time) int {
 		}
 	}
 	if len(ages) == 0 {
-		return 0
+		return 0, 0
 	}
 	for i := 1; i < len(ages); i++ {
 		for j := i; j > 0 && ages[j] < ages[j-1]; j-- {
 			ages[j], ages[j-1] = ages[j-1], ages[j]
 		}
 	}
-	return ages[len(ages)/2]
+	return ages[len(ages)/2], len(ages)
 }
 
 // Append records a snapshot in the local ledger so trends become visible. A
@@ -248,6 +265,15 @@ func Compare(current Snapshot, history []Snapshot) []Trend {
 			Reading: measure.reading,
 			Delta:   "—",
 		}
+		// A median taken over no claims is not zero. Printed as a number it
+		// reads as "every claim was verified today", which is the most
+		// flattering thing that could be said about a workspace that has
+		// verified nothing — and a trend against it is arithmetic on nothing.
+		if measure.name == "median claim age" && current.ClaimsMeasured == 0 {
+			trend.Current = noReading
+			trends = append(trends, trend)
+			continue
+		}
 		if previous != nil {
 			before := previousValue(*previous, measure.name)
 			delta := measure.value - before
@@ -264,9 +290,15 @@ func Compare(current Snapshot, history []Snapshot) []Trend {
 		}
 		trends = append(trends, trend)
 	}
+	// No check having run and every check having passed are the same number
+	// without the denominator, and the second is the one a reader assumes.
+	rework := noReading
+	if current.ChecksRecorded > 0 {
+		rework = fmt.Sprintf("%.0f%%", current.ReworkRate*100)
+	}
 	trends = append(trends, Trend{
 		Name:    "rework rate",
-		Current: fmt.Sprintf("%.0f%%", current.ReworkRate*100),
+		Current: rework,
 		Delta:   "—",
 		Reading: "share of recorded checks that failed",
 	})

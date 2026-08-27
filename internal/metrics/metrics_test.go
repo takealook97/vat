@@ -197,3 +197,78 @@ func TestEveryMeasureExplainsWhatItMeans(t *testing.T) {
 		}
 	}
 }
+
+// A median of no claims and a failure rate of no checks are not zero, they are
+// nothing. Printed as "0 days since the typical claim was verified" and "0% of
+// checks failed", they are the most flattering possible reading of a workspace
+// that has verified nothing at all — and these are the numbers somebody quotes
+// to justify the tool.
+func TestAMeasurementWithNothingToMeasureSaysSoRatherThanZero(t *testing.T) {
+	// Arrange
+	ws := fixture(t)
+
+	// Act
+	snapshot, err := metrics.Collect(context.Background(), ws, reference)
+	if err != nil {
+		t.Fatal(err)
+	}
+	trends := metrics.Compare(snapshot, nil)
+
+	// Assert
+	byName := map[string]metrics.Trend{}
+	for _, trend := range trends {
+		byName[trend.Name] = trend
+	}
+	for _, name := range []string{"median claim age", "rework rate"} {
+		got := byName[name].Current
+		if got == "0" || got == "0%" {
+			t.Errorf("%q reads %q on a workspace with nothing to measure", name, got)
+		}
+	}
+	if snapshot.ClaimsMeasured != 0 || snapshot.ChecksRecorded != 0 {
+		t.Errorf("the population counts are not zero: %d claims, %d checks",
+			snapshot.ClaimsMeasured, snapshot.ChecksRecorded)
+	}
+}
+
+// And a real reading must still be a number, or the rule that makes the empty
+// case honest has made every case useless.
+func TestARealMeasurementStillReadsAsANumber(t *testing.T) {
+	// Arrange
+	snapshot := metrics.Snapshot{
+		MedianClaimAgeDays: 12, ClaimsMeasured: 3,
+		ReworkRate: 0.25, ChecksRecorded: 8,
+	}
+
+	// Act
+	trends := metrics.Compare(snapshot, nil)
+
+	// Assert
+	byName := map[string]string{}
+	for _, trend := range trends {
+		byName[trend.Name] = trend.Current
+	}
+	if byName["median claim age"] != "12" {
+		t.Errorf("median claim age reads %q, want 12", byName["median claim age"])
+	}
+	if byName["rework rate"] != "25%" {
+		t.Errorf("rework rate reads %q, want 25%%", byName["rework rate"])
+	}
+}
+
+// A rate of zero over checks that did run is a real and good number, and must
+// not be hidden by the guard that hides a rate over no checks at all.
+func TestAGenuineZeroRateIsStillReported(t *testing.T) {
+	// Arrange
+	snapshot := metrics.Snapshot{ReworkRate: 0, ChecksRecorded: 40}
+
+	// Act
+	trends := metrics.Compare(snapshot, nil)
+
+	// Assert
+	for _, trend := range trends {
+		if trend.Name == "rework rate" && trend.Current != "0%" {
+			t.Errorf("forty passing checks read as %q, not 0%%", trend.Current)
+		}
+	}
+}

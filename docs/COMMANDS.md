@@ -632,6 +632,12 @@ vat metrics [--record] [--history]
 `--record` appends a snapshot to `.vat/metrics.jsonl` so trends become visible.
 A single reading says little.
 
+A measurement with nothing to measure prints `—`, not a number. A median taken
+over no claims and a failure rate over no checks are not zero: printed as `0`
+and `0%` they are the most flattering possible reading of a workspace that has
+verified nothing. Under `--json` the populations are `claims_measured` and
+`checks_recorded`, so a consumer can tell an empty one from a genuine zero.
+
 ---
 
 ## vat fit
