@@ -1012,3 +1012,27 @@ func readFile(t *testing.T, path string) string {
 	}
 	return string(content)
 }
+
+// `vat repo new Payments` in a workspace that already governs `payments` said
+// "use `vat repo adopt Payments` instead" — and following that advice used to
+// put a second entry in the manifest for one directory, and now walks into a
+// refusal. A hint that walks into a refusal is the same defect wherever it
+// appears: the tool advertising a step it will reject.
+func TestRepoNewNamesTheRepositoryAlreadyGoverningThatDirectory(t *testing.T) {
+	// Arrange
+	h := adoptedFixture(t, "payments")
+
+	// Act
+	code, output := h.run("repo", "new", "Payments", "--no-remote")
+
+	// Assert
+	if code == ExitOK {
+		t.Fatalf("a name colliding with an existing repository was accepted:\n%s", output)
+	}
+	if strings.Contains(output, "repo adopt") {
+		t.Errorf("the refusal advises a command that would itself be refused:\n%s", output)
+	}
+	if !strings.Contains(output, "payments") {
+		t.Errorf("the refusal does not name the repository already there:\n%s", output)
+	}
+}

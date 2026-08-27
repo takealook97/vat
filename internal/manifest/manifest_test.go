@@ -260,3 +260,51 @@ func TestMarshalRoundTripsThroughParse(t *testing.T) {
 		t.Errorf("checks lost in round trip: %v", parsed.Repos[0].Checks)
 	}
 }
+
+// Two repositories whose directories differ only in case are one directory on
+// macOS and on Windows. Both entries then govern the same tree: `vat status`
+// counts two, every rule fires twice, the generated AGENTS.md is written twice
+// with different names so one of them is always drifted, and `vat repo remove
+// --delete` on either takes the other's working tree with it.
+//
+// Refused on every platform, not only where the filesystem collides. A manifest
+// is the shared truth of a workspace, and one that validates on the author's
+// Linux box and destroys a colleague's checkout on macOS is not shared truth.
+func TestTwoRepositoriesDifferingOnlyInCaseAreRefused(t *testing.T) {
+	// Arrange
+	m := manifest.Default("acme")
+	m = manifest.WithRepo(m, manifest.Repo{
+		Name: "payments", Origin: "https://example.invalid/acme/payments.git", Role: manifest.RoleProduct,
+	})
+	m = manifest.WithRepo(m, manifest.Repo{
+		Name: "Payments", Origin: "https://example.invalid/acme/payments-two.git", Role: manifest.RoleProduct,
+	})
+
+	// Act
+	err := manifest.Validate(m)
+
+	// Assert
+	if err == nil {
+		t.Fatal("a manifest naming one directory twice was accepted")
+	}
+	if !strings.Contains(err.Error(), "case") {
+		t.Errorf("the refusal does not say what the collision is: %v", err)
+	}
+}
+
+// Names that differ by more than case still describe different directories.
+func TestTwoRepositoriesWithGenuinelyDifferentNamesAreAccepted(t *testing.T) {
+	// Arrange
+	m := manifest.Default("acme")
+	m = manifest.WithRepo(m, manifest.Repo{
+		Name: "payments", Origin: "https://example.invalid/acme/payments.git", Role: manifest.RoleProduct,
+	})
+	m = manifest.WithRepo(m, manifest.Repo{
+		Name: "payments-api", Origin: "https://example.invalid/acme/payments-api.git", Role: manifest.RoleProduct,
+	})
+
+	// Act & Assert
+	if err := manifest.Validate(m); err != nil {
+		t.Errorf("two distinct repositories were refused: %v", err)
+	}
+}

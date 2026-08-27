@@ -63,6 +63,15 @@ func runRepoAdopt(ctx context.Context, env *Env, args []string) error {
 	if _, exists := ws.Manifest.Find(name); exists {
 		return usageErrorf("%s is already in %s", name, manifest.FileName)
 	}
+	// Two names differing only in case are one directory on macOS and on
+	// Windows, and the manifest refuses the pair. Said here, before anything is
+	// built or written, rather than as a validation failure afterwards.
+	if governing, clash := repoGoverningDirectory(ws, name); clash {
+		return usageErrorf(
+			"%s already governs that directory; %q and %q differ only in case, which is one directory on macOS and on Windows.\n"+
+				"  Work in %s, or choose a name that differs by more than case.",
+			governing, governing, name, governing)
+	}
 
 	// Explicit flags win; anything not given keeps what was discovered on disk.
 	repo := discovered

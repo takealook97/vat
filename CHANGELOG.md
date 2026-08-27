@@ -229,6 +229,17 @@ Notable changes to `vat`. The format follows
 
 ### Fixed
 
+- Two repositories whose directories differ only in case are refused. On macOS
+  and on Windows they are one directory, so both manifest entries governed the
+  same tree: `vat status` counted two, every rule fired twice, the generated
+  `AGENTS.md` was written twice with different names so one was always drifted,
+  and `vat repo remove --delete` on either would have taken the other's working
+  tree with it. `vat repo new Payments` beside an existing `payments` advised
+  `vat repo adopt Payments`, which is exactly how a workspace reached that
+  state. Refused on every platform, because a manifest that validates on the
+  author's Linux box and destroys a colleague's checkout on macOS is not the
+  shared truth a workspace is built on — and `new`, `add`, and `adopt` all say
+  so before building anything, rather than failing validation afterwards.
 - The scan for abandoned adapters read every file under a runtime directory in
   full. A skill directory holds references and scripts beside its procedure, so
   a large asset was read end to end on every lint to decide it was not a

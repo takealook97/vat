@@ -59,6 +59,11 @@ silently skip it forever.
 Roles are guessed from the name (`brain`, `credential`, `docs`, `infra`) and
 written into the manifest where they are visible and easy to correct.
 
+Two repositories whose directories differ only in case are refused, on every
+platform. They are one directory on macOS and on Windows, and a manifest that
+validates on the author's machine and puts two entries over one colleague's
+working tree is not the shared truth a workspace is built on.
+
 A workspace that enrols nothing is a supported state, not a mistake: it is what
 somebody adopting the harness for a single repository ends up with. `init` says
 so rather than warning about repositories that do not exist, and offers

@@ -117,7 +117,7 @@ func Validate(m Manifest) error {
 		}
 	}
 	seenNames := map[string]bool{}
-	seenPaths := map[string]bool{}
+	seenPaths := map[string]string{}
 	// Two entries may share an upstream when they track different branches --
 	// that is a worktree-per-branch layout. Sharing an upstream *and* a branch
 	// is not a layout: they fetch and push over each other, and nothing else
@@ -152,10 +152,27 @@ func Validate(m Manifest) error {
 				where, repo.Role, joinRoleNames()))
 		}
 		dir := repo.Dir()
-		if seenPaths[dir] {
-			problems = append(problems, fmt.Sprintf("%s: two repositories resolve to the same directory %q", where, dir))
+		// Folded, because two names differing only in case are one directory on
+		// macOS and on Windows. Both entries then govern the same tree: status
+		// counts two, every rule fires twice, the generated AGENTS.md is written
+		// twice with different names so one is always drifted, and
+		// `vat repo remove --delete` on either takes the other's working tree.
+		//
+		// Refused on every platform and not only where the filesystem collides.
+		// A manifest is the shared truth of a workspace, and one that validates
+		// on the author's Linux box and destroys a colleague's checkout on macOS
+		// is not shared truth.
+		folded := strings.ToLower(dir)
+		if first, clash := seenPaths[folded]; clash {
+			detail := fmt.Sprintf("two repositories resolve to the same directory %q", dir)
+			if first != dir {
+				detail = fmt.Sprintf(
+					"resolves to the same directory as %q once case is folded; that is one directory on macOS and on Windows",
+					first)
+			}
+			problems = append(problems, where+": "+detail)
 		}
-		seenPaths[dir] = true
+		seenPaths[folded] = dir
 
 		if origin := strings.TrimSpace(repo.Origin); origin != "" {
 			upstream := origin + "#" + repo.Branch(m.Workspace.DefaultBranch)

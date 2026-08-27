@@ -61,6 +61,16 @@ func runRepoNew(ctx context.Context, env *Env, args []string) error {
 	if _, exists := ws.Manifest.Find(name); exists {
 		return usageErrorf("%s is already in %s", name, manifest.FileName)
 	}
+	// Checked with case folded, because two names differing only in case are one
+	// directory on macOS and on Windows. Without this the refusal below advised
+	// `vat repo adopt`, which the manifest now rejects — a hint that walks into
+	// a refusal, and before that a second manifest entry governing one tree.
+	if governing, clash := repoGoverningDirectory(ws, name); clash {
+		return usageErrorf(
+			"%s already governs that directory; %q and %q differ only in case, which is one directory on macOS and on Windows.\n"+
+				"  Work in %s, or choose a name that differs by more than case.",
+			governing, governing, name, governing)
+	}
 	// Asked before the path is built, not after the manifest is saved. The name
 	// becomes a directory and a remote URL, so `vat repo new ../escaped` used to
 	// initialise a repository outside the workspace, scaffold it, commit it, and
@@ -199,4 +209,17 @@ func scaffoldNewRepo(dir, name string, role manifest.Role, workspaceName string)
 		}
 	}
 	return nil
+}
+
+// repoGoverningDirectory returns the repository whose directory folds to the
+// same name, if any. The manifest refuses the pair; this says so before a
+// command has built anything.
+func repoGoverningDirectory(ws *workspace.Workspace, name string) (string, bool) {
+	folded := strings.ToLower(name)
+	for _, repo := range ws.Manifest.Repos {
+		if strings.ToLower(repo.Dir()) == folded {
+			return repo.Name, true
+		}
+	}
+	return "", false
 }
