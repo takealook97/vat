@@ -300,9 +300,9 @@ func checkSecrets(ws *workspace.Workspace, now time.Time, maxAgeDays int) []Find
 		}
 		findings = append(findings, Finding{
 			Section: sectionCredentials, Subject: credential.Name, Status: StatusFail,
-			Detail: fmt.Sprintf("%d file(s) look like unencrypted secrets: %s",
-				len(plaintext), strings.Join(shown, ", ")),
-			Fix: "encrypt them before committing; a private repository is not encryption",
+			Detail: fmt.Sprintf("%s like unencrypted secrets: %s",
+				Plural(len(plaintext), "file looks", "files look"), strings.Join(shown, ", ")),
+			Fix: "encrypt before committing; a private repository is not encryption",
 		})
 	}
 	findings = append(findings, Finding{
@@ -383,9 +383,9 @@ func checkCredentialPermissions(dir, name string) []Finding {
 	}
 	return []Finding{{
 		Section: sectionCredentials, Subject: "permissions", Status: StatusFail,
-		Detail: fmt.Sprintf("%d file(s) readable by other users: %s",
-			len(exposed), strings.Join(shown, ", ")),
-		Fix: fmt.Sprintf("chmod 600 the files above, inside %s", name),
+		Detail: fmt.Sprintf("%s readable by other users: %s",
+			Plural(len(exposed), "file is", "files are"), strings.Join(shown, ", ")),
+		Fix: fmt.Sprintf("chmod 600 what is listed above, inside %s", name),
 	}}
 }
 
@@ -671,8 +671,22 @@ func describeExposure(unpushed, stashes int) string {
 		return fmt.Sprintf("%d commits and %d stashes exist only on this machine",
 			unpushed, stashes)
 	case unpushed > 0:
-		return fmt.Sprintf("%d commits exist only on this machine", unpushed)
+		return Plural(unpushed, "commit exists", "commits exist") + " only on this machine"
 	default:
 		return fmt.Sprintf("%d stashes exist only on this machine", stashes)
 	}
+}
+
+// Plural renders a count with the right noun form.
+//
+// doctor is the command whose entire job is careful reporting, and it read
+// "1 file(s) look like unencrypted secrets" and "1 commits exist only on this
+// machine" — the second in the recovery section, which is the most alarming
+// thing this tool prints. A report that cannot count to one is a report people
+// stop reading closely.
+func Plural(count int, singular, many string) string {
+	if count == 1 {
+		return fmt.Sprintf("%d %s", count, singular)
+	}
+	return fmt.Sprintf("%d %s", count, many)
 }

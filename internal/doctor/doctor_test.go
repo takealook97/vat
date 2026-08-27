@@ -335,3 +335,28 @@ func TestDoctorSaysNothingAboutRecoverabilityWhenNothingIsCloned(t *testing.T) {
 		}
 	}
 }
+
+// doctor is the command whose entire job is careful reporting, and three of its
+// details read "1 file(s) look like unencrypted secrets" and "1 commits exist
+// only on this machine". The second sits in the recovery section, which is the
+// most alarming thing this tool prints. This repository has fixed the same
+// class before, in `vat status`.
+func TestDoctorCountsReadCorrectlyForOne(t *testing.T) {
+	// Arrange & Act & Assert
+	cases := []struct {
+		count int
+		one   string
+		many  string
+		want  string
+	}{
+		{1, "file", "files", "1 file"},
+		{2, "file", "files", "2 files"},
+		{1, "commit exists", "commits exist", "1 commit exists"},
+		{3, "commit exists", "commits exist", "3 commits exist"},
+	}
+	for _, testCase := range cases {
+		if got := doctor.Plural(testCase.count, testCase.one, testCase.many); got != testCase.want {
+			t.Errorf("Plural(%d) = %q, want %q", testCase.count, got, testCase.want)
+		}
+	}
+}
