@@ -61,6 +61,7 @@ func runChangesetVerify(ctx context.Context, env *Env, args []string) error {
 	}
 
 	failures := 0
+	unverifiable := 0
 	for _, participant := range current.Repositories {
 		repo, ok := ws.Manifest.Find(participant.Name)
 		if !ok {
@@ -114,7 +115,10 @@ func runChangesetVerify(ctx context.Context, env *Env, args []string) error {
 		if len(repo.Checks) == 0 {
 			env.Printer.Status(ui.LevelWarn, participant.Name,
 				"declares no canonical checks; nothing can be verified")
-			failures++
+			// Counted apart from a failed check. Both block the changeset, and
+			// they are not the same fact: one is evidence that something broke,
+			// the other is the absence of any evidence at all.
+			unverifiable++
 			current = changeset.WithParticipant(current, updated)
 			continue
 		}
@@ -142,7 +146,7 @@ func runChangesetVerify(ctx context.Context, env *Env, args []string) error {
 		current = changeset.WithParticipant(current, updated)
 	}
 
-	if failures == 0 {
+	if failures+unverifiable == 0 {
 		current.Status = changeset.StatusVerified
 	} else {
 		current.Status = changeset.StatusOpen
@@ -152,9 +156,8 @@ func runChangesetVerify(ctx context.Context, env *Env, args []string) error {
 	}
 
 	env.Printer.Heading("Result")
-	if failures > 0 {
-		env.Printer.Status(ui.LevelFail, current.ID,
-			fmt.Sprintf("%d check(s) failed; recorded against the revisions they ran on", failures))
+	if summary := verifySummary(failures, unverifiable); summary != "" {
+		env.Printer.Status(ui.LevelFail, current.ID, summary)
 		return findingsErrorf("")
 	}
 	env.Printer.Status(ui.LevelOK, current.ID, "every repository verified")
@@ -167,4 +170,26 @@ func runChangesetVerify(ctx context.Context, env *Env, args []string) error {
 	env.Printer.Hint("  vat changeset close %s --acceptance \"...\"", current.ID)
 	env.Printer.Hint("      — the one end-to-end outcome that proves the pieces work together")
 	return nil
+}
+
+// verifySummary states what stopped the changeset, keeping a check that ran and
+// failed apart from a repository that had nothing to run.
+//
+// Reporting both as "check(s) failed ... recorded against the revisions they ran
+// on" made the record's evidentiary claim about checks that never executed,
+// which is the one sentence a reader is entitled to trust.
+func verifySummary(failures, unverifiable int) string {
+	switch {
+	case failures > 0 && unverifiable > 0:
+		return fmt.Sprintf("%s failed, recorded against the revisions they ran on; %s no canonical checks",
+			pluralise(failures, "check", "checks"),
+			pluralise(unverifiable, "repository declares", "repositories declare"))
+	case failures > 0:
+		return fmt.Sprintf("%s failed; recorded against the revisions they ran on",
+			pluralise(failures, "check", "checks"))
+	case unverifiable > 0:
+		return fmt.Sprintf("%s no canonical checks, so nothing could be verified",
+			pluralise(unverifiable, "repository declares", "repositories declare"))
+	}
+	return ""
 }

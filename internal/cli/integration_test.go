@@ -723,3 +723,54 @@ func TestBrainSupersedeRefusesARecordSupersedingItself(t *testing.T) {
 
 // commitAll commits whatever `init --adopt` left in a repository, so a test
 // about something else does not trip the dirty-tree guard.
+
+// A repository with no canonical checks was counted as a failed check, and the
+// summary said those checks were "recorded against the revisions they ran on".
+// Nothing ran. That phrase is the evidentiary claim the whole record rests on,
+// so a summary that makes it about checks which never executed is not a wording
+// problem.
+func TestChangesetVerifySeparatesAFailedCheckFromNoCheckAtAll(t *testing.T) {
+	// Arrange: one repository that can be verified and fails, one that declares
+	// nothing to run.
+	h := adoptedFixture(t, "payments", "orders")
+	addCheck(t, h, "payments", "exit 1")
+	h.mustRun("changeset", "new", "Both at once", "--repos", "payments,orders")
+
+	// Act
+	code, output := h.run("changeset", "verify", "CS-0001")
+
+	// Assert
+	if code == ExitOK {
+		t.Fatalf("verification passed with a failing check:\n%s", output)
+	}
+	if !strings.Contains(output, "1 check") {
+		t.Errorf("the summary does not count the one check that actually ran:\n%s", output)
+	}
+	if strings.Contains(output, "2 check") {
+		t.Errorf("a repository with nothing to run was counted as a failed check:\n%s", output)
+	}
+	if !strings.Contains(output, "canonical checks") {
+		t.Errorf("the summary does not say a repository declared nothing to run:\n%s", output)
+	}
+}
+
+func TestChangesetVerifySaysWhenNothingCouldBeVerifiedAtAll(t *testing.T) {
+	// Arrange: neither repository declares a check, so no check failed — there
+	// were none.
+	h := adoptedFixture(t, "payments", "orders")
+	h.mustRun("changeset", "new", "Nothing to run", "--repos", "payments,orders")
+
+	// Act
+	code, output := h.run("changeset", "verify", "CS-0001")
+
+	// Assert
+	if code == ExitOK {
+		t.Fatalf("an unverifiable changeset was reported as verified:\n%s", output)
+	}
+	if strings.Contains(output, "check(s) failed") || strings.Contains(output, "checks failed") {
+		t.Errorf("the summary reports failed checks where none ran:\n%s", output)
+	}
+	if !strings.Contains(output, "2 repositories") {
+		t.Errorf("the summary does not count the repositories that could not be verified:\n%s", output)
+	}
+}

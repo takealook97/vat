@@ -446,7 +446,10 @@ changeset is closed or abandoned: enrolling a repository afterwards rewrites the
 one claim the record exists to make.
 
 `verify` runs each repository's canonical checks and records the outcome against
-the exact revision it ran on. It refuses on a dirty working tree, because
+the exact revision it ran on. A repository that declares no checks is counted
+apart from a check that ran and failed: both stop the changeset, and they are
+not the same fact — one is evidence that something broke, the other is the
+absence of any evidence at all. It refuses on a dirty working tree, because
 results recorded against a revision that does not describe what was tested are
 worse than none, and refuses on a changeset that is already closed.
 

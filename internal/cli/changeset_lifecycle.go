@@ -52,7 +52,7 @@ func changesetShowCommand() *Command {
 			for _, participant := range current.Repositories {
 				verdict := "not verified"
 				if participant.Verified() {
-					verdict = fmt.Sprintf("%d checks passed", len(participant.Checks))
+					verdict = pluralise(len(participant.Checks), "check", "checks") + " passed"
 				}
 				rows = append(rows, []string{
 					participant.Name, shortRev(participant.RollbackPoint),

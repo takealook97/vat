@@ -233,6 +233,14 @@ Notable changes to `vat`. The format follows
   should exist while the steps for building one sat in a skill it never named.
   A role is who is running and a skill is how a job is done; the pairs that
   overlap now point at each other.
+- `vat changeset verify` counted a repository that declares no canonical checks
+  as a failed check, and summarised them as "N check(s) failed; recorded against
+  the revisions they ran on" when nothing had run. That phrase is the
+  evidentiary claim the whole record rests on, so a summary that makes it about
+  checks which never executed is not a wording problem. The two are counted
+  apart now: both stop the changeset, and one is evidence that something broke
+  while the other is the absence of any evidence at all.
+- `vat changeset show` reported "1 checks passed".
 - `vat doctor` could be made to certify a knowledge layer that does not exist,
   by following its own advice. On a repository declared as the brain and never
   initialised — the state every workspace with a directory called `brain` starts
