@@ -51,6 +51,11 @@ Most proposals should be rejected. That is the job.
 6. **Is it fixable without judgement?** Only regeneration qualifies. A repair
    that guesses at what someone meant is not a repair.
 
+Once a proposal passes, the mechanics of landing it — where the rule is
+registered, which reference table gains a row, and which tests go red if either
+is skipped — are in `.agents/skills/add-a-lint-rule/SKILL.md`. This role decides
+whether the rule should exist; that skill is how it gets built.
+
 ## Outputs
 
 For an accepted proposal:

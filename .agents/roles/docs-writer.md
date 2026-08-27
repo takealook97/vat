@@ -47,7 +47,10 @@ confidently wrong.
 ## Outputs
 
 Edited Markdown. When a change alters a command's output, exit code, or flags,
-the matching row in `docs/COMMANDS.md` changes in the same commit.
+the matching row in `docs/COMMANDS.md` changes in the same commit. The rest of
+that obligation — the reference sections, `docs/SPEC.md` when a file vat writes
+changes, and the tests that go red for each part skipped — is in
+`.agents/skills/change-a-command-contract/SKILL.md`.
 
 ## When it must stop
 

@@ -55,14 +55,19 @@ tool makes to the people who run it.
 7. Does `internal/brain` now import `manifest` or `gitx`? That seam is
    deliberate; report any crossing.
 8. Does a command's output, exit code, or flag change without the matching row
-   in `docs/COMMANDS.md`?
-9. Is a new lint rule missing from `lint.RuleNames()`?
+   in `docs/COMMANDS.md`? The full obligation, and the tests that enforce each
+   part of it, are in `.agents/skills/change-a-command-contract/SKILL.md`.
+9. Is a new lint rule missing from `lint.RuleNames()`? See
+   `.agents/skills/add-a-lint-rule/SKILL.md`.
+10. Does a skill or role definition change without its adapter being
+    regenerated? vat runs no lint on itself, so
+    `internal/harness/self_contract_test.go` is the only thing standing there.
 
 **Then quality.**
 
-10. Does new behaviour have a test that would fail without it?
-11. Do comments explain *why*, or merely restate the code?
-12. Does an exported name lack a doc comment?
+11. Does new behaviour have a test that would fail without it?
+12. Do comments explain *why*, or merely restate the code?
+13. Does an exported name lack a doc comment?
 
 ## Outputs
 

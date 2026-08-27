@@ -203,6 +203,11 @@ Notable changes to `vat`. The format follows
   canonical procedure with the suite green. It now also makes the two checks
   `harness/skill-metadata` and `harness/runtime-unknown` would make elsewhere: a
   skill with no description, and one that renders no adapter at all.
+- The three roles this repository defines and the three skills it now defines
+  did not know about each other, so `rule-designer` decided whether a rule
+  should exist while the steps for building one sat in a skill it never named.
+  A role is who is running and a skill is how a job is done; the pairs that
+  overlap now point at each other.
 - `docs/ADOPTION.md` told a reader adopting vat to commit four files by name,
   which stopped being every file `vat init` writes the moment init began seeding
   procedures. Its stage 2 also defined roles and never mentioned skills, so the
