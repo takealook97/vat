@@ -526,7 +526,10 @@ Notable changes to `vat`. The format follows
   adopting a repository cloned over SSH recorded an origin with the login name
   removed, and that URL does not authenticate. A password is still a credential
   whatever the scheme, and userinfo over http still is, because that is how a
-  token is carried.
+  token is carried. `vat repo adopt` keeps the login and still strips the token,
+  which are two different jobs that had been sharing one helper with the
+  comparison that decides whether two spellings name the same repository — where
+  the login is noise, and here it is the point.
 - An origin or a branch beginning with `-` is refused. git reads such a value as
   an option wherever the call has no `--` in front of it, and the manifest that
   carries it is committed and reaches every colleague's machine. Refused where it

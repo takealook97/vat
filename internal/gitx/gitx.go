@@ -391,7 +391,31 @@ func Redact(text string) string {
 // masked, for recording rather than printing. The manifest is committed, so it
 // holds identity and never access.
 func WithoutCredentials(url string) string {
-	return stripUserinfo(strings.TrimSpace(url))
+	trimmed := strings.TrimSpace(url)
+	scheme, rest, ok := strings.Cut(trimmed, "://")
+	if !ok {
+		// The scp-like form, git@host:path. There is nowhere in it to put a
+		// password, and the user is the login.
+		return trimmed
+	}
+	authority, _, _ := strings.Cut(rest, "/")
+	at := strings.LastIndex(authority, "@")
+	if at < 0 {
+		return trimmed
+	}
+	// A bare user name over SSH is the login, not a secret:
+	// `ssh://git@github.com/acme/x.git` is the URL every forge publishes, and
+	// removing `git` leaves one that does not authenticate — written into the
+	// file the workspace is rebuilt from. A password goes whatever the scheme,
+	// and userinfo over http goes because that is how a token is carried.
+	//
+	// Kept apart from stripUserinfo, which always removes: that one answers
+	// whether two spellings name the same repository, and the login is noise
+	// for that question and the whole point of this one.
+	if keepsLogin(scheme, authority[:at]) {
+		return trimmed
+	}
+	return stripUserinfo(trimmed)
 }
 
 // SameRemote reports whether two URLs designate the same repository.
@@ -446,4 +470,17 @@ func InterruptedOperation(dir string) string {
 func Ignores(ctx context.Context, dir, relative string) bool {
 	_, err := Run(ctx, dir, "check-ignore", "--quiet", "--", relative)
 	return err == nil
+}
+
+// keepsLogin reports whether userinfo is an address rather than a secret.
+func keepsLogin(scheme, userinfo string) bool {
+	if strings.Contains(userinfo, ":") {
+		return false
+	}
+	switch strings.ToLower(scheme) {
+	case "ssh", "git+ssh", "git":
+		return true
+	default:
+		return false
+	}
 }

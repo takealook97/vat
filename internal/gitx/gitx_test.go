@@ -594,3 +594,34 @@ func writeFile(t *testing.T, dir, name, content string) {
 		t.Fatalf("write %s: %v", name, err)
 	}
 }
+
+// `vat repo adopt` records what git already had, with credentials removed. The
+// removal was unconditional, so a repository cloned over SSH was recorded as
+// `ssh://github.com/acme/x.git` — the login name gone, and a URL that does not
+// authenticate written into the file the workspace is rebuilt from.
+func TestRemovingCredentialsKeepsAnSSHLoginName(t *testing.T) {
+	// Act & Assert
+	kept := map[string]string{
+		"ssh://git@github.com/acme/payments.git":    "ssh://git@github.com/acme/payments.git",
+		"ssh://git@example.invalid:2222/acme/x.git": "ssh://git@example.invalid:2222/acme/x.git",
+		"git@github.com:acme/payments.git":          "git@github.com:acme/payments.git",
+		"https://github.com/acme/payments.git":      "https://github.com/acme/payments.git",
+	}
+	for url, want := range kept {
+		if got := gitx.WithoutCredentials(url); got != want {
+			t.Errorf("WithoutCredentials(%q) = %q, want %q", url, got, want)
+		}
+	}
+
+	// A password and an http token are still removed: vat.yaml is committed.
+	removed := map[string]string{
+		"ssh://git:hunter2@example.invalid/acme/x.git": "ssh://example.invalid/acme/x.git",
+		"https://token@github.com/acme/x.git":          "https://github.com/acme/x.git",
+		"https://user:token@github.com/acme/x.git":     "https://github.com/acme/x.git",
+	}
+	for url, want := range removed {
+		if got := gitx.WithoutCredentials(url); got != want {
+			t.Errorf("WithoutCredentials(%q) = %q, want %q", url, got, want)
+		}
+	}
+}
