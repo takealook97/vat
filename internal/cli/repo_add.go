@@ -54,6 +54,13 @@ func runRepoAdd(ctx context.Context, env *Env, args []string) error {
 	if err != nil {
 		return err
 	}
+	// Asked before anything is written, so the refusal is "you called this
+	// wrong" and not "the file you just wrote is invalid". `repo new` has done
+	// this since a name that escaped the workspace left files behind; this
+	// command reached the same check only through Save.
+	if err := manifest.ValidateRepoName(name); err != nil {
+		return usageErrorf("%v", err)
+	}
 	if _, exists := ws.Manifest.Find(name); exists {
 		return usageErrorf("%s is already in %s", name, manifest.FileName)
 	}

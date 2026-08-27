@@ -10,6 +10,7 @@ import (
 
 	"github.com/takealook97/vat/internal/frontmatter"
 	"github.com/takealook97/vat/internal/fsx"
+	"github.com/takealook97/vat/internal/manifest"
 )
 
 // Directory layout for agent assets. The role body is canonical; everything
@@ -280,7 +281,35 @@ func ValidRoleName(name string) bool {
 			return false
 		}
 	}
-	return true
+	// The same portability rule a repository name is held to, from the one
+	// definition of it: `.claude/agents/con.md` cannot exist on Windows, and
+	// this definition is committed for everybody.
+	return manifest.PortableName(name) == nil
+}
+
+// ValidateDefinitionName reports why a role or skill name cannot be used, and
+// nil when it can.
+//
+// ValidRoleName answers yes or no, which is all a loader needs. A command
+// refusing what somebody typed has to say which rule was broken: reporting "use
+// letters, digits, '-', and '_' only" for the name "con" tells them their name
+// violates a rule it satisfies, and leaves them retyping it.
+func ValidateDefinitionName(kind, name string) error {
+	if name == "" {
+		return fmt.Errorf("a %s name is required", kind)
+	}
+	if len(name) > 64 {
+		return fmt.Errorf("a %s name may not be longer than 64 characters", kind)
+	}
+	for _, r := range name {
+		switch {
+		case r >= 'a' && r <= 'z', r >= 'A' && r <= 'Z', r >= '0' && r <= '9':
+		case r == '-', r == '_':
+		default:
+			return fmt.Errorf("a %s name may hold only letters, digits, '-', and '_'", kind)
+		}
+	}
+	return manifest.PortableName(name)
 }
 
 // LoadRole reads one role definition.

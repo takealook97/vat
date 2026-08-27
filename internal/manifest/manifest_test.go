@@ -308,3 +308,33 @@ func TestTwoRepositoriesWithGenuinelyDifferentNamesAreAccepted(t *testing.T) {
 		t.Errorf("two distinct repositories were refused: %v", err)
 	}
 }
+
+// vat ships Windows binaries and runs Windows CI, and a manifest is the shared
+// truth of a workspace. A name that cannot become a directory on Windows is one
+// a colleague can never clone into, so it is refused everywhere rather than on
+// the machine that happens to notice.
+func TestNamesThatCannotBecomeADirectoryOnEveryPlatformAreRefused(t *testing.T) {
+	// Arrange & Act & Assert
+	for _, name := range []string{
+		// Windows device names, which cannot be directories at all.
+		"con", "CON", "nul", "aux", "prn", "com1", "COM9", "lpt1", "lpt9",
+		// Reserved with any extension, because the device is matched first.
+		"con.api", "NUL.service",
+		// Windows silently strips a trailing dot, so this becomes "foo" and
+		// collides with a repository actually called foo.
+		"foo.", "foo..",
+	} {
+		if err := manifest.ValidateRepoName(name); err == nil {
+			t.Errorf("%q was accepted as a repository name", name)
+		}
+	}
+	for _, name := range []string{
+		// Not devices: the reservation is on the exact stem, not a prefix.
+		"console", "connect", "com", "com10", "lpt", "auxiliary", "printer",
+		"payments", "payments-api", "a.b", "v1.2.3",
+	} {
+		if err := manifest.ValidateRepoName(name); err != nil {
+			t.Errorf("%q is a usable directory name and was refused: %v", name, err)
+		}
+	}
+}

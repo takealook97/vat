@@ -78,3 +78,20 @@ func TestASingleRuntimeRoleStillHonoursABareModel(t *testing.T) {
 		t.Error("one runtime, one model: nothing is ambiguous")
 	}
 }
+
+// A role name becomes a file in every runtime's adapter directory, so it is
+// held to the same portability rule a repository name is: `.claude/agents/con.md`
+// cannot exist on Windows, and the definition is committed for everybody.
+func TestARoleNameThatCannotBecomeAFileOnEveryPlatformIsRefused(t *testing.T) {
+	// Act & Assert
+	for _, name := range []string{"con", "NUL", "aux", "com1", "lpt9", "prn"} {
+		if harness.ValidRoleName(name) {
+			t.Errorf("%q was accepted as a role name", name)
+		}
+	}
+	for _, name := range []string{"console", "connect", "com", "reviewer", "go-reviewer"} {
+		if !harness.ValidRoleName(name) {
+			t.Errorf("%q is a usable name and was refused", name)
+		}
+	}
+}

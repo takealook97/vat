@@ -121,10 +121,8 @@ func runHarnessSkill(ctx context.Context, env *Env, args []string) error {
 	// Validated with the role rule because the loader validates skill names the
 	// same way, but reported as a skill: naming the wrong kind here sends the
 	// reader to a directory that holds nothing of theirs.
-	if !harness.ValidRoleName(name) {
-		return usageErrorf(
-			"%q is not a usable skill name; use letters, digits, '-', and '_' only.\n"+
-				"  The name becomes a directory in every runtime's skill directory.", name)
+	if err := harness.ValidateDefinitionName("skill", name); err != nil {
+		return usageErrorf("%q is not usable: %v.\n  The name becomes a directory in every runtime's skill directory.", name, err)
 	}
 
 	ws, err := env.Workspace()

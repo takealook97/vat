@@ -60,6 +60,9 @@ func runRepoAdopt(ctx context.Context, env *Env, args []string) error {
 	if !ok {
 		return usageErrorf("%s is not a git repository inside the workspace", name)
 	}
+	if err := manifest.ValidateRepoName(name); err != nil {
+		return usageErrorf("%v", err)
+	}
 	if _, exists := ws.Manifest.Find(name); exists {
 		return usageErrorf("%s is already in %s", name, manifest.FileName)
 	}

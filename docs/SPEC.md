@@ -385,6 +385,15 @@ window exists in which a consumer expects an interface that is already gone.
 .codex/agents/<name>.toml            generated adapter; `-` in the name becomes `_`
 ```
 
+A name that becomes a directory or a file — a repository, a role, a skill —
+**MUST NOT** be one a supported platform cannot create. An implementation
+**MUST** refuse the Windows device names (`con`, `prn`, `aux`, `nul`, `com0`
+through `com9`, `lpt0` through `lpt9`, with or without an extension) and a name
+ending in `.` or a space, on every platform and not only where the filesystem
+objects. Two names that differ only in case **MUST** be refused for the same
+reason: they are one directory on macOS and on Windows. A workspace description
+that is valid only on the machine that wrote it is not a shared description.
+
 A canonical file holds the prose. An adapter holds **discovery metadata and a
 pointer**, and **MUST NOT** contain a copy of the prose. Two copies of a
 contract that disagree by one line are worse than one copy nobody has read,

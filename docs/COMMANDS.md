@@ -59,6 +59,14 @@ silently skip it forever.
 Roles are guessed from the name (`brain`, `credential`, `docs`, `infra`) and
 written into the manifest where they are visible and easy to correct.
 
+A name that cannot become a directory on Windows is refused on every platform:
+the device names `con`, `prn`, `aux`, `nul`, `com0`–`com9`, `lpt0`–`lpt9` — with
+or without an extension, because Windows matches the device before the first dot
+— and any name ending in `.` or a space, which Windows strips silently so the
+directory would not be the one named here. Role and skill names are held to the
+same rule, for the same reason: `.claude/agents/con.md` cannot exist there
+either.
+
 Two repositories whose directories differ only in case are refused, on every
 platform. They are one directory on macOS and on Windows, and a manifest that
 validates on the author's machine and puts two entries over one colleague's

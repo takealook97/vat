@@ -229,6 +229,22 @@ Notable changes to `vat`. The format follows
 
 ### Fixed
 
+- A name that cannot become a directory on Windows is refused on every
+  platform: the device names `con`, `prn`, `aux`, `nul`, `com0`–`com9`,
+  `lpt0`–`lpt9` — with or without an extension, because Windows matches the
+  device before the first dot — and any name ending in `.` or a space, which
+  Windows strips silently so the directory is not the one the manifest names.
+  Role and skill names are held to the same rule from the same definition:
+  `.claude/agents/con.md` cannot exist there either, and the definition is
+  committed for everybody. vat ships Windows binaries and runs Windows CI, so a
+  workspace that only its author can clone is a defect and not a preference.
+- `vat repo add` and `vat repo adopt` validate the name before doing anything,
+  rather than reaching the same check through Save and reporting "vat.yaml is
+  invalid" for a command that was called wrong. `vat repo new` has asked first
+  since a name that escaped the workspace left files behind.
+- A role or skill refusal says which rule was broken. Reporting "use letters,
+  digits, '-', and '_' only" for the name `con` tells somebody their name
+  violates a rule it satisfies, and leaves them retyping it.
 - Two repositories whose directories differ only in case are refused. On macOS
   and on Windows they are one directory, so both manifest entries governed the
   same tree: `vat status` counted two, every rule fired twice, the generated
