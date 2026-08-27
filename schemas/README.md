@@ -8,6 +8,8 @@ reimplementing the prose.
 | File | Format | Draft |
 | --- | --- | --- |
 | `vat-manifest-v1.schema.json` | workspace manifest, version 1 | JSON Schema 2020-12 |
+| `vat-changeset-v1.schema.json` | completion record, version 1 | JSON Schema 2020-12 |
+| `vat-brain-record-1.schema.json` | knowledge record front matter, schema 1 | JSON Schema 2020-12 |
 
 ## What these are, and are not
 
@@ -23,8 +25,10 @@ schema change meaning after release, because manifests in the wild point at it.
 
 ## Validating a file
 
-Every manifest `vat` writes opens with a modeline, so editors using
-`yaml-language-server` validate it with no configuration:
+Every manifest and completion record `vat` writes opens with a modeline, so
+editors using `yaml-language-server` validate it with no configuration. Front
+matter inside a Markdown record carries none, because no editor looks for one
+there; validate those by extracting the front matter first.
 
 ```yaml
 # yaml-language-server: $schema=https://raw.githubusercontent.com/takealook97/vat/main/schemas/vat-manifest-v1.schema.json
@@ -40,7 +44,7 @@ check-jsonschema --schemafile schemas/vat-manifest-v1.schema.json vat.yaml
 ## How these are kept honest
 
 A published schema that has drifted from the tool is worse than none: it makes
-editors reject files `vat` itself wrote. `internal/manifest/schema_contract_test.go`
+editors reject files `vat` itself wrote. `internal/cli/schema_contract_test.go`
 reads each schema and holds it against the Go types — every property against
 the struct's serialised fields in both directions, every enum against the values
 `vat` accepts, the version bound against `SchemaVersion`, the name cap against

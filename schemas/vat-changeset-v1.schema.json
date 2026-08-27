@@ -1,0 +1,80 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/takealook97/vat/main/schemas/vat-changeset-v1.schema.json",
+  "title": "vat completion record, version 1",
+  "description": "One unit of work that crossed a repository boundary: which revisions were verified together, what proved it, and the way back. Normative prose is docs/SPEC.md section 6; where the two disagree, SPEC.md is the specification and this file has a bug.",
+  "type": "object",
+  "required": ["id", "objective", "status", "opened_at", "repositories"],
+  "additionalProperties": false,
+  "properties": {
+    "id": {
+      "description": "Identifies the record and names its file.",
+      "type": "string",
+      "pattern": "^CS-\\d+$"
+    },
+    "objective": { "type": "string", "minLength": 1 },
+    "status": { "$ref": "#/$defs/status" },
+    "opened_at": { "type": "string" },
+    "closed_at": { "type": "string" },
+    "non_goals": { "type": "array", "items": { "type": "string" } },
+    "contracts": { "type": "array", "items": { "type": "string" } },
+    "integration_acceptance": {
+      "description": "What proved the repositories work together, as opposed to each one working alone.",
+      "type": "string"
+    },
+    "repositories": {
+      "description": "The revision bundle. A record with one participant is a git commit with extra steps.",
+      "type": "array",
+      "items": { "$ref": "#/$defs/participant" }
+    },
+    "landing_waived": {
+      "description": "Records a deliberate decision that this work is complete without reaching a shipping branch, so that an unlanded record is either explained or reported.",
+      "type": "boolean"
+    },
+    "decisions": { "type": "array", "items": { "type": "string" } },
+    "approved_by": { "type": "string" },
+    "notes": { "type": "string" }
+  },
+  "$defs": {
+    "status": {
+      "type": "string",
+      "enum": ["open", "verified", "closed", "rolled_back", "abandoned"]
+    },
+    "participant": {
+      "description": "One repository's part in the work, and the evidence for it.",
+      "type": "object",
+      "required": ["name"],
+      "additionalProperties": false,
+      "properties": {
+        "name": { "type": "string", "minLength": 1 },
+        "rollback_point": {
+          "description": "The revision to return to. Recorded before the change, because afterwards nobody can tell which commit was the last good one.",
+          "type": "string"
+        },
+        "revision": { "type": "string" },
+        "branch": { "type": "string" },
+        "checks": { "type": "array", "items": { "$ref": "#/$defs/check" } },
+        "notes": { "type": "string" },
+        "landed_on": {
+          "description": "The shipping branch this participant reached. Absent means the work is recorded but not shipped.",
+          "type": "string"
+        },
+        "landed_at": { "type": "string" },
+        "review": { "type": "string" }
+      }
+    },
+    "check": {
+      "description": "A command that was run and what it returned. Evidence is a command and its result, not an assertion that someone tested it.",
+      "type": "object",
+      "required": ["command", "status"],
+      "additionalProperties": false,
+      "properties": {
+        "command": { "type": "string", "minLength": 1 },
+        "status": { "type": "string" },
+        "ran_at": { "type": "string" },
+        "revision": { "type": "string" },
+        "detail": { "type": "string" }
+      }
+    }
+  }
+}

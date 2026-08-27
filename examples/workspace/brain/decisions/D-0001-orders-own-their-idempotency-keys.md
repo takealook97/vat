@@ -1,7 +1,7 @@
 ---
 id: D-0001
 status: active
-date: 2026-03-14
+date: "2026-03-14"
 claim_kind: intent
 reviewed_by: alex
 refs: [O-0001]

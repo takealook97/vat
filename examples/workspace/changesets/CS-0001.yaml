@@ -1,10 +1,11 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/takealook97/vat/main/schemas/vat-changeset-v1.schema.json
 # vat changeset — the revision bundle, the evidence, and the way back.
 # Written by `vat changeset`. Safe to edit by hand; `vat lint` checks it.
 id: CS-0001
 objective: Move order cancellation to v2
 status: closed
-opened_at: 2026-08-11
-closed_at: 2026-08-14
+opened_at: "2026-08-11"
+closed_at: "2026-08-14"
 
 non_goals:
   - changing refund timing
@@ -28,7 +29,7 @@ repositories:
     checks:
       - command: make check
         status: pass
-        ran_at: 2026-08-14T09:12:44Z
+        ran_at: "2026-08-14T09:12:44Z"
         revision: a71c93d0e5f2189b4c0d76ae3f118825bb60c94e
 
   - name: console
@@ -38,9 +39,9 @@ repositories:
     checks:
       - command: pnpm test
         status: pass
-        ran_at: 2026-08-14T09:13:22Z
+        ran_at: "2026-08-14T09:13:22Z"
         revision: 5c1f80ab3d9e6142870bd35fa9c1e07b4d28619f
       - command: pnpm typecheck
         status: pass
-        ran_at: 2026-08-14T09:13:58Z
+        ran_at: "2026-08-14T09:13:58Z"
         revision: 5c1f80ab3d9e6142870bd35fa9c1e07b4d28619f

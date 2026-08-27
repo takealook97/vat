@@ -131,6 +131,11 @@ type Changeset struct {
 // Dir is the workspace directory holding changesets.
 const Dir = "changesets"
 
+// SchemaURL is where the published JSON Schema for this record version lives.
+// It is written into every record vat saves. The schema version is in the
+// filename, so this URL does not move when a version 2 is published beside it.
+const SchemaURL = "https://raw.githubusercontent.com/takealook97/vat/main/schemas/vat-changeset-v1.schema.json"
+
 var idPattern = regexp.MustCompile(`^CS-(\d+)$`)
 
 // ErrNotFound is returned when no changeset exists for an identifier.
@@ -253,7 +258,11 @@ func Save(root string, set Changeset) error {
 	if err != nil {
 		return fmt.Errorf("encode %s: %w", set.ID, err)
 	}
-	header := "# vat changeset — the revision bundle, the evidence, and the way back.\n" +
+	// A modeline first, so the record carries the means of validating itself to
+	// any tool that reads YAML — the format is published for readers that are
+	// not vat, and a reader that is not a person needs more than prose.
+	header := "# yaml-language-server: $schema=" + SchemaURL + "\n" +
+		"# vat changeset — the revision bundle, the evidence, and the way back.\n" +
 		"# Written by `vat changeset`. Safe to edit by hand; `vat lint` checks it.\n"
 	path := filepath.Join(root, Path(set.ID))
 	return fsx.WriteFileAtomic(path, append([]byte(header), encoded...), fsx.DefaultFileMode)

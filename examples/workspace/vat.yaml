@@ -1,3 +1,4 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/takealook97/vat/main/schemas/vat-manifest-v1.schema.json
 # vat workspace manifest — https://github.com/takealook97/vat
 # The single declaration of which repositories this workspace governs.
 version: 1

@@ -32,11 +32,15 @@ the readers that are not people:
 | Format | Schema |
 | --- | --- |
 | workspace manifest, version 1 | [`schemas/vat-manifest-v1.schema.json`](../schemas/vat-manifest-v1.schema.json) |
+| completion record, version 1 | [`schemas/vat-changeset-v1.schema.json`](../schemas/vat-changeset-v1.schema.json) |
+| knowledge record front matter, schema 1 | [`schemas/vat-brain-record-1.schema.json`](../schemas/vat-brain-record-1.schema.json) |
 
 A schema is a projection of this document, not a second source of truth. Where
 the two disagree, this document is the specification and the schema has a bug.
-Every manifest `vat` writes carries a `yaml-language-server` modeline naming its
-schema, so a file can be validated by a tool that has never heard of `vat`.
+Manifests and completion records carry a `yaml-language-server` modeline naming
+their schema, so a file can be validated by a tool that has never heard of
+`vat`. Front matter inside Markdown carries none, because no reader looks for
+one there.
 
 ## 2. What this does not specify
 
@@ -58,7 +62,10 @@ a description of a program.
    the same directory and renamed. A reader **MUST** tolerate finding a
    temporary file and **MUST NOT** treat it as content.
 3. Dates are `YYYY-MM-DD`. Timestamps are RFC 3339 **with an explicit offset**,
-   which may be local. A reader **MUST NOT** assume `Z`.
+   which may be local. A reader **MUST NOT** assume `Z`. Both are strings, and
+   a writer **MUST** quote them: unquoted, `2026-08-11` is a timestamp to any
+   YAML 1.1 reader and a string to a YAML 1.2 one, so two conforming
+   implementations would disagree about the type of the same field.
 4. A revision is a git object name, full or unambiguously abbreviated — at
    least seven hexadecimal characters. A branch name is not a revision: a
    branch moves and takes the evidence with it, which is the half of this rule

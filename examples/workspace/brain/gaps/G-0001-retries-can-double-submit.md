@@ -1,11 +1,11 @@
 ---
 id: G-0001
 status: stale
-date: 2026-05-02
+date: "2026-05-02"
 claim_kind: current-state
 owned_by: payments
 source_ref: payments@3f9a1c2e8b74:docs/ORDERING.md
-observed_at: 2026-05-02
+observed_at: "2026-05-02"
 revalidate_on: source-revision-change
 reason: observed 115 days ago, past the 90-day window
 refs: [O-0001, D-0001]

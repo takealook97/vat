@@ -1,0 +1,56 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/takealook97/vat/main/schemas/vat-brain-record-1.schema.json",
+  "title": "vat brain record front matter, schema 1",
+  "description": "The YAML front matter of one atomic knowledge record. The record's kind comes from the directory it sits in and its title from the body's heading, so neither appears here. Normative prose is docs/SPEC.md section 5; where the two disagree, SPEC.md is the specification and this file has a bug.",
+  "type": "object",
+  "required": ["id", "status"],
+  "additionalProperties": false,
+  "properties": {
+    "id": {
+      "description": "Names the record's file, so it is bounded by what is safe to build a path from. Deliberately looser than any one numbering scheme: a workspace may name records however it likes.",
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 64,
+      "pattern": "^[A-Za-z0-9_-][A-Za-z0-9._-]*$"
+    },
+    "status": { "$ref": "#/$defs/status" },
+    "date": { "type": "string" },
+    "claim_kind": { "$ref": "#/$defs/claimKind" },
+    "owned_by": {
+      "description": "The repository answerable for the claim. A current-state claim without an owner is a fact nobody can be asked about.",
+      "type": "string"
+    },
+    "source_ref": {
+      "description": "Where the claim was observed, as repo@revision or repo@revision:path. The revision is what makes the claim checkable later: the record is not wrong when the source moves, it is unverified.",
+      "type": "string",
+      "pattern": "^[^@\\s]+@[^:\\s]+(?::.+)?$"
+    },
+    "observed_at": { "type": "string" },
+    "revalidate_on": { "type": "string" },
+    "supersedes": { "type": "array", "items": { "type": "string" } },
+    "superseded_by": { "type": "string" },
+    "refs": { "type": "array", "items": { "type": "string" } },
+    "axis": { "type": "string" },
+    "reason": {
+      "description": "Why a record was revoked or quarantined. A withdrawal with no reason cannot be reviewed.",
+      "type": "string"
+    },
+    "reviewed_by": {
+      "description": "Who promoted the record. A record that reached active without one was never reviewed.",
+      "type": "string"
+    }
+  },
+  "$defs": {
+    "status": {
+      "description": "Where the record stands. Only active is canon; provisional is not yet a fact, and stale is a fact nobody has rechecked.",
+      "type": "string",
+      "enum": ["provisional", "active", "stale", "quarantined", "superseded", "revoked", "resolved"]
+    },
+    "claimKind": {
+      "description": "What kind of claim this is. Only current-state decays with time: an intent does not stop being the intent because a year passed.",
+      "type": "string",
+      "enum": ["current-state", "historical", "intent"]
+    }
+  }
+}

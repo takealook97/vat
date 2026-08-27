@@ -1,7 +1,7 @@
 ---
 id: O-0001
 status: active
-date: 2026-03-14
+date: "2026-03-14"
 claim_kind: intent
 axis: correctness
 reviewed_by: alex
