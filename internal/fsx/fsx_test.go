@@ -241,8 +241,15 @@ func TestWriteFileAtomicReportsADirectoryItCannotWriteInto(t *testing.T) {
 	if err == nil {
 		t.Fatal("WriteFileAtomic succeeded in a directory it may not write to")
 	}
-	if !strings.Contains(err.Error(), "temp file") {
-		t.Errorf("error %q does not say the temporary file was the step that failed", err)
+	// Reported against the file the caller asked to write. This used to assert
+	// that the message named the temporary file instead, which is this
+	// function's own business and nothing the caller can act on.
+	target := filepath.Join(locked, "manifest.yaml")
+	if !strings.Contains(err.Error(), target) {
+		t.Errorf("error %q does not name the file it failed to write", err)
+	}
+	if strings.Contains(err.Error(), ".vat-") {
+		t.Errorf("error %q names the temporary file", err)
 	}
 }
 
@@ -402,5 +409,46 @@ func TestPortableNameSaysWhichRuleWasBroken(t *testing.T) {
 	}
 	if trailing == nil || !strings.Contains(trailing.Error(), "'.'") {
 		t.Errorf("the trailing refusal does not name the character: %v", trailing)
+	}
+}
+
+// Every write in this tool goes through WriteFileAtomic, so its failures are
+// the ones people read. It reported the temporary file it had chosen —
+// "create temp file in /long/path/decisions: open
+// /long/path/decisions/.vat-116146809: permission denied" — which names the
+// directory twice and a file the caller never asked for and cannot act on.
+//
+// What they asked to write is the only path worth telling them about.
+func TestAFailedAtomicWriteNamesTheFileItWasAskedToWrite(t *testing.T) {
+	// Arrange: a directory nothing may be created in.
+	if os.Geteuid() == 0 {
+		t.Skip("root writes through the permission bit this test needs")
+	}
+	dir := t.TempDir()
+	locked := filepath.Join(dir, "locked")
+	if err := os.MkdirAll(locked, 0o555); err != nil {
+		t.Fatalf("mkdir: %v", err)
+	}
+	target := filepath.Join(locked, "record.md")
+
+	// Act
+	err := fsx.WriteFileAtomic(target, []byte("x"), 0o644)
+
+	// Assert
+	if err == nil {
+		t.Fatal("a write into a directory nothing may be created in succeeded")
+	}
+	message := err.Error()
+	if !strings.Contains(message, target) {
+		t.Errorf("error %q does not name the file the caller asked to write", message)
+	}
+	if strings.Contains(message, ".vat-") {
+		t.Errorf("error %q names the temporary file, which the caller never asked for", message)
+	}
+	if strings.Count(message, locked) > 1 {
+		t.Errorf("error %q names the directory more than once", message)
+	}
+	if !strings.Contains(message, "permission denied") {
+		t.Errorf("error %q does not say what went wrong", message)
 	}
 }

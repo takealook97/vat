@@ -33,31 +33,49 @@ func WriteFileAtomic(path string, data []byte, mode fs.FileMode) error {
 	if err := os.MkdirAll(dir, DefaultDirMode); err != nil {
 		return err
 	}
+	// Every failure below is reported against path. The temporary file is this
+	// function's own business: naming it tells the caller about a file they
+	// never asked for and cannot act on, and repeats the directory they can
+	// already see in the name they did ask for.
 	tmp, err := os.CreateTemp(dir, ".vat-*")
 	if err != nil {
-		return fmt.Errorf("create temp file in %s: %w", dir, err)
+		return failedOn("create", path, err)
 	}
 	tmpName := tmp.Name()
 	defer func() { _ = os.Remove(tmpName) }()
 
 	if _, err := tmp.Write(data); err != nil {
 		_ = tmp.Close()
-		return err
+		return failedOn("write", path, err)
 	}
 	if err := tmp.Sync(); err != nil {
 		_ = tmp.Close()
-		return fmt.Errorf("sync %s: %w", tmpName, err)
+		return failedOn("sync", path, err)
 	}
 	if err := tmp.Close(); err != nil {
-		return fmt.Errorf("close %s: %w", tmpName, err)
+		return failedOn("close", path, err)
 	}
 	if err := os.Chmod(tmpName, mode); err != nil {
-		return fmt.Errorf("chmod %s: %w", tmpName, err)
+		return failedOn("chmod", path, err)
 	}
 	if err := os.Rename(tmpName, path); err != nil {
-		return fmt.Errorf("rename %s to %s: %w", tmpName, path, err)
+		return failedOn("rename", path, err)
 	}
 	return nil
+}
+
+// failedOn re-points a filesystem failure at the file the caller asked about,
+// keeping the cause underneath so errors.Is still answers about it.
+func failedOn(op, path string, err error) error {
+	var pathErr *fs.PathError
+	if errors.As(err, &pathErr) {
+		return &fs.PathError{Op: op, Path: path, Err: pathErr.Err}
+	}
+	var linkErr *os.LinkError
+	if errors.As(err, &linkErr) {
+		return &fs.PathError{Op: op, Path: path, Err: linkErr.Err}
+	}
+	return err
 }
 
 // Exists reports whether path exists, without distinguishing file from
