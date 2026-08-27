@@ -78,6 +78,15 @@ func checkHarness(ws *workspace.Workspace) ([]Finding, error) {
 			})
 			continue
 		}
+		if harness.CountRegions(string(repoContent)) > 1 {
+			findings = append(findings, Finding{
+				Rule: "harness/region-duplicated", Severity: SeverityWarn, Subject: ws.Rel(path),
+				Message: "more than one generated region; vat maintains the first and never looks at the rest, " +
+					"which keep whatever they hold and are loaded as though it were generated",
+				Fix: "delete the regions vat does not maintain, keeping anything of yours inside them",
+			})
+			continue
+		}
 		if !harness.RegionMatches(string(repoContent), repoRegion) {
 			findings = append(findings, Finding{
 				Rule: "harness/repo-drift", Severity: SeverityWarn, Subject: repo.Name,

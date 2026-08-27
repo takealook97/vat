@@ -421,3 +421,30 @@ func TestASingleGeneratedRegionIsNotReported(t *testing.T) {
 		t.Errorf("a correct contract was reported: %+v", report.Findings)
 	}
 }
+
+// The same file in a repository, where a session actually opens. The rule was
+// written for the workspace contract and the repositories carry the identical
+// structure.
+func TestASecondGeneratedRegionInARepositoryContractIsReported(t *testing.T) {
+	// Arrange
+	h := adoptedFixture(t, "payments")
+	path := h.path("payments", "AGENTS.md")
+	content := readFile(t, path)
+	if err := os.WriteFile(path, []byte(content+
+		"\n<!-- vat:begin generated -->\nStale.\n<!-- vat:end generated -->\n"), 0o644); err != nil {
+		t.Fatalf("write: %v", err)
+	}
+
+	// Act
+	report := h.lint(t, "--offline")
+
+	// Assert
+	if !report.reports("harness/region-duplicated") {
+		t.Errorf("a second region in a repository contract went unreported; lint said %v", report.rules())
+	}
+	for _, finding := range report.Findings {
+		if finding.Rule == "harness/region-duplicated" && !strings.Contains(finding.Subject, "payments") {
+			t.Errorf("the finding does not name the repository: %q", finding.Subject)
+		}
+	}
+}

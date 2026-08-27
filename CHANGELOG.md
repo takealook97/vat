@@ -465,7 +465,9 @@ Notable changes to `vat`. The format follows
   though vat wrote them that morning — the failure this whole layer exists to
   prevent, inside the file that prevents it. Not repairable, because which of
   the two is the real one is a judgement and the abandoned one may be the only
-  copy of something somebody wrote.
+  copy of something somebody wrote. Reported for the workspace contract and for
+  every repository contract, which carry the identical structure and are where a
+  session actually opens.
 - `brain/schema-newer` is reported by `vat lint` and not only by `vat brain
   check`. The knowledge layer refuses to judge a brain written against a newer
   schema, for the reason its own comment gives — "the records would look clean
