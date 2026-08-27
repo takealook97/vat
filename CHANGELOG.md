@@ -18,17 +18,11 @@ Notable changes to `vat`. The format follows
   the one file this tool will not overwrite. An adopted role records the runtime
   it came from and no other, because a bare `model` is honoured only by a role
   targeting one runtime, and it grants no write access, because adoption must
-  not hand a definition a capability it never stated.
-- `vat harness adopt` reports the front-matter keys it cannot carry over. A
-  Claude agent file may declare `tools:` or `color:`, which vat's role has no
-  field for, and rewriting somebody's file while discarding half its header
-  without saying so is the quiet kind of data loss — the runtime that file was
-  written for may well honour the key. Reported before `--apply`, so it is read
-  before the move rather than discovered after it.
-- The scan for abandoned adapters read every file under a runtime directory in
-  full. A skill directory holds references and scripts beside its procedure, so
-  a large asset was read end to end on every lint to decide it was not a
-  generated pointer; the marker is in the first lines by construction.
+  not hand a definition a capability it never stated. A header key the canonical
+  format has no field for is reported rather than discarded in silence, before
+  `--apply` as well as after: the runtime that file was written for may well
+  honour it, and rewriting somebody's file while dropping half its header is the
+  quiet kind of data loss.
 - `harness/adapter-orphaned`, for a generated adapter left behind by a deleted
   definition. Drift compares an adapter with the definition it came from and
   cannot see the case where there is none left to compare against: delete
@@ -235,6 +229,10 @@ Notable changes to `vat`. The format follows
 
 ### Fixed
 
+- The scan for abandoned adapters read every file under a runtime directory in
+  full. A skill directory holds references and scripts beside its procedure, so
+  a large asset was read end to end on every lint to decide it was not a
+  generated pointer; the marker is in the first lines by construction.
 - `.claude/agents/<name>.md` carried no "generated" marker while the Codex
   adapter and the Claude skill adapter both did, which left the file people open
   most often as the only generated file that never said it was generated — and
