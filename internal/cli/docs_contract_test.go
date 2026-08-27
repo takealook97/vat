@@ -750,20 +750,32 @@ func TestEverySampleThresholdIsOneTheAdvisorPrints(t *testing.T) {
 	}
 }
 
-// A sample is what a reader types. The reference is held to the command tree
-// already; every other document showing a transcript was not, so a renamed or
-// removed command could sit in the README indefinitely with nothing to say.
+// A sample is what a reader types. The reference is held to the command tree in
+// both directions; every other document showing an invocation was not, so a
+// renamed or removed command could sit in the README indefinitely with nothing
+// to say.
+//
+// Only the verb is checked. A sample's later words are arguments — a repository
+// name, a query term, a record kind — and nothing in their shape separates them
+// from a subcommand, so asserting them either passes everything or reports
+// somebody's example query as a missing command. Deeper paths are covered where
+// they can be: the reference is compared against the tree both ways, and the
+// seeded procedures are held to full invocations because those are vat's own
+// words rather than a reader's.
 func TestEveryCommandShownInTheDocsExists(t *testing.T) {
 	// Arrange
-	known := map[string]bool{}
-	walkCommands(Root(), nil, func(_ *Command, path []string) {
-		known["vat "+strings.Join(path, " ")] = true
-	})
+	top := map[string]bool{}
+	for _, sub := range Root().Subcommands {
+		top[sub.Name] = true
+	}
+	if len(top) == 0 {
+		t.Fatal("the command tree is empty; it changed shape and this test stopped checking anything")
+	}
 	// Anchored on the two forms that are an invocation rather than prose about
 	// the tool: inside a code span, or after a shell prompt. "vat reads the
 	// manifest" is a sentence, and holding sentences to the command tree is how
 	// a guard earns being switched off.
-	invocation := regexp.MustCompile("(?m)(?:`|^\\$ )vat(?: [a-z][a-z-]*)+")
+	invocation := regexp.MustCompile("(?m)(?:`|^\\$ )vat ([a-z][a-z-]*)")
 	paths, err := filepath.Glob("../../docs/*.md")
 	if err != nil {
 		t.Fatalf("glob docs: %v", err)
@@ -776,21 +788,10 @@ func TestEveryCommandShownInTheDocsExists(t *testing.T) {
 		if err != nil {
 			continue
 		}
-		for _, quoted := range invocation.FindAllString(string(content), -1) {
-			words := strings.Fields(strings.TrimLeft(quoted, "`$ "))
-			// Matched greedily, so trim back to the longest prefix that is a
-			// command: `vat sync` in "vat sync fetches" is the command and
-			// "fetches" is prose.
-			var resolved bool
-			for n := len(words); n > 1; n-- {
-				if known[strings.Join(words[:n], " ")] {
-					resolved = true
-					break
-				}
-			}
-			if !resolved {
-				t.Errorf("%s shows %q, and no prefix of it is a command this binary has",
-					path, quoted)
+		for _, match := range invocation.FindAllStringSubmatch(string(content), -1) {
+			if !top[match[1]] {
+				t.Errorf("%s shows `vat %s`, which is not a command this binary has",
+					path, match[1])
 			}
 		}
 	}

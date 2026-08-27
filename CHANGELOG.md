@@ -438,8 +438,9 @@ Notable changes to `vat`. The format follows
   The reference was already held to it; every other document showing one was
   not, so a renamed or removed command could sit in the README indefinitely with
   nothing to say. Anchored on a code span or a shell prompt, because "vat reads
-  the manifest" is a sentence and holding sentences to the command tree is how a
-  guard earns being switched off.
+  the manifest" is a sentence — and only the verb is checked, because nothing in
+  the shape of a sample's later words separates a subcommand from a repository
+  name or a query term.
 - The README's `vat fit` sample showed thresholds the tool does not print —
   "agents work across more than one repository" where it says "coding agents
   work in this code at all", which is a different recommendation to a different
