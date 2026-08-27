@@ -385,6 +385,12 @@ window exists in which a consumer expects an interface that is already gone.
 .codex/agents/<name>.toml            generated adapter; `-` in the name becomes `_`
 ```
 
+Whether generated content has drifted **MUST** be decided on content and not on
+line endings. git converts LF to CRLF on checkout under its default
+configuration on Windows, so a byte comparison reports every generated file in
+the workspace as drifted, on every run, on a file nobody has touched — and a
+repair that rewrites it produces the same finding on the next run.
+
 A generated region **MUST** fit the budget the implementation itself enforces on
 the file holding it. Where a roster is too long to list, the implementation
 **MUST** state how many entries it did not list rather than dropping them

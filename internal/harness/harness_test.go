@@ -376,3 +376,132 @@ func TestTheGeneratedContractStaysInsideTheBudgetItsOwnRuleEnforces(t *testing.T
 		}
 	}
 }
+
+// git on Windows converts LF to CRLF on checkout under its default
+// core.autocrlf, so a contract this tool wrote and committed comes back with
+// different line endings. Comparing bytes reported drift on a file nobody had
+// touched, `vat lint --fix` rewrote it with LF, git converted it back, and the
+// finding returned on the next run — for as long as anybody kept looking.
+//
+// This project pins its own working tree to LF in .gitattributes. A user's
+// workspace has no such file unless they write one, and vat does not.
+func TestALineEndingIsNotDrift(t *testing.T) {
+	// Arrange
+	m := demoManifest()
+	region := harness.RenderWorkspace(m)
+	document := harness.ApplyRegion("# acme\n\nHand-written.\n", region)
+
+	// Act
+	windows := strings.ReplaceAll(document, "\n", "\r\n")
+
+	// Assert
+	if !harness.RegionMatches(document, region) {
+		t.Fatal("a document this tool just wrote does not match the region it wrote")
+	}
+	if !harness.RegionMatches(windows, region) {
+		t.Error("the same contract with CRLF endings is reported as drifted")
+	}
+}
+
+// The same failure in the adapters, which are compared whole rather than by
+// region: on Windows a committed adapter comes back with CRLF and every one of
+// them is reported as drifted, on every run, for as long as anybody keeps
+// looking. The self-contract test in this package already normalises for the
+// same reason; the product did not.
+func TestALineEndingIsNotAdapterDrift(t *testing.T) {
+	// Arrange
+	root := t.TempDir()
+	writeAt(t, root, ".agents/roles/planner.md",
+		"---\nname: planner\ndescription: Plans work.\n---\n\nBody.\n")
+	writeAt(t, root, ".agents/skills/deploy/SKILL.md",
+		"---\nname: deploy\ndescription: Ships one service.\n---\n\nSteps.\n")
+	roles, _, err := harness.LoadRoles(root)
+	if err != nil {
+		t.Fatalf("LoadRoles: %v", err)
+	}
+	skills, _, err := harness.LoadSkills(root)
+	if err != nil {
+		t.Fatalf("LoadSkills: %v", err)
+	}
+	if _, err := harness.WriteAdapters(root, roles); err != nil {
+		t.Fatalf("WriteAdapters: %v", err)
+	}
+	if _, err := harness.WriteSkillAdapters(root, skills); err != nil {
+		t.Fatalf("WriteSkillAdapters: %v", err)
+	}
+
+	// Act: git's default on Windows, applied to every adapter on the way out.
+	converted := 0
+	for _, adapter := range harness.RenderAdapters(roles[0]) {
+		toCRLF(t, filepath.Join(root, adapter.Path))
+		converted++
+	}
+	for _, adapter := range harness.RenderSkillAdapters(skills[0]) {
+		toCRLF(t, filepath.Join(root, adapter.Path))
+		converted++
+	}
+	if converted != 3 {
+		t.Fatalf("expected two role adapters and one skill adapter, converted %d", converted)
+	}
+
+	// Assert
+	drifted, err := harness.AdapterDrift(root, roles)
+	if err != nil {
+		t.Fatalf("AdapterDrift: %v", err)
+	}
+	if len(drifted) != 0 {
+		t.Errorf("role adapters reported as drifted for their line endings: %v", drifted)
+	}
+	skillDrift, err := harness.SkillAdapterDrift(root, skills)
+	if err != nil {
+		t.Fatalf("SkillAdapterDrift: %v", err)
+	}
+	if len(skillDrift) != 0 {
+		t.Errorf("skill adapters reported as drifted for their line endings: %v", skillDrift)
+	}
+}
+
+// toCRLF rewrites a file the way git does on Windows under its default
+// core.autocrlf.
+func toCRLF(t *testing.T, path string) {
+	t.Helper()
+	content, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("read %s: %v", path, err)
+	}
+	crlf := strings.ReplaceAll(string(content), "\n", "\r\n")
+	if err := os.WriteFile(path, []byte(crlf), 0o644); err != nil {
+		t.Fatalf("write %s: %v", path, err)
+	}
+}
+
+// `vat harness render` reported every adapter as written on every run under
+// git's default on Windows, because the write was skipped only on an exact byte
+// match. Rendering that is not idempotent is rendering nobody can put in CI.
+func TestRenderingIsIdempotentAcrossLineEndings(t *testing.T) {
+	// Arrange
+	root := t.TempDir()
+	writeAt(t, root, ".agents/roles/planner.md",
+		"---\nname: planner\ndescription: Plans work.\n---\n\nBody.\n")
+	roles, _, err := harness.LoadRoles(root)
+	if err != nil {
+		t.Fatalf("LoadRoles: %v", err)
+	}
+	if _, err := harness.WriteAdapters(root, roles); err != nil {
+		t.Fatalf("WriteAdapters: %v", err)
+	}
+	for _, adapter := range harness.RenderAdapters(roles[0]) {
+		toCRLF(t, filepath.Join(root, adapter.Path))
+	}
+
+	// Act
+	written, err := harness.WriteAdapters(root, roles)
+	if err != nil {
+		t.Fatalf("WriteAdapters: %v", err)
+	}
+
+	// Assert
+	if len(written) != 0 {
+		t.Errorf("adapters were rewritten for their line endings: %v", written)
+	}
+}

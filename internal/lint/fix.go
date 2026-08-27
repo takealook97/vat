@@ -126,7 +126,11 @@ func applyRegion(path, region, preamble string) (bool, error) {
 		base = preamble
 	}
 	next := harness.ApplyRegion(base, region)
-	if next == string(current) {
+	// Compared on content. Under the default core.autocrlf on Windows every
+	// generated file comes back with CRLF, and an exact match had each run
+	// rewrite all of them — splicing an LF region into a CRLF document and
+	// leaving a file with both.
+	if harness.NormaliseNewlines(next) == harness.NormaliseNewlines(string(current)) {
 		return false, nil
 	}
 	if err := fsx.WriteFileAtomic(path, []byte(next), fsx.DefaultFileMode); err != nil {

@@ -60,5 +60,19 @@ func RegionMatches(content, region string) bool {
 	if !ok {
 		return false
 	}
-	return found == strings.TrimSpace(region)
+	// Compared on content, not on the reader's git configuration. Under the
+	// default core.autocrlf on Windows, a contract this tool wrote and committed
+	// comes back with CRLF endings: comparing bytes reported drift on a file
+	// nobody had touched, `vat lint --fix` rewrote it with LF, git converted it
+	// back, and the finding returned on the next run for as long as anybody kept
+	// looking. This repository pins its own tree in .gitattributes; a user's
+	// workspace has no such file unless they write one.
+	return NormaliseNewlines(found) == NormaliseNewlines(strings.TrimSpace(region))
+}
+
+// NormaliseNewlines collapses CRLF so a comparison is about content rather than
+// about the reader's git configuration. Exported because every check that asks
+// whether generated content has drifted has to ask the same question.
+func NormaliseNewlines(text string) string {
+	return strings.ReplaceAll(text, "\r\n", "\n")
 }

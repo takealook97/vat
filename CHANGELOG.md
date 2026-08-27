@@ -436,6 +436,16 @@ Notable changes to `vat`. The format follows
   none. That text is committed into the repository of everybody adopting the
   harness on its own, where it reads as a defect in the generated file rather
   than as the state it describes.
+- Drift is decided on content, not on line endings. Under git's default
+  `core.autocrlf` on Windows every generated file comes back with CRLF, so a
+  byte comparison reported the workspace contract, every repository contract,
+  and every runtime adapter as drifted — on every run, on files nobody had
+  touched. `vat lint --fix` rewrote them with LF, git converted them straight
+  back, and the findings returned; the region repair also spliced an LF region
+  into a CRLF document and left a file holding both. This repository pins its
+  own tree in `.gitattributes` and its self-contract test already normalised for
+  exactly this reason. A user's workspace has no such file, and the product did
+  not.
 - A file saved with a UTF-8 byte order mark is read. The mark sits in front of
   the opening delimiter, so the header stopped being one — and nothing errored:
   the whole file became body, every declared field was lost, and a role that

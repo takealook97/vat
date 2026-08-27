@@ -557,3 +557,56 @@ func TestTheRemoteMissingFixDoesNotHandBackThePlaceholderAsAUrl(t *testing.T) {
 		t.Errorf("the fix does not say a real url is needed: %q", finding.Fix)
 	}
 }
+
+// Under git's default on Windows every generated file comes back with CRLF.
+// applyRegion compared the whole document byte for byte, so each run rewrote
+// every one of them — and spliced an LF region into a CRLF document, leaving a
+// file with both. Rendering that is neither idempotent nor consistent is
+// rendering nobody can put in CI.
+func TestRenderingIsIdempotentWhenTheFilesCameBackWithCRLF(t *testing.T) {
+	// Arrange
+	ws := fixture(t, manifest.Repo{
+		Name: "payments", Origin: "https://example.invalid/acme/payments.git",
+		Role: manifest.RoleProduct,
+	})
+	if _, err := lint.RenderHarness(ws); err != nil {
+		t.Fatalf("RenderHarness: %v", err)
+	}
+	generated := []string{
+		filepath.Join(ws.Root, "AGENTS.md"),
+		filepath.Join(ws.Root, "payments", "AGENTS.md"),
+	}
+	for _, path := range generated {
+		content, err := os.ReadFile(path)
+		if err != nil {
+			t.Fatalf("read %s: %v", path, err)
+		}
+		crlf := strings.ReplaceAll(string(content), "\n", "\r\n")
+		if err := os.WriteFile(path, []byte(crlf), 0o644); err != nil {
+			t.Fatalf("write %s: %v", path, err)
+		}
+	}
+
+	// Act
+	changed, err := lint.RenderHarness(ws)
+	if err != nil {
+		t.Fatalf("RenderHarness: %v", err)
+	}
+
+	// Assert
+	for _, file := range changed {
+		if strings.HasSuffix(file, "AGENTS.md") {
+			t.Errorf("%s was rewritten for its line endings", file)
+		}
+	}
+	for _, path := range generated {
+		content, err := os.ReadFile(path)
+		if err != nil {
+			t.Fatalf("read back %s: %v", path, err)
+		}
+		if strings.Contains(strings.ReplaceAll(string(content), "\r\n", ""), "\n") &&
+			strings.Contains(string(content), "\r\n") {
+			t.Errorf("%s now holds both line endings", path)
+		}
+	}
+}
