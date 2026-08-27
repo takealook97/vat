@@ -229,6 +229,11 @@ Notable changes to `vat`. The format follows
 
 ### Fixed
 
+- Two role or skill definitions whose names differ only in case are refused at
+  load. They are one file on macOS and on Windows, so a pair authored on Linux
+  reaches a colleague's checkout as one silently overwriting the other, and the
+  filesystem noticing is a coincidence of where the definition was typed rather
+  than a rule anybody can rely on.
 - A name that cannot become a directory on Windows is refused on every
   platform: the device names `con`, `prn`, `aux`, `nul`, `com0`–`com9`,
   `lpt0`–`lpt9` — with or without an extension, because Windows matches the

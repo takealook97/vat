@@ -95,3 +95,51 @@ func TestARoleNameThatCannotBecomeAFileOnEveryPlatformIsRefused(t *testing.T) {
 		}
 	}
 }
+
+// Two definitions whose names differ only in case are one file on macOS and on
+// Windows, so a pair authored on Linux arrives at a colleague's checkout as one
+// file silently overwriting the other. Refused at load, on every platform: the
+// filesystem catching it is not a rule, it is a coincidence of where the
+// definition was typed.
+func TestTwoDefinitionsDifferingOnlyInCaseAreRefused(t *testing.T) {
+	// Arrange
+	// Two files, because on a case-insensitive filesystem two paths differing
+	// only in case are already one file. What collides is the name each one
+	// declares, which is what the adapter path is built from.
+	root := t.TempDir()
+	writeAt(t, root, ".agents/roles/one.md",
+		"---\nname: planner\ndescription: Lower.\n---\n\nBody.\n")
+	writeAt(t, root, ".agents/roles/two.md",
+		"---\nname: Planner\ndescription: Upper.\n---\n\nBody.\n")
+
+	// Act
+	_, _, err := harness.LoadRoles(root)
+
+	// Assert
+	if err == nil {
+		t.Fatal("two roles claiming one file on macOS were loaded")
+	}
+	if !strings.Contains(err.Error(), "case") {
+		t.Errorf("the refusal does not say what the collision is: %v", err)
+	}
+}
+
+func TestTwoDefinitionsWithGenuinelyDifferentNamesLoad(t *testing.T) {
+	// Arrange
+	root := t.TempDir()
+	writeAt(t, root, ".agents/roles/planner.md",
+		"---\nname: planner\ndescription: One.\n---\n\nBody.\n")
+	writeAt(t, root, ".agents/roles/reviewer.md",
+		"---\nname: reviewer\ndescription: Two.\n---\n\nBody.\n")
+
+	// Act
+	roles, _, err := harness.LoadRoles(root)
+
+	// Assert
+	if err != nil {
+		t.Fatalf("two distinct roles were refused: %v", err)
+	}
+	if len(roles) != 2 {
+		t.Errorf("expected both roles, got %d", len(roles))
+	}
+}

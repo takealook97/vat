@@ -258,6 +258,12 @@ WARN  harness/adapter-orphaned · .claude/agents/planner.md   generated adapter 
       -> restore the definition it was generated from, or delete .claude/agents/planner.md
 ```
 
+Two definitions whose names differ only in case are refused at load, on every
+platform. They are one file on macOS and on Windows, so a pair authored on Linux
+arrives at a colleague's checkout as one silently overwriting the other — and
+the filesystem catching it is not a rule, it is a coincidence of where the
+definition was typed.
+
 The rule reads the generated marker rather than the directory, so an agent file
 somebody wrote by hand is left alone. It is not repairable: the fix is a
 deletion, and this tool does not delete — the adapter may be the only remaining

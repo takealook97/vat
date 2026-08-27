@@ -195,6 +195,19 @@ func refuseDuplicateNames(byName map[string][]string) error {
 			return fmt.Errorf("%w %q: %s", ErrDuplicateName, name, strings.Join(sources, " and "))
 		}
 	}
+	// Folded, because two names differing only in case are one file on macOS
+	// and on Windows. A pair authored on Linux arrives at a colleague's
+	// checkout as one file silently overwriting the other, and the filesystem
+	// catching it is not a rule — it is a coincidence of where it was typed.
+	folded := map[string]string{}
+	for _, name := range names {
+		key := strings.ToLower(name)
+		if first, clash := folded[key]; clash {
+			return fmt.Errorf("%w %q and %q: they differ only in case, which is one file on macOS and on Windows",
+				ErrDuplicateName, first, name)
+		}
+		folded[key] = name
+	}
 	return nil
 }
 
