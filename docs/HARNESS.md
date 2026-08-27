@@ -244,6 +244,25 @@ WARN  harness/adapter-drift · .codex/agents/planner.toml   runtime adapter no l
 Somebody edited the adapter directly. The role body is canonical; regenerate.
 Skill adapters are checked by the same rule against `.agents/skills`.
 
+Drift compares an adapter with the definition it came from, so it cannot see the
+case where there is none left. Delete a role and its adapters stay: the runtime
+keeps advertising it, and the session that opens it is told to read a file that
+is gone.
+
+```console
+$ vat lint
+WARN  harness/adapter-orphaned · .claude/agents/planner.md   generated adapter for a definition
+                                                            that no longer exists; a session
+                                                            still loads it and it points at a
+                                                            missing file
+      -> restore the definition it was generated from, or delete .claude/agents/planner.md
+```
+
+The rule reads the generated marker rather than the directory, so an agent file
+somebody wrote by hand is left alone. It is not repairable: the fix is a
+deletion, and this tool does not delete — the adapter may be the only remaining
+copy of a definition removed by accident.
+
 ---
 
 ## Trust, rendered into every contract
