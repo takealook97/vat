@@ -209,6 +209,20 @@ spelled correctly and is right on a role, so nothing else notices: there is no
 adapter, so there is no drift, and the skill sits on disk generating nothing
 while the report reads green. It is reported for that reason.
 
+`vat harness skill new <name> --description "..."` writes the canonical
+procedure and generates the adapter. It reports both of the above at creation —
+a `--runtimes` list that selects nothing, and a missing description — rather
+than leaving them for the next `vat lint`. The description is left empty when
+none is given rather than filled with a generated one, because a placeholder
+would satisfy `harness/skill-metadata` while telling the runtime nothing, and
+that rule exists to catch exactly the skill nobody can be offered.
+
+`vat init` seeds two procedures into a new workspace, `before-cross-repo-work`
+and `consult-the-brain-first`. They describe vat's own command sequences and
+nothing else: a procedure vat writes once and never maintains would be a second
+source of truth of the kind this tool exists to remove. They are canonical files
+from the moment they land — edit them, or delete them, with no consequence.
+
 ```console
 $ vat lint
 WARN  harness/runtime-unknown · codex-only  declares runtime "codex", which generates no skill
@@ -293,10 +307,12 @@ role that may decide something is not having the capability to do it.
 ## Commands
 
 ```bash
-vat harness render                       # regenerate every region and adapter
-vat harness check                        # report drift, write nothing
-vat harness roles                        # list roles, models, write scope, runtimes
-vat harness role new <name> [--writes ...] # create a runtime-neutral role
+vat harness render                        # regenerate every region and adapter
+vat harness check                         # report drift, write nothing
+vat harness roles                         # list roles, models, write scope, runtimes
+vat harness skills                        # list skills and the runtimes that render one
+vat harness role new  <name> [--writes ...]     # create a runtime-neutral role
+vat harness skill new <name> [--description ...] # create a runtime-neutral procedure
 ```
 
 `vat repo add|new|adopt|rename|archive` re-renders automatically, so a new

@@ -40,16 +40,51 @@ on-disk format is a breaking change even when no Go symbol moved.
 6. Verify the release page carries, for every target, an archive and a
    `.cdx.json`, plus one `checksums.txt` and a provenance attestation.
 
-## When it must stop
+## When a published release turns out to be defective
 
-**A published tag is frozen. Never move one.** The Go module proxy caches a
-version the first time anyone fetches it, so re-pointing `vX.Y.Z` leaves two
-different trees answering to one version while the proxy keeps serving the
-first. A release that went out wrong goes out again as the next patch version.
+**A published tag is frozen. Never move one, and never delete one.**
+`proxy.golang.org` caches a version's content the first time anyone fetches it
+and offers no deletion, so `go install module@vX.Y.Z` will serve that code
+forever. Re-pointing the tag leaves two different trees answering to one version
+while the proxy keeps serving the first, and deleting the tag on the forge does
+not reach the proxy at all.
+
+The fix is two things, not one:
+
+1. Ship the correction as the **next** version. Never as the same one.
+2. **Retract the defective version in `go.mod`**, with a comment saying what was
+   wrong with it. Retraction is what keeps the toolchain from offering it:
+   `go get` refuses a retracted version, `go list -m -versions` hides it, and
+   `@latest` skips past it.
+
+```
+retract (
+    // What was wrong with it, in enough detail to judge the risk.
+    v0.1.5
+    // A contiguous range, when several versions share one defect.
+    [v0.1.2, v0.1.4]
+)
+```
+
+A retraction only takes effect once it is published in a version **above** the
+ones it names, so the retraction and the fix ship together in the new tag.
+
+Record it in `CHANGELOG.md` too. The `retract` block is read by the toolchain
+and by nobody else; a person deciding whether they are running something unsafe
+reads the release notes.
+
+Retract for a defect that matters to somebody running it — a disclosed
+credential, a write outside the directory vat governs, a wrong version stamp.
+Not for a typo.
+
+## When it must stop
 
 Stop before pushing if `make check` is red, if the working tree is dirty, or if
 the version cannot be justified from the diff. None of those is recoverable
-afterwards.
+afterwards, because the push is the publication.
+
+Deciding that a defect is severe enough to retract is a judgement about other
+people's installations. Say what the defect is and let a human make it.
 
 Nothing in this repository updates the Homebrew tap. If a release needs to reach
 `brew install`, that happens outside this repository and is not this skill's to
