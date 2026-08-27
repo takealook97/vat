@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/takealook97/vat/internal/harness"
+	"gopkg.in/yaml.v3"
 )
 
 func writeSkill(t *testing.T, root, name, content string) {
@@ -306,5 +307,38 @@ runtimes: [codex]
 	if len(adapters) != 0 {
 		t.Fatalf("rendered %d adapters for a skill no runtime generates one for, want 0: %+v",
 			len(adapters), adapters)
+	}
+}
+
+// The skill adapter's front matter is the only thing that makes the procedure
+// discoverable, and it is built by the same renderer the role adapter is.
+func TestAGeneratedSkillHeaderSurvivesWhateverADescriptionContains(t *testing.T) {
+	// Arrange
+	for _, description := range []string{
+		`He said "hi" and a back\slash`,
+		"line one\nline two",
+		"  indented",
+		"*anchor &ref !tag |block",
+	} {
+		skill := harness.Skill{Name: "deploy", Description: description}
+
+		// Act
+		adapter := harness.RenderSkillAdapters(skill)[0]
+		header, _, found := strings.Cut(strings.TrimPrefix(adapter.Content, "---\n"), "\n---")
+		if !found {
+			t.Fatalf("the adapter has no front matter:\n%s", adapter.Content)
+		}
+
+		// Assert
+		var parsed struct {
+			Description string `yaml:"description"`
+		}
+		if err := yaml.Unmarshal([]byte(header), &parsed); err != nil {
+			t.Errorf("the generated header does not parse for %q: %v", description, err)
+			continue
+		}
+		if parsed.Description != description {
+			t.Errorf("description round-tripped as %q, want %q", parsed.Description, description)
+		}
 	}
 }

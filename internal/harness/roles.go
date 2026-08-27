@@ -464,14 +464,68 @@ func adapterPreamble(role Role) string {
 	return b.String()
 }
 
+// yamlScalar renders a value as a YAML scalar a runtime can parse back into
+// exactly what went in.
+//
+// The adapter's front matter is what a runtime reads to find the definition at
+// all. Quoting without escaping produced `description: "a back\slash"`, and
+// `\s` is not a YAML escape, so the header did not parse and the role was
+// invisible to the runtime it was generated for. A newline folded to a space and
+// a leading space was eaten, both silently. vat never noticed any of it: nothing
+// reads an adapter back except a comparison against the string it just rendered.
 func yamlScalar(value string) string {
 	if value == "" {
 		return `""`
 	}
-	if strings.ContainsAny(value, ":#\"'\n{}[]&*!|>%@`") {
-		return `"` + strings.ReplaceAll(value, `"`, `\"`) + `"`
+	if !needsQuoting(value) {
+		return value
 	}
-	return value
+	var b strings.Builder
+	b.WriteByte('"')
+	for _, r := range value {
+		switch r {
+		case '\\':
+			b.WriteString(`\\`)
+		case '"':
+			b.WriteString(`\"`)
+		case '\n':
+			b.WriteString(`\n`)
+		case '\r':
+			b.WriteString(`\r`)
+		case '\t':
+			b.WriteString(`\t`)
+		default:
+			if r < 0x20 || r == 0x7f {
+				fmt.Fprintf(&b, `\x%02x`, r)
+				continue
+			}
+			b.WriteRune(r)
+		}
+	}
+	b.WriteByte('"')
+	return b.String()
+}
+
+// needsQuoting reports whether a plain YAML scalar would not survive the round
+// trip. Leading and trailing whitespace is stripped from a plain scalar, and
+// every character below opens some other construct.
+func needsQuoting(value string) bool {
+	if strings.TrimSpace(value) != value {
+		return true
+	}
+	// A comma and a backslash are not special in a plain scalar in block
+	// context: quoting for them churns every adapter and buys nothing. When
+	// quoting is triggered by something that is special, the writer escapes
+	// both.
+	if strings.ContainsAny(value, ":#\"'\n\r\t{}[]&*!|>%@`") {
+		return true
+	}
+	for _, r := range value {
+		if r < 0x20 || r == 0x7f {
+			return true
+		}
+	}
+	return false
 }
 
 func tomlString(value string) string {

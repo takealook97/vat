@@ -458,6 +458,13 @@ Notable changes to `vat`. The format follows
   `vat brain build` rewriting both files every run, and every command that
   touches the manifest reporting ".gitignore updated" on a file nobody had
   changed.
+- A generated adapter's front matter survives whatever a description contains.
+  Quoting without escaping produced `description: "a back\slash"`, and `\s` is
+  not a YAML escape — the header did not parse, so the role was invisible to the
+  runtime it was generated for. A newline folded to a space and a leading space
+  was eaten, both silently. vat never noticed any of it: nothing reads an adapter
+  back except a comparison against the string it just rendered, which agreed with
+  itself. The Codex adapter had escaped correctly all along.
 - A file saved with a UTF-8 byte order mark is read. The mark sits in front of
   the opening delimiter, so the header stopped being one — and nothing errored:
   the whole file became body, every declared field was lost, and a role that

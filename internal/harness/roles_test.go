@@ -3,10 +3,12 @@ package harness_test
 import (
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 
 	"github.com/takealook97/vat/internal/harness"
+	"gopkg.in/yaml.v3"
 )
 
 // A model name lives in a vendor's namespace. vat generated `model = "opus"`
@@ -178,5 +180,62 @@ func TestAMalformedDefinitionIsReportedWithoutRepeatingItsPath(t *testing.T) {
 	}
 	if !strings.Contains(entry.Problem, "is a directory") {
 		t.Errorf("the problem does not say what went wrong: %q", entry.Problem)
+	}
+}
+
+// The adapter's front matter is what a runtime parses to find the role at all.
+// A backslash in a description produced `description: "a back\slash"` — `\s` is
+// not a YAML escape, so the header does not parse and the role is invisible to
+// the runtime it was generated for. vat never noticed: nothing reads an adapter
+// back except a comparison against the string it just rendered.
+func TestAGeneratedHeaderSurvivesWhateverADescriptionContains(t *testing.T) {
+	// Arrange
+	cases := []struct{ name, description string }{
+		{"quoted", `He said "hello"`},
+		{"backslash", `a back\slash`},
+		{"both", `He said "hi" and a back\slash`},
+		{"newline", "line one\nline two"},
+		{"tab", "before\tafter"},
+		{"colon", "key: value"},
+		{"leading-space", "  indented"},
+		{"yaml-ish", "*anchor &ref !tag |block >fold %directive @at `tick`"},
+	}
+
+	for _, testCase := range cases {
+		t.Run(testCase.name, func(t *testing.T) {
+			root := t.TempDir()
+			writeAt(t, root, ".agents/roles/"+testCase.name+".md",
+				"---\nname: "+testCase.name+"\ndescription: "+strconv.Quote(testCase.description)+
+					"\nruntimes: [claude]\n---\n\nBody.\n")
+			roles, _, err := harness.LoadRoles(root)
+			if err != nil {
+				t.Fatalf("LoadRoles: %v", err)
+			}
+			if len(roles) != 1 {
+				t.Fatalf("expected the role, got %+v", roles)
+			}
+
+			// Act
+			adapter := harness.RenderAdapters(roles[0])[0]
+			header, _, found := strings.Cut(strings.TrimPrefix(adapter.Content, "---\n"), "\n---")
+			if !found {
+				t.Fatalf("the adapter has no front matter:\n%s", adapter.Content)
+			}
+
+			// Assert: what a runtime does with it.
+			var parsed struct {
+				Name        string `yaml:"name"`
+				Description string `yaml:"description"`
+			}
+			if err := yaml.Unmarshal([]byte(header), &parsed); err != nil {
+				t.Fatalf("the generated header does not parse: %v\n%s", err, header)
+			}
+			if parsed.Name != testCase.name {
+				t.Errorf("name = %q", parsed.Name)
+			}
+			if parsed.Description != roles[0].Description {
+				t.Errorf("description round-tripped as %q, want %q", parsed.Description, roles[0].Description)
+			}
+		})
 	}
 }
