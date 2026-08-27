@@ -359,6 +359,12 @@ Notable changes to `vat`. The format follows
   shows, and nothing checked that — in the one asset a reader takes as evidence
   the tool does what the page claims. A contract test now holds it to naming
   every file `vat init` writes unconditionally, the seeded procedures included.
+- An `opened_at` a changeset record cannot be read as a date is reported. The age
+  is computed by parsing it, and a parse failure returned zero — which reads as
+  "opened today" and hid the record from `changeset/open-too-long`, the rule
+  that finds cross-repo work somebody abandoned. One malformed line was enough,
+  and so was an ISO timestamp, which the published schema did not forbid. The
+  schema now pins the shape and SPEC §6 states it.
 - A `vat.yaml` with no `version:` is refused instead of silently read as
   version 1. SPEC §4 lists the key as required and the published schema puts it
   in `required` with `minimum: 1`, so anyone validating a manifest against vat's

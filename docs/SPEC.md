@@ -337,6 +337,11 @@ repositories:
 
 `status` is one of `open`, `verified`, `closed`, `rolled_back`, `abandoned`.
 
+`opened_at` and `closed_at` **MUST** be written as `YYYY-MM-DD`. An
+implementation that cannot read the date cannot compute the age, and an age
+reported as zero is indistinguishable from a changeset opened today — so a
+malformed date silently exempts the record from every staleness check.
+
 ### 6.1 The three claims
 
 A changeset makes three claims that **MUST** be recorded separately, because

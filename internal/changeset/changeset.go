@@ -274,7 +274,7 @@ func New(id, objective string, now time.Time) Changeset {
 		ID:        id,
 		Objective: objective,
 		Status:    StatusOpen,
-		OpenedAt:  now.Format("2006-01-02"),
+		OpenedAt:  now.Format(openedLayout),
 	}
 }
 
@@ -342,7 +342,7 @@ func (c Changeset) FullyLanded() bool {
 
 // AgeDays returns how long the changeset has been open.
 func (c Changeset) AgeDays(now time.Time) int {
-	opened, err := time.Parse("2006-01-02", c.OpenedAt)
+	opened, err := time.Parse(openedLayout, c.OpenedAt)
 	if err != nil {
 		return 0
 	}
@@ -386,6 +386,11 @@ func shortOr(value, fallback string) string {
 	return value
 }
 
+// openedLayout is the one shape opened_at is written and read in. Named so the
+// writer and the reader cannot drift apart, which is how a date became
+// unreadable and an age became a silent zero.
+const openedLayout = "2006-01-02"
+
 // Validate reports structural problems in a changeset.
 func Validate(set Changeset, requireRollbackPoint bool) []string {
 	var problems []string
@@ -394,6 +399,14 @@ func Validate(set Changeset, requireRollbackPoint bool) []string {
 	}
 	if strings.TrimSpace(set.Objective) == "" {
 		problems = append(problems, "objective is empty")
+	}
+	// AgeDays cannot answer for a date it could not read, so it returns zero —
+	// and zero reads as a fact. One malformed line made a changeset permanently
+	// new and invisible to changeset/open-too-long, which is the rule that
+	// finds cross-repo work somebody abandoned.
+	if _, err := time.Parse(openedLayout, strings.TrimSpace(set.OpenedAt)); err != nil {
+		problems = append(problems, fmt.Sprintf(
+			"opened_at %q is not a date this format reads; write it as YYYY-MM-DD", set.OpenedAt))
 	}
 	switch set.Status {
 	case StatusOpen, StatusVerified, StatusClosed, StatusRolledBack, StatusAbandoned:

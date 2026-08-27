@@ -284,3 +284,63 @@ func TestAChangesetWhoseIdentifierDisagreesWithItsFilenameIsRefused(t *testing.T
 		t.Errorf("the error does not say which identifier it found: %v", err)
 	}
 }
+
+// AgeDays cannot answer for a date it could not parse, so it returns zero — and
+// zero reads as a fact. One malformed line made a changeset permanently new,
+// invisible to changeset/open-too-long, which is the rule that finds cross-repo
+// work somebody abandoned. The published schema says only "string", so an
+// honest tool writing an ISO timestamp lands in the same place.
+func TestAnOpenDateThatCannotBeReadIsReported(t *testing.T) {
+	// Arrange
+	cases := []struct {
+		name string
+		when string
+	}{
+		{"absent", ""},
+		{"an ISO timestamp, which the schema does not forbid", "2020-01-01T00:00:00Z"},
+		{"a date nobody writes", "01/02/2020"},
+		{"not a date at all", "yesterday"},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			set := changeset.Changeset{
+				ID: "CS-0001", Objective: "something", Status: changeset.StatusOpen,
+				OpenedAt:     tc.when,
+				Repositories: []changeset.Participant{{Name: "api", RollbackPoint: "abc123"}},
+			}
+
+			// Act
+			problems := changeset.Validate(set, true)
+
+			// Assert
+			if len(problems) == 0 {
+				t.Fatalf("opened_at %q was accepted", tc.when)
+			}
+			joined := strings.Join(problems, "; ")
+			if !strings.Contains(joined, "opened_at") {
+				t.Errorf("the problem does not name the field: %s", joined)
+			}
+			if !strings.Contains(joined, "YYYY-MM-DD") {
+				t.Errorf("the problem does not say what shape to write: %s", joined)
+			}
+		})
+	}
+}
+
+// The date vat itself writes must pass, or every changeset it creates is
+// invalid the moment it is created.
+func TestTheOpenDateVatWritesIsAccepted(t *testing.T) {
+	// Arrange
+	now := time.Date(2026, 8, 27, 12, 0, 0, 0, time.UTC)
+	set := changeset.New("CS-0001", "something", now)
+	set = changeset.WithParticipant(set, changeset.Participant{Name: "api", RollbackPoint: "abc123"})
+
+	// Act
+	problems := changeset.Validate(set, true)
+
+	// Assert
+	if len(problems) != 0 {
+		t.Errorf("a changeset vat just created does not validate: %v", problems)
+	}
+}
