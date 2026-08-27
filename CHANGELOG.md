@@ -487,6 +487,12 @@ Notable changes to `vat`. The format follows
   because half of what governs them was invisible" — and lint read exactly that
   brain silently and certified it, in the command this project's adoption guide
   puts in CI.
+- `vat changeset list` marks a closure that waived the landing gate. One closed
+  with `--force` sat in the table beside changesets whose revisions were
+  verified and observed on the branches they ship from, reading exactly alike —
+  and which of the two it is is the whole of what the record says. `vat lint`
+  reported it and `vat changeset show` revealed it; the table a person scans did
+  not.
 - An evidence packet listed the same canonical check once per repository that
   declares it, so a briefing for two repositories running `make check` said
   "make check" twice and told a worker nothing the scope line above had not. The

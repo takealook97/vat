@@ -118,8 +118,17 @@ func changesetListCommand() *Command {
 				for _, participant := range current.Repositories {
 					names = append(names, participant.Name)
 				}
+				// A closure that waived the landing gate is not the same fact as
+				// one that met it, and the one thing this record exists to say
+				// is which revisions were verified together. `vat lint` reports
+				// it and `vat changeset show` reveals it; the table a person
+				// scans read them alike.
+				status := string(current.Status)
+				if current.LandingWaived {
+					status += " (waived)"
+				}
 				rows = append(rows, []string{
-					current.ID, string(current.Status), age,
+					current.ID, status, age,
 					strings.Join(names, ","), truncate(current.Objective, 48),
 				})
 			}

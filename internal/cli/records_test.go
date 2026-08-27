@@ -675,3 +675,39 @@ func TestAnEvidencePacketKeepsChecksThatDiffer(t *testing.T) {
 		}
 	}
 }
+
+// A changeset closed with --force reads as "closed" in the listing, beside ones
+// whose revisions were actually verified together. That is the one thing the
+// record exists to say, and the summary said the opposite of it — `vat lint`
+// reports it and `vat changeset show` reveals it, but the table a person scans
+// did not.
+func TestTheChangesetListingSaysWhenAClosureWasForced(t *testing.T) {
+	// Arrange
+	h := adoptedFixture(t, "payments")
+	h.mustRun("changeset", "new", "Forced", "--repos", "payments")
+	h.mustRun("changeset", "close", "CS-0001", "--acceptance", "Trust me.", "--force")
+
+	// Act
+	output := h.mustRun("changeset", "list")
+
+	// Assert
+	if !strings.Contains(output, "waived") {
+		t.Errorf("a forced closure reads as an ordinary one:\n%s", output)
+	}
+}
+
+func TestTheChangesetListingDoesNotMarkAnOrdinaryClosure(t *testing.T) {
+	// Arrange
+	h := adoptedFixture(t, "payments")
+	addCheck(t, h, "payments", "true")
+	h.mustRun("changeset", "new", "Ordinary", "--repos", "payments")
+	h.mustRun("changeset", "verify", "CS-0001")
+
+	// Act
+	output := h.mustRun("changeset", "list")
+
+	// Assert
+	if strings.Contains(output, "waived") {
+		t.Errorf("a changeset nobody forced was marked:\n%s", output)
+	}
+}

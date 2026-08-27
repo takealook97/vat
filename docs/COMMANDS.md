@@ -502,6 +502,11 @@ worse than none, and refuses on a changeset that is already closed.
 is where `abandon --reason` is kept, because why work stopped is the whole value
 of an abandoned record.
 
+`list` marks a closure that waived the landing gate. A changeset closed with
+`--force` is not the same fact as one whose revisions were verified and observed
+on the branches they ship from, and which of the two it is is the whole of what
+this record says.
+
 `list --open` narrows to unfinished work in both renderings, so a CI job asking
 for it in `--json` gets the same answer the table shows.
 
