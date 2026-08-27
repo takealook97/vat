@@ -28,7 +28,16 @@ type Document struct {
 // Split separates a Markdown file into header and body. A file without a
 // header yields Present=false and the whole file as Body.
 func Split(content string) Document {
-	normalised := strings.ReplaceAll(content, "\r\n", "\n")
+	// An editor that writes a byte order mark puts three bytes in front of the
+	// opening delimiter, and the header stops being a header. Nothing errored:
+	// the whole file became body, every field was lost, and a role that plainly
+	// declared a description was reported as having none — which sent somebody
+	// to fix a file that was already right.
+	//
+	// Stripped here because roles, skills, and brain records all arrive through
+	// this one function.
+	normalised := strings.TrimPrefix(content, "\ufeff")
+	normalised = strings.ReplaceAll(normalised, "\r\n", "\n")
 	if !strings.HasPrefix(normalised, delimiter+"\n") {
 		return Document{Body: normalised}
 	}

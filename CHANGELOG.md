@@ -436,6 +436,12 @@ Notable changes to `vat`. The format follows
   none. That text is committed into the repository of everybody adopting the
   harness on its own, where it reads as a defect in the generated file rather
   than as the state it describes.
+- A file saved with a UTF-8 byte order mark is read. The mark sits in front of
+  the opening delimiter, so the header stopped being one — and nothing errored:
+  the whole file became body, every declared field was lost, and a role that
+  plainly carried a description was then reported as having none, sending
+  somebody to fix a file that was already right. Roles, skills, and brain
+  records all arrive through the one function that now strips it.
 - `brain/schema-newer` is reported by `vat lint` and not only by `vat brain
   check`. The knowledge layer refuses to judge a brain written against a newer
   schema, for the reason its own comment gives — "the records would look clean

@@ -344,3 +344,55 @@ func TestMergeWritesAHeaderWhenTheDocumentHadNone(t *testing.T) {
 		t.Errorf("no header was written:\n%s", rendered)
 	}
 }
+
+// An editor that writes a UTF-8 byte order mark puts three bytes in front of the
+// opening delimiter, so the header stopped being a header. Nothing errored: the
+// whole file became body, every field was lost, and the role that plainly
+// declared a description was then reported as having none — sending somebody to
+// fix a file that was already right.
+//
+// Stripped here rather than in each reader, because roles, skills, and brain
+// records all arrive through this one function.
+func TestAByteOrderMarkDoesNotHideTheHeader(t *testing.T) {
+	// Arrange
+	const bom = "\ufeff"
+	document := bom + "---\nname: planner\ndescription: Plans work.\n---\n\nBody.\n"
+
+	// Act
+	split := frontmatter.Split(document)
+
+	// Assert
+	if !split.Present {
+		t.Fatalf("a header behind a byte order mark was not seen:\n%q", split.Body)
+	}
+	var declared struct {
+		Name        string `yaml:"name"`
+		Description string `yaml:"description"`
+	}
+	if err := split.Decode(&declared); err != nil {
+		t.Fatalf("Decode: %v", err)
+	}
+	if declared.Name != "planner" || declared.Description != "Plans work." {
+		t.Errorf("fields were lost: %+v", declared)
+	}
+	if strings.Contains(split.Body, bom) {
+		t.Error("the mark was carried into the body")
+	}
+	if strings.TrimSpace(split.Body) != "Body." {
+		t.Errorf("body = %q", split.Body)
+	}
+}
+
+// A mark in front of a document with no header is still not content.
+func TestAByteOrderMarkIsNotBodyText(t *testing.T) {
+	// Act
+	split := frontmatter.Split("\ufeff# Just prose\n")
+
+	// Assert
+	if split.Present {
+		t.Error("a document with no header was read as having one")
+	}
+	if strings.HasPrefix(split.Body, "\ufeff") {
+		t.Errorf("the mark was kept as the first character of the body: %q", split.Body)
+	}
+}
