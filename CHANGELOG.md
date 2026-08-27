@@ -359,6 +359,12 @@ Notable changes to `vat`. The format follows
   shows, and nothing checked that — in the one asset a reader takes as evidence
   the tool does what the page claims. A contract test now holds it to naming
   every file `vat init` writes unconditionally, the seeded procedures included.
+- CI refuses a commit whose author or committer address cannot route. Two
+  reached `main` as `t <t@e>` — a shell that had exported `GIT_COMMITTER_EMAIL`
+  to build a throwaway git fixture went on to commit here, and the environment
+  beats `git config`. Nothing caught it until a person read the contributor
+  list, and the repair was a history rewrite and a force push. The only test is
+  a domain with a dot in it, so it needs no list of who may commit.
 - `make check` vets for every platform CI builds on, not only the one it runs
   on. CI builds on three operating systems and `check` ran the suite on one, so
   `check` could pass on a change CI then rejected — the hole the lint target

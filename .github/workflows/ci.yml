@@ -47,7 +47,12 @@ jobs:
     name: quality
     runs-on: ubuntu-latest
     steps:
+      # Full history: the authorship check below reads the commits a push
+      # brought, and a shallow clone leaves it looking at the tip alone — a
+      # check that passes because it cannot see, which is worse than none.
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - uses: actions/setup-go@v5
         with:
@@ -65,6 +70,35 @@ jobs:
 
       - name: Vet
         run: go vet ./...
+
+      # A commit whose author cannot be reached is one nobody can ask about, and
+      # GitHub links it to no profile at all. Two reached main on 2026-08-27 as
+      # `t <t@e>`: a shell that had exported GIT_COMMITTER_EMAIL to build a
+      # throwaway git fixture went on to commit here, and the environment beats
+      # `git config`. Nothing caught it until a person read the contributor list,
+      # and the repair was a history rewrite and a force push.
+      #
+      # The only test is that the address could route: a domain with a dot in
+      # it. That holds for every real contributor and fails for every local
+      # placeholder, so it needs no allow-list of who may commit.
+      - name: Verify commit authorship is reachable
+        run: |
+          range="-20"
+          if git rev-parse --quiet --verify "${{ github.event.before }}^{commit}" >/dev/null 2>&1; then
+            range="${{ github.event.before }}..${{ github.sha }}"
+          fi
+          # No pipeline into a loop: a `while read` in a subshell cannot fail
+          # the step, which is how a check like this passes while finding things.
+          unroutable=$(git log --format='%H %ae%n%H %ce' $range |
+            awk '{ split($2, parts, "@"); if (index(parts[2], ".") == 0) print }' | sort -u)
+          if [ -n "$unroutable" ]; then
+            echo "these commits carry an address that cannot route:"
+            echo "$unroutable"
+            echo
+            echo "Commit as the identity in git config user.email. Never export"
+            echo "GIT_AUTHOR_EMAIL or GIT_COMMITTER_EMAIL in a shell that also commits here."
+            exit 1
+          fi
 
       - name: Verify modules are tidy
         run: |
