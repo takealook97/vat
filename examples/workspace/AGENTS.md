@@ -46,6 +46,11 @@ A change that spans repositories is not one commit. Open a changeset with
 `vat changeset new` so the revision bundle, the checks, and the rollback
 points are recorded together.
 
+This file states what is true of the workspace. A procedure that applies
+only sometimes — how a release is cut, what has to change together when a
+contract does — belongs in `.agents/skills/`. Read one when its job comes
+up; `vat harness skills` lists them.
+
 ### Precedence
 
 When instructions conflict, resolve in this order:

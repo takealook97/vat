@@ -49,6 +49,14 @@ Notable changes to `vat`. The format follows
   file is canonical from the moment it lands: an existing one is never
   rewritten, and removing one is without consequence. Both are specified in
   `docs/SPEC.md` and both are tested.
+- The generated workspace contract points at where procedures live. It named
+  the boundary, the precedence order, the trust tiers, and the commands, and
+  never said that procedures exist — so an agent knew what it may not do and
+  nothing about how a job is done, which is the gap the skills half of the
+  harness was built to close. A pointer, never the steps: the root file is
+  always in context and has a byte budget, and a procedure copied into it is
+  both a second copy to drift and a paragraph every session pays for whether or
+  not the job ever comes up.
 - vat's own first three skills, under `.agents/skills/`. The tool generated
   skill adapters, linted them four ways, and specified them normatively while
   keeping none of its own, which is a poor argument from a tool whose whole

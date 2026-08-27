@@ -100,6 +100,14 @@ func renderRouting(m manifest.Manifest) string {
 	b.WriteString("A change that spans repositories is not one commit. Open a changeset with\n")
 	b.WriteString("`vat changeset new` so the revision bundle, the checks, and the rollback\n")
 	b.WriteString("points are recorded together.\n")
+	// A pointer, never the steps. This file is always in context and has a byte
+	// budget; a procedure copied into it is both a second copy to drift and a
+	// paragraph every session pays for whether or not the job ever comes up.
+	b.WriteString("\n")
+	b.WriteString("This file states what is true of the workspace. A procedure that applies\n")
+	b.WriteString("only sometimes — how a release is cut, what has to change together when a\n")
+	fmt.Fprintf(&b, "contract does — belongs in `%s/`. Read one when its job comes\n", SkillsDir)
+	b.WriteString("up; `vat harness skills` lists them.\n")
 	return b.String()
 }
 

@@ -303,3 +303,27 @@ func TestAnEscapingRoleNameStopsTheLoadRatherThanBeingSkipped(t *testing.T) {
 		t.Errorf("a refusal returned partial data: roles=%+v malformed=%+v", roles, malformed)
 	}
 }
+
+// The generated contract is the file every session loads, and it named the
+// boundary, the precedence order, the trust tiers, and the commands — and never
+// said that procedures exist or where they live. An agent that knows what it
+// may not do and not how the job is done guesses at the how, which is the gap
+// the skills half of this package was built to close.
+func TestTheWorkspaceContractPointsAtWhereProceduresLive(t *testing.T) {
+	// Arrange
+	m := manifest.Manifest{Version: 1}
+	m.Workspace.Name = "acme"
+
+	// Act
+	rendered := harness.RenderWorkspace(m)
+
+	// Assert
+	if !strings.Contains(rendered, harness.SkillsDir) {
+		t.Errorf("the contract never names %s:\n%s", harness.SkillsDir, rendered)
+	}
+	// Named as a pointer, not restated. The root file has a byte budget and a
+	// copy of a procedure is the drift this package exists to prevent.
+	if strings.Contains(rendered, "SKILL.md") {
+		t.Errorf("the contract reaches past a pointer into the procedures themselves:\n%s", rendered)
+	}
+}
