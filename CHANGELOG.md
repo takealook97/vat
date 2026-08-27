@@ -519,6 +519,16 @@ Notable changes to `vat`. The format follows
 - An unknown flag is reported as a flag. `vat --nope status` answered "unknown
   command" and offered to suggest a verb, which sends somebody looking through
   the command list for something they never typed.
+- Nothing vat prints can act on the terminal. The contract this tool generates
+  says untrusted content is data and never instruction, and a terminal escape is
+  an instruction to the terminal — while almost everything vat prints came out of
+  a file somebody else may write: a record in the knowledge repository, a
+  description in a manifest, a remote read back from `.git/config`, the text of a
+  definition that would not parse. A record committed by anybody with access to
+  the knowledge repository could erase the lines vat had just printed and write
+  its own. Control characters are shown in caret notation rather than executed,
+  and rather than dropped, so an attempt is visible instead of tidied away; the
+  colour vat adds is applied around those values and never through them.
 - A value carrying a newline no longer breaks the row it sits in. Every table
   and status line here is laid out in columns, and the values are free text
   somebody typed — a description, an objective, a record title — so one newline

@@ -7,6 +7,20 @@ For reporting a vulnerability, see [SECURITY.md](../SECURITY.md).
 
 ---
 
+
+## Nothing vat prints can act on your terminal
+
+The generated contract states that untrusted content is data and never
+instruction. A terminal escape sequence is an instruction to the terminal, and
+almost everything vat prints came out of a file somebody else may write: a
+record in the knowledge repository, a description in a manifest, a remote read
+back from `.git/config`, the text of a definition that would not parse.
+
+Every value vat prints is rendered before it reaches the screen. A control
+character is shown in caret notation rather than executed, and rather than
+dropped — so an attempt is visible instead of tidied away. The colour vat adds
+is applied around those values, never through them.
+
 ## The three separations
 
 ### 1. Reading is not judging is not acting

@@ -129,18 +129,23 @@ func (p *Printer) Printf(format string, args ...any) {
 
 // Println writes an unadorned line to stdout.
 func (p *Printer) Println(args ...any) {
-	_, _ = fmt.Fprintln(p.out, args...)
+	// Tamed like everything else: `vat brain query` prints excerpts of records
+	// through here, and a record is content somebody else may write.
+	_, _ = fmt.Fprintln(p.out, multiLine(fmt.Sprint(args...)))
 }
 
 // Errorf writes a formatted line to stderr, prefixed so it is visible when
 // interleaved with normal output.
 func (p *Printer) Errorf(format string, args ...any) {
-	_, _ = fmt.Fprintf(p.err, "%s %s\n", p.paint(colorRed, "error:"), fmt.Sprintf(format, args...))
+	// Tamed after formatting, because what arrives through the arguments is a
+	// file's own content: a malformed definition's problem, a git error, a
+	// record nobody could parse.
+	_, _ = fmt.Fprintf(p.err, "%s %s\n", p.paint(colorRed, "error:"), multiLine(fmt.Sprintf(format, args...)))
 }
 
 // Warnf writes a warning line to stderr.
 func (p *Printer) Warnf(format string, args ...any) {
-	_, _ = fmt.Fprintf(p.err, "%s %s\n", p.paint(colorYellow, "warning:"), fmt.Sprintf(format, args...))
+	_, _ = fmt.Fprintf(p.err, "%s %s\n", p.paint(colorYellow, "warning:"), multiLine(fmt.Sprintf(format, args...)))
 }
 
 // Heading writes a section heading, skipped in quiet mode.
@@ -148,7 +153,7 @@ func (p *Printer) Heading(text string) {
 	if p.quiet {
 		return
 	}
-	_, _ = fmt.Fprintf(p.out, "\n%s\n", p.paint(colorBold, text))
+	_, _ = fmt.Fprintf(p.out, "\n%s\n", p.paint(colorBold, oneLine(text)))
 }
 
 // Hint writes a de-emphasised follow-up suggestion, skipped in quiet mode.
@@ -156,7 +161,7 @@ func (p *Printer) Hint(format string, args ...any) {
 	if p.quiet {
 		return
 	}
-	_, _ = fmt.Fprintf(p.out, "%s\n", p.paint(colorGray, fmt.Sprintf(format, args...)))
+	_, _ = fmt.Fprintf(p.out, "%s\n", p.paint(colorGray, multiLine(fmt.Sprintf(format, args...))))
 }
 
 // Status writes one observation as "LEVEL  subject  detail".
@@ -306,15 +311,65 @@ func colorEnabled() bool {
 	return info.Mode()&os.ModeCharDevice != 0
 }
 
-// oneLine collapses a value onto a single terminal line.
+// oneLine renders a value as something safe to put on a terminal line.
 //
-// Every table and status line here is laid out in columns, and a value carrying
-// a newline puts the rest of its row on the next line and loses every column
-// after it. The values are free text somebody typed — a description, an
-// objective, a record title — so this is reachable from most of what vat prints.
+// Two failures, one answer. A value carrying a newline put the rest of its row
+// on the next line and lost every column after it. A value carrying an escape
+// sequence rewrote the screen: the generated contract this tool writes says
+// untrusted content is data and never instruction, and an escape is an
+// instruction to the terminal. Everything printed here is free text somebody
+// wrote — a description in a manifest, a title in a record, a remote read back
+// from .git/config — and a record in a governed repository is content the trust
+// table classifies as semi-trusted at best.
+//
+// Control characters are shown in caret notation rather than dropped, so the
+// fact that something tried is on the screen instead of being silently tidied
+// away. The colour vat adds is applied around this, never through it.
 func oneLine(value string) string {
-	if !strings.ContainsAny(value, "\r\n") {
+	if !needsTaming(value) {
 		return value
 	}
-	return strings.Join(strings.Fields(value), " ")
+	var b strings.Builder
+	for _, r := range value {
+		switch {
+		case r == '\n' || r == '\r' || r == '\t':
+			b.WriteByte(' ')
+		case r < 0x20:
+			b.WriteByte('^')
+			b.WriteRune(r + '@')
+		case r == 0x7f:
+			b.WriteString("^?")
+		case r >= 0x80 && r <= 0x9f:
+			// C1: some terminals read these as escapes of their own.
+			fmt.Fprintf(&b, "\\u%04x", r)
+		default:
+			b.WriteRune(r)
+		}
+	}
+	return strings.Join(strings.Fields(b.String()), " ")
+}
+
+func needsTaming(value string) bool {
+	for _, r := range value {
+		if r < 0x20 || r == 0x7f || (r >= 0x80 && r <= 0x9f) {
+			return true
+		}
+	}
+	return false
+}
+
+// multiLine tames a message that is allowed to span lines, so an escape cannot
+// act while a genuine newline still reads as one.
+func multiLine(value string) string {
+	if !needsTaming(value) {
+		return value
+	}
+	var b strings.Builder
+	for _, line := range strings.Split(value, "\n") {
+		if b.Len() > 0 {
+			b.WriteByte('\n')
+		}
+		b.WriteString(oneLine(line))
+	}
+	return b.String()
 }

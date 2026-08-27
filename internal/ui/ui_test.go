@@ -275,3 +275,51 @@ func TestAStatusKeepsItsDetailOnOneLine(t *testing.T) {
 		t.Errorf("a status ran onto a second line:\n%q", out.String())
 	}
 }
+
+// The generated contract this tool writes says untrusted content is data, never
+// instruction. A terminal escape is an instruction to the terminal, and vat
+// printed them straight through: a record in a governed repository, a
+// description in a manifest, a remote URL read back from .git/config — anything
+// vat reads and prints could erase the lines above it and write its own.
+//
+// Rendered visibly rather than dropped, so the fact that something tried is on
+// the screen.
+func TestNothingPrintedCanRewriteTheTerminal(t *testing.T) {
+	// Arrange
+	printer, out, errOut := newPrinter()
+	const attack = "before\x1b[2K\x1b[1GHIJACKED\x07"
+
+	// Act
+	printer.Status(ui.LevelWarn, "payments", attack)
+	printer.Table([]string{"NAME", "TITLE"}, [][]string{{attack, attack}})
+	printer.Errorf("%s", attack)
+
+	// Assert
+	for _, stream := range []string{out.String(), errOut.String()} {
+		if strings.ContainsAny(stream, "\x1b\x07") {
+			t.Errorf("an escape reached the terminal: %q", stream)
+		}
+	}
+	if !strings.Contains(out.String(), "HIJACKED") {
+		t.Errorf("the text was dropped rather than made safe:\n%q", out.String())
+	}
+	if !strings.Contains(out.String(), "^[") {
+		t.Errorf("the escape was removed without a trace, so nobody can see it was there:\n%q", out.String())
+	}
+}
+
+// vat's own colour is still applied: sanitising the values must not strip the
+// codes the printer adds around them.
+func TestColourIsStillAppliedAroundASanitisedValue(t *testing.T) {
+	// Arrange
+	var out, errOut bytes.Buffer
+	printer := ui.NewWith(&out, &errOut, true)
+
+	// Act
+	printer.Status(ui.LevelFail, "payments", "plain detail")
+
+	// Assert
+	if !strings.Contains(out.String(), "\x1b[") {
+		t.Errorf("colour was stripped from the printer's own output: %q", out.String())
+	}
+}
