@@ -308,3 +308,46 @@ func TestAHandWrittenAgentFileIsNotMistakenForAnOrphan(t *testing.T) {
 		t.Errorf("the hand-written file was disturbed: %v", err)
 	}
 }
+
+// `vat lint --only harness` in CI is what this project's own adoption guide
+// recommends. Mistype the selector and the run reported "0 rules checked,
+// nothing to report" and exited 0 — a green build that checked nothing, for as
+// long as nobody looked. The selector is a substring match on purpose, so
+// `--only harness` keeps working; a value that matches no rule at all is the
+// case that cannot be intentional.
+func TestASelectorThatMatchesNoRuleIsRefusedRatherThanReportedClean(t *testing.T) {
+	// Arrange
+	h := adoptedFixture(t, "payments")
+
+	// Act
+	code, output := h.run("lint", "--only", "harness/adaptor-drift")
+
+	// Assert
+	if code == ExitOK {
+		t.Errorf("a selector matching no rule reported success:\n%s", output)
+	}
+	if !strings.Contains(output, "adaptor-drift") {
+		t.Errorf("the refusal does not name what was passed:\n%s", output)
+	}
+	if !strings.Contains(output, "--list") {
+		t.Errorf("the refusal does not say how to find the real names:\n%s", output)
+	}
+}
+
+func TestASelectorThatMatchesAFamilyOfRulesStillRuns(t *testing.T) {
+	// Arrange: the substring match is the feature, not an accident.
+	h := adoptedFixture(t, "payments")
+
+	// Act
+	report := h.lint(t, "--only", "harness")
+
+	// Assert
+	if report.Checked == 0 {
+		t.Error("`--only harness` selected no rules")
+	}
+	for _, finding := range report.Findings {
+		if !strings.HasPrefix(finding.Rule, "harness/") {
+			t.Errorf("`--only harness` also reported %s", finding.Rule)
+		}
+	}
+}

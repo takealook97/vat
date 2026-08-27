@@ -195,6 +195,11 @@ The rules, and what each one prevents:
 | `changeset/closed-unlanded` | warn | a changeset whose closing waived the landing gate, so the waiver stays visible |
 | `changeset/open-too-long` | warn | repositories mid-contract-change with no closing evidence |
 
+`--only` matches a substring, so `--only harness` selects the whole family. A
+value matching no rule at all is refused rather than reported as a clean run: a
+mistyped selector in CI buys a green build that checked nothing, for as long as
+nobody looks. `--list` names every rule.
+
 `--fix` repairs only what can be repaired without judgement: it regenerates what
 is generated and re-excludes what should have been excluded. It never edits a
 fact, a decision, or a working tree.
@@ -415,7 +420,10 @@ record is still loaded, so its supersession chain is still checked from both
 ends; `--apply` writes the moves.
 
 `check --list` names every rule it can report, and `--only` narrows a run to
-one class while you work through it. The rules are tabulated in
+one class while you work through it. `--only` matches a substring, so
+`--only claim` selects a family — and a value matching no rule at all is
+refused rather than reported as a clean run, because a mistyped selector in CI
+buys a green build that checked nothing. The rules are tabulated in
 [BRAIN.md](BRAIN.md).
 
 `check` reports `brain/record-malformed` for a file it cannot read as a record

@@ -614,3 +614,22 @@ func TestBrainCommandsRefuseADirectoryThatIsNotABrainYet(t *testing.T) {
 		}
 	}
 }
+
+// The same failure `vat lint --only` had, in the command that reports on the
+// knowledge layer: a mistyped selector reported a clean run.
+func TestABrainSelectorThatMatchesNoRuleIsRefused(t *testing.T) {
+	// Arrange
+	h := adoptedFixture(t, "payments", "brain")
+	h.mustRun("brain", "init")
+
+	// Act
+	code, output := h.run("brain", "check", "--only", "claimm")
+
+	// Assert
+	if code == ExitOK {
+		t.Errorf("a selector matching no rule reported success:\n%s", output)
+	}
+	if !strings.Contains(output, "claimm") || !strings.Contains(output, "--list") {
+		t.Errorf("the refusal does not name what was passed or how to find the real names:\n%s", output)
+	}
+}

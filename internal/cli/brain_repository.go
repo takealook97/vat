@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"path/filepath"
+	"strings"
 
 	"github.com/takealook97/vat/internal/brain"
 	"github.com/takealook97/vat/internal/manifest"
@@ -166,7 +167,15 @@ class of problem while you work through it; --list names every rule.`,
 				return err
 			}
 			policy := brainPolicy(ws)
-			policy.Only = splitList(*only)
+			// The same failure `vat lint --only` had: a selector matching no
+			// rule reported a clean run. The match is a substring so a family
+			// can be selected; matching nothing at all cannot be intentional.
+			selectors := splitList(*only)
+			if unmatched := unmatchedSelectors(selectors, brain.RuleNames()); len(unmatched) > 0 {
+				return usageErrorf("no rule matches %s.\n  List them: vat brain check --list",
+					strings.Join(quoteAll(unmatched), ", "))
+			}
+			policy.Only = selectors
 			findings := brain.Check(store, policy, env.Now)
 			switch {
 			case env.JSON:

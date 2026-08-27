@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
+	"strconv"
 	"strings"
 
 	"github.com/takealook97/vat/internal/frontmatter"
@@ -129,4 +130,37 @@ func isFlagSet(set *flag.FlagSet, name string) bool {
 		}
 	})
 	return found
+}
+
+// unmatchedSelectors returns the --only values that select nothing at all.
+//
+// The match is a substring so that `--only harness` selects a family, which
+// means an unknown value cannot be caught by an exact lookup. What can be
+// caught is a value that matches no rule in the list, which is never something
+// somebody meant to type.
+func unmatchedSelectors(selectors, names []string) []string {
+	var unmatched []string
+	for _, selector := range selectors {
+		matched := false
+		for _, name := range names {
+			if strings.Contains(name, selector) {
+				matched = true
+				break
+			}
+		}
+		if !matched {
+			unmatched = append(unmatched, selector)
+		}
+	}
+	return unmatched
+}
+
+// quoteAll quotes each value so a refusal shows exactly what was passed,
+// including a stray space somebody cannot otherwise see.
+func quoteAll(values []string) []string {
+	quoted := make([]string, 0, len(values))
+	for _, value := range values {
+		quoted = append(quoted, strconv.Quote(value))
+	}
+	return quoted
 }

@@ -246,6 +246,13 @@ Notable changes to `vat`. The format follows
   shows, and nothing checked that — in the one asset a reader takes as evidence
   the tool does what the page claims. A contract test now holds it to naming
   every file `vat init` writes unconditionally, the seeded procedures included.
+- `vat lint --only <typo>` and `vat brain check --only <typo>` reported "0 rules
+  checked, nothing to report" and exited 0. `vat lint --only harness` in CI is
+  what this project's own adoption guide recommends, so a mistyped selector
+  bought a green build that checked nothing for as long as nobody looked — the
+  exact failure this tool exists to prevent, committed by the tool. The match is
+  a substring on purpose, so selecting a family still works; a value matching no
+  rule at all is refused and told where the real names are.
 - `vat sync` reported the branch the manifest declares rather than the one the
   repository is on, for a repository with no remote and for a fresh clone. That
   made this table and `vat status` disagree about the same repository at the

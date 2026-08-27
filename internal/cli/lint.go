@@ -3,6 +3,7 @@ package cli
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/takealook97/vat/internal/lint"
 	"github.com/takealook97/vat/internal/ui"
@@ -80,7 +81,18 @@ func runLint(ctx context.Context, env *Env, args []string) error {
 		}
 	}
 
-	report, err := lint.Run(ctx, ws, lint.Options{Offline: *offline, Now: env.Now, Only: splitList(*only)})
+	selectors := splitList(*only)
+	// A selector that matches no rule reported "0 rules checked, nothing to
+	// report" and exited 0. `vat lint --only harness` in CI is what this
+	// project's own adoption guide recommends, so a mistyped one bought a green
+	// build that checked nothing for as long as nobody looked. The match is a
+	// substring on purpose; matching nothing at all is the case that cannot be
+	// intentional.
+	if unmatched := unmatchedSelectors(selectors, lint.RuleNames()); len(unmatched) > 0 {
+		return usageErrorf("no rule matches %s.\n  List them: vat lint --list",
+			strings.Join(quoteAll(unmatched), ", "))
+	}
+	report, err := lint.Run(ctx, ws, lint.Options{Offline: *offline, Now: env.Now, Only: selectors})
 	if err != nil {
 		return err
 	}
