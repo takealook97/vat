@@ -55,7 +55,7 @@ internal/metrics        measurement and the local ledger
 internal/fit            the adoption break-even advisor
 internal/runner         command execution across repositories
 internal/frontmatter    YAML headers in Markdown
-internal/fsx            atomic writes
+internal/fsx            atomic writes, and what a name may be before it is one
 internal/ui             terminal output
 internal/version        build metadata
 ```
