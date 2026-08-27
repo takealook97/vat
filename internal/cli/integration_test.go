@@ -479,6 +479,7 @@ func TestEveryReportingCommandEmitsAnArrayNotNull(t *testing.T) {
 		{"changeset", "list"},
 		{"evidence", "list"},
 		{"harness", "roles"},
+		{"harness", "skills"},
 		{"harness", "check"},
 	}
 

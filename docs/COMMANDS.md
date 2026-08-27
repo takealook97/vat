@@ -276,8 +276,10 @@ commands — for a repository that is finished rather than gone.
 vat harness render
 vat harness check
 vat harness roles
-vat harness role new <name> [--writes <repos>] [--reads <repos>] [--model <m>]
-                            [--effort <e>] [--description <text>] [--runtimes <list>]
+vat harness skills
+vat harness role new  <name> [--writes <repos>] [--reads <repos>] [--model <m>]
+                             [--effort <e>] [--description <text>] [--runtimes <list>]
+vat harness skill new <name> [--description <text>] [--runtimes <list>]
 ```
 
 `render` writes the generated region of every `AGENTS.md` and every runtime
@@ -288,9 +290,25 @@ defaults to **read-only**: write access is granted by naming the repositories it
 may change, because a role that can edit anything is a role whose boundary
 cannot be reviewed.
 
-A role name may hold only letters, digits, `-`, and `_`. It is pasted into a
-path in `.agents/roles/` and in every runtime's adapter directory, and adapters
-are written whole rather than into a marked region.
+`skill new` creates a runtime-neutral procedure under `.agents/skills/`. A role
+is who is running; a skill is a procedure loaded on demand. The body stays
+canonical and each adapter carries a pointer to it, never a copy.
+
+A skill renders an adapter for Claude Code and for no other runtime, so
+`--runtimes codex` produces a definition that generates nothing. The command
+says so at creation rather than leaving it for the next `vat lint`. It also says
+when a skill has no `--description`, because the description is the whole of
+what a runtime advertises, and one invented here would satisfy
+`harness/skill-metadata` while telling the runtime nothing.
+
+`skills` lists what is defined, reporting the runtimes that actually render an
+adapter rather than the `runtimes:` field, because those differ exactly where it
+matters.
+
+A role or skill name may hold only letters, digits, `-`, and `_`. It is pasted
+into a path in `.agents/roles/`, in `.agents/skills/`, and in every runtime's
+adapter directory, and adapters are written whole rather than into a marked
+region.
 
 ---
 

@@ -16,7 +16,7 @@ func harnessCommand() *Command {
 	return &Command{
 		Name:    "harness",
 		Summary: "Generate and check the agent contracts across the workspace",
-		Usage:   "vat harness <render|check|roles|role>",
+		Usage:   "vat harness <render|check|roles|skills|role|skill>",
 		Long: `Keep every agent contract consistent with the manifest.
 
 The workspace AGENTS.md and each repository's AGENTS.md carry a generated
@@ -31,7 +31,9 @@ behaves differently depending on which tool opened the session.`,
 			harnessRenderCommand(),
 			harnessCheckCommand(),
 			harnessRolesCommand(),
+			harnessSkillsCommand(),
 			harnessRoleCommand(),
+			harnessSkillCommand(),
 		},
 	}
 }
@@ -152,7 +154,7 @@ func harnessRolesCommand() *Command {
 				if err := emitJSON(env, listed); err != nil {
 					return err
 				}
-				return reportUnreadableRoles(env, malformed)
+				return reportUnreadableDefinitions(env, malformed, "role")
 			}
 			if len(roles) == 0 {
 				env.Printer.Println("No roles defined.")
@@ -172,25 +174,30 @@ func harnessRolesCommand() *Command {
 				})
 			}
 			env.Printer.Table([]string{"ROLE", "MODEL", "WRITES", "RUNTIMES", "DESCRIPTION"}, rows)
-			return reportUnreadableRoles(env, malformed)
+			return reportUnreadableDefinitions(env, malformed, "role")
 		},
 	}
 }
 
-// reportUnreadableRoles surfaces the definitions that did not load.
+// reportUnreadableDefinitions surfaces the definitions that did not load.
 //
 // Before this package returned them separately, a role that failed to parse
 // failed the command outright. Collecting them so the sound ones still render
 // must not also mean the broken ones stop being mentioned: a listing that omits
 // a role in silence is how somebody concludes it was deleted.
-func reportUnreadableRoles(env *Env, malformed []harness.Malformed) error {
+//
+// The kind is a parameter for the same reason it is one on the lint rule that
+// reports an unknown runtime: roles and skills load through different functions
+// into different directories, and a message that names the wrong one sends the
+// reader somewhere their file is not.
+func reportUnreadableDefinitions(env *Env, malformed []harness.Malformed, kind string) error {
 	if len(malformed) == 0 {
 		return nil
 	}
 	for _, entry := range malformed {
 		env.Printer.Errorf("%s: %s", entry.Path, entry.Problem)
 	}
-	return findingsErrorf("These define no role until they parse. `vat lint` reports them too.")
+	return findingsErrorf("These define no %s until they parse. `vat lint` reports them too.", kind)
 }
 
 // roleSummary is the shape `vat harness roles` reports, in either form.

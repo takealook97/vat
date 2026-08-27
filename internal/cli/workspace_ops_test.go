@@ -375,6 +375,7 @@ func TestEmptyListingsSaySoRatherThanPrintingNothing(t *testing.T) {
 		args []string
 	}{
 		{"harness roles", []string{"harness", "roles"}},
+		{"harness skills", []string{"harness", "skills"}},
 		{"evidence list", []string{"evidence", "list"}},
 		{"changeset list", []string{"changeset", "list"}},
 	}
@@ -469,6 +470,106 @@ func TestHarnessRoleNewStillAcceptsAnOrdinaryName(t *testing.T) {
 	// Assert
 	if _, err := os.Stat(h.path(".agents", "roles", "planner.md")); err != nil {
 		t.Errorf("an ordinary role name did not produce a role body: %v", err)
+	}
+}
+
+func TestHarnessSkillNewRefusesANameThatWouldEscapeItsDirectory(t *testing.T) {
+	// Arrange: a skill name becomes a directory under .agents/skills and under
+	// every runtime's skill directory, and an adapter is written whole rather
+	// than into a marked region. The role command learned this the hard way;
+	// the skill command must not have to learn it again.
+	h := adoptedFixture(t, "payments")
+	outside := filepath.Join(filepath.Dir(h.root), "pwned")
+
+	for _, name := range []string{"../../../pwned", "../escape", "nested/skill"} {
+		t.Run(name, func(t *testing.T) {
+			// Act
+			code, output := h.run("harness", "skill", "new", name, "--description", "x")
+
+			// Assert
+			if code == ExitOK {
+				t.Errorf("`harness skill new %s` was accepted:\n%s", name, output)
+			}
+			if !strings.Contains(output, "skill") {
+				t.Errorf("`harness skill new %s` reported a problem without saying it was a skill, "+
+					"which sends the reader to the wrong directory:\n%s", name, output)
+			}
+			if _, err := os.Stat(outside); err == nil {
+				t.Errorf("`harness skill new %s` wrote outside the workspace:\n%s", name, output)
+			}
+			stray := filepath.Join(h.root, filepath.Base(name))
+			if _, err := os.Stat(stray); err == nil {
+				t.Errorf("`harness skill new %s` wrote %s, which no command reads:\n%s",
+					name, stray, output)
+			}
+		})
+	}
+}
+
+func TestHarnessSkillNewGeneratesAClaudeAdapterAndNoOther(t *testing.T) {
+	// Arrange: a skill has an adapter for Claude Code and none for Codex, which
+	// reads the canonical directory itself. Generating a .codex entry would
+	// invent a file that runtime never looks for.
+	h := adoptedFixture(t, "payments")
+
+	// Act
+	h.mustRun("harness", "skill", "new", "release-a-service",
+		"--description", "Take one service to a verified deployment.")
+
+	// Assert
+	if _, err := os.Stat(h.path(".agents", "skills", "release-a-service", "SKILL.md")); err != nil {
+		t.Errorf("no canonical skill was written: %v", err)
+	}
+	if _, err := os.Stat(h.path(".claude", "skills", "release-a-service", "SKILL.md")); err != nil {
+		t.Errorf("no Claude adapter was generated: %v", err)
+	}
+	if _, err := os.Stat(h.path(".codex", "skills")); err == nil {
+		t.Error("a Codex skill directory was generated; Codex reads the canonical directory")
+	}
+}
+
+func TestHarnessSkillNewSaysWhenTheSkillWillGenerateNothing(t *testing.T) {
+	// Arrange: `--runtimes codex` is spelled correctly, is right on a role, and
+	// selects no skill adapter at all. Left unsaid at creation, the skill sits
+	// on disk generating nothing while every other check reads green.
+	h := adoptedFixture(t, "payments")
+
+	// Act
+	code, output := h.run("harness", "skill", "new", "codex-only",
+		"--description", "x", "--runtimes", "codex")
+
+	// Assert
+	if code != ExitOK {
+		t.Errorf("creating an inert skill failed rather than reporting it:\n%s", output)
+	}
+	if !strings.Contains(output, "no adapter") {
+		t.Errorf("`harness skill new --runtimes codex` did not say it generates nothing:\n%s", output)
+	}
+}
+
+func TestHarnessSkillsReportsWhatEachSkillAdvertises(t *testing.T) {
+	// Arrange: the runtimes column reports the adapters actually rendered, not
+	// the runtimes: field, because those differ exactly where it matters.
+	h := adoptedFixture(t, "payments")
+	h.mustRun("harness", "skill", "new", "release-a-service", "--description", "Ship one service.")
+
+	// Act
+	var listed []struct {
+		Name        string   `json:"name"`
+		Description string   `json:"description"`
+		Runtimes    []string `json:"runtimes"`
+	}
+	h.runJSON(&listed, "harness", "skills")
+
+	// Assert
+	if len(listed) != 1 {
+		t.Fatalf("expected one skill, got %+v", listed)
+	}
+	if listed[0].Name != "release-a-service" || listed[0].Description != "Ship one service." {
+		t.Errorf("the listing does not describe the skill that was created: %+v", listed[0])
+	}
+	if len(listed[0].Runtimes) != 1 || listed[0].Runtimes[0] != "claude" {
+		t.Errorf("expected the claude adapter alone, got %v", listed[0].Runtimes)
 	}
 }
 

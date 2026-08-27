@@ -567,7 +567,7 @@ never declared one.
 | `vat lint` | enforce the rules mechanically; `--fix` regenerates |
 | `vat exec` | run a command across the workspace, in parallel, with your quoting intact |
 | `vat repo` | `add` `new` `adopt` `remove` `archive` `unarchive` `rename` `list` |
-| `vat harness` | `render` `check` `roles` `role new` |
+| `vat harness` | `render` `check` `roles` `skills` `role new` `skill new` |
 | `vat brain` | `init` `new` `build` `check` `query` `review` `sweep` `promote` `supersede` `adopt` |
 | `vat changeset` | `new` `add` `verify` `show` `list` `close` `abandon` `undo-plan` |
 | `vat ship` | judge whether a changeset's verified revisions have actually landed |
