@@ -101,12 +101,6 @@ func RemoteURL(ctx context.Context, dir, remote string) (string, error) {
 	return Run(ctx, dir, "remote", "get-url", remote)
 }
 
-// SetRemoteURL points an existing remote at a new URL.
-func SetRemoteURL(ctx context.Context, dir, remote, url string) error {
-	_, err := Run(ctx, dir, "remote", "set-url", remote, url)
-	return err
-}
-
 // CurrentBranch returns the checked-out branch, or an empty string when HEAD is
 // detached.
 func CurrentBranch(ctx context.Context, dir string) (string, error) {

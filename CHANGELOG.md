@@ -223,6 +223,11 @@ Notable changes to `vat`. The format follows
 
 ### Removed
 
+- `gitx.SetRemoteURL`. Nothing called it, and what it did is the one operation
+  this tool promises never to perform: rewriting a remote turns a possible
+  supply-chain problem into a silent redirection of every future fetch. A
+  guarantee is worth more as a missing capability than as a discipline, and this
+  one was sitting in the package one merge away from having a caller.
 - `workspace.OpenCurrent` and `brain.MemoryMonths`, which nothing called. These
   are `internal` packages, so no consumer outside this module can exist and an
   uncalled exported function has no possible user.
@@ -289,6 +294,12 @@ Notable changes to `vat`. The format follows
   should exist while the steps for building one sat in a skill it never named.
   A role is who is running and a skill is how a job is done; the pairs that
   overlap now point at each other.
+- Four of the eight rules `AGENTS.md` says this code holds itself to are checked
+  against the source: never silently modify a working tree, never rewrite a
+  remote, every write is atomic, and the seam that keeps `internal/brain` clear
+  of `manifest` and `gitx`. The file calls breaking one a defect regardless of
+  what the change achieves, and the tool exists because a rule only written down
+  is a hope. They were hopes.
 - The architecture map in `AGENTS.md` is checked against the packages that
   exist, in both directions. It is the first thing that file tells a session to
   read, and it was a claim about the codebase that nothing verified: a package

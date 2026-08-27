@@ -69,35 +69,29 @@ func TestHasRefDistinguishesARefThatExistsFromOneThatDoesNot(t *testing.T) {
 	}
 }
 
-func TestAddRemoteAndSetRemoteURLAgreeWithWhatGitReports(t *testing.T) {
+func TestAddRemoteAgreesWithWhatGitReports(t *testing.T) {
 	// Arrange: the remote is the supply-chain claim every other check compares
 	// against, so reading it back has to be exact.
+	//
+	// There is no test for changing one, because there is no way to. vat refuses
+	// to rewrite a remote — a mismatch is a signal, never something to redirect
+	// — and the helper that could has been removed so the guarantee is a missing
+	// capability rather than a discipline.
 	dir := newRepo(t)
-	const first = "https://example.invalid/acme/payments.git"
-	const second = "https://example.invalid/acme/payments-renamed.git"
+	const url = "https://example.invalid/acme/payments.git"
 
 	// Act
-	if err := gitx.AddRemote(t.Context(), dir, "origin", first); err != nil {
+	if err := gitx.AddRemote(t.Context(), dir, "origin", url); err != nil {
 		t.Fatalf("add remote: %v", err)
 	}
 	added, err := gitx.RemoteURL(t.Context(), dir, "origin")
 	if err != nil {
 		t.Fatalf("read remote: %v", err)
 	}
-	if err := gitx.SetRemoteURL(t.Context(), dir, "origin", second); err != nil {
-		t.Fatalf("set remote: %v", err)
-	}
-	updated, err := gitx.RemoteURL(t.Context(), dir, "origin")
-	if err != nil {
-		t.Fatalf("read remote: %v", err)
-	}
 
 	// Assert
-	if added != first {
-		t.Errorf("the remote came back as %q, want %q", added, first)
-	}
-	if updated != second {
-		t.Errorf("the updated remote is %q, want %q", updated, second)
+	if added != url {
+		t.Errorf("remote = %q, want %q", added, url)
 	}
 }
 
