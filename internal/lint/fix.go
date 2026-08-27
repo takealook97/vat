@@ -84,6 +84,13 @@ func RenderHarness(ws *workspace.Workspace) ([]string, error) {
 		if repo.Archived || !fsx.IsDir(dir) {
 			continue
 		}
+		// Silent on purpose: repo/outside-workspace reports this repository in
+		// the same run, and `vat lint --fix` renders as part of that run. What
+		// must not happen is writing a contract through the link while
+		// reporting that writing through it is the hazard.
+		if !ws.Contains(dir) {
+			continue
+		}
 		path := filepath.Join(dir, "AGENTS.md")
 		updated, err := applyRegion(path, harness.RenderRepo(ws.Manifest, repo), repoHarnessPreamble(repo.Name))
 		if err != nil {

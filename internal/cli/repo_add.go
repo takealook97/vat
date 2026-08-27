@@ -4,6 +4,7 @@ import (
 	"context"
 	"strings"
 
+	"github.com/takealook97/vat/internal/fsx"
 	"github.com/takealook97/vat/internal/gitx"
 	"github.com/takealook97/vat/internal/manifest"
 	"github.com/takealook97/vat/internal/ui"
@@ -80,6 +81,19 @@ func runRepoAdd(ctx context.Context, env *Env, args []string) error {
 			"%s already governs that directory; %q and %q differ only in case, which is one directory on macOS and on Windows.\n"+
 				"  Work in %s, or choose a name that differs by more than case.",
 			governing, governing, name, governing)
+	}
+
+	// The manifest refuses a path that escapes textually, but no string
+	// comparison can see a symlink: a link inside the workspace pointing out of
+	// it satisfies every one of them while every write through it lands
+	// somewhere vat may not touch. `repo new`, `repo adopt`, and `repo rename`
+	// resolve the link before they act; this command reached an existing
+	// directory and rendered a contract into it.
+	candidate := ws.RepoPath(manifest.Repo{Name: name, Path: *path})
+	if fsx.Exists(candidate) && !ws.Contains(candidate) {
+		return usageErrorf(
+			"%s resolves outside the workspace, so a rendered contract or a deletion would land there instead.\n"+
+				"  Move the directory into the workspace, or register it in the workspace that really holds it.", name)
 	}
 
 	repo, err := fields.apply(manifest.Repo{Name: name, Origin: *origin, Path: *path})

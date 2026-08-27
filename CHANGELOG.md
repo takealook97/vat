@@ -359,6 +359,13 @@ Notable changes to `vat`. The format follows
   shows, and nothing checked that — in the one asset a reader takes as evidence
   the tool does what the page claims. A contract test now holds it to naming
   every file `vat init` writes unconditionally, the seeded procedures included.
+- `vat repo add` refuses a directory that resolves outside the workspace, and
+  the harness render writes nothing through one. A symlink inside the workspace
+  pointing out of it satisfies every string comparison vat makes about the path.
+  `repo new`, `repo adopt`, and `repo rename` already resolved the link; `repo
+  add` reached an existing directory and rendered a contract into it, and
+  `vat lint --fix` rendered through the same link in the run that reported it as
+  the hazard.
 - `vat lint` reports a duplicated managed region in `.gitignore`
   (`workspace/ignore-region-duplicated`). The same exposure `harness/region-duplicated`
   covers for `AGENTS.md` is worse here, because the last matching pattern in a

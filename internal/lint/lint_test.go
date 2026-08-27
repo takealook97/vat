@@ -646,3 +646,40 @@ func TestASecondManagedGitignoreRegionIsReportedRatherThanIgnored(t *testing.T) 
 		t.Error("which region to keep is a judgement; this must not claim to be repairable")
 	}
 }
+
+// A workspace built before that check existed, or edited by hand afterwards,
+// can hold a repository directory that resolves out of the workspace. lint
+// reports it as repo/outside-workspace, and `--fix` renders in the same run, so
+// the render must refuse to write through the link it is about to report.
+func TestRenderHarnessWritesNothingThroughALinkOutOfTheWorkspace(t *testing.T) {
+	// Arrange
+	ws := fixture(t)
+	outside := t.TempDir()
+	if err := os.Symlink(outside, filepath.Join(ws.Root, "payments")); err != nil {
+		t.Skipf("symlinks unavailable: %v", err)
+	}
+	next := manifest.WithRepo(ws.Manifest, manifest.Repo{
+		Name: "payments", Origin: "https://example.invalid/acme/payments.git", Role: manifest.RoleProduct,
+	})
+	if err := manifest.Save(filepath.Join(ws.Root, manifest.FileName), next); err != nil {
+		t.Fatal(err)
+	}
+	reloaded, err := workspace.OpenAt(ws.Root)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Act
+	if _, err := lint.RenderHarness(reloaded); err != nil {
+		t.Fatalf("RenderHarness returned an error: %v", err)
+	}
+
+	// Assert
+	entries, err := os.ReadDir(outside)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(entries) != 0 {
+		t.Errorf("the render wrote outside the workspace: %v", entries)
+	}
+}

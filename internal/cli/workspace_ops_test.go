@@ -1109,3 +1109,34 @@ func TestRepoAddRefusesAnEscapingPathBeforeDoingAnything(t *testing.T) {
 		t.Errorf("the refusal does not name what was passed:\n%s", output)
 	}
 }
+
+// A symlink inside the workspace pointing out of it satisfies every string
+// comparison vat makes about the path, and every write through it lands
+// somewhere vat may not touch. `repo new`, `repo adopt`, and `repo rename` all
+// resolve the link before they act; this command reached a directory that
+// already existed and rendered a contract through it.
+func TestRepoAddRefusesADirectoryThatResolvesOutsideTheWorkspace(t *testing.T) {
+	// Arrange
+	h := newFixture(t)
+	h.mustRun("init", "--name", "acme")
+	outside := t.TempDir()
+	if err := os.Symlink(outside, h.path("payments")); err != nil {
+		t.Skipf("symlinks unavailable: %v", err)
+	}
+
+	// Act
+	code, output := h.run("repo", "add", "payments",
+		"--origin", "https://example.invalid/acme/payments.git", "--no-clone")
+
+	// Assert
+	if code == ExitOK {
+		t.Fatalf("a directory resolving outside the workspace was accepted:\n%s", output)
+	}
+	entries, err := os.ReadDir(outside)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(entries) != 0 {
+		t.Errorf("vat wrote into a directory outside the workspace: %v", entries)
+	}
+}
