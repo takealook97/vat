@@ -300,6 +300,15 @@ Notable changes to `vat`. The format follows
   of `manifest` and `gitx`. The file calls breaking one a defect regardless of
   what the change achieves, and the tool exists because a rule only written down
   is a hope. They were hopes.
+- The generated workspace contract stays inside the byte budget its own lint
+  rule enforces. A workspace of 120 repositories rendered 15,195 bytes and
+  tripped `harness/workspace-oversized` — every byte of it written by vat, none
+  of it removable, and `vat lint --fix` could not help. A rule that fires on a
+  correct workspace is a rule that gets turned off, and this one guards the
+  thing that matters most: past the budget a runtime stops loading the
+  per-repository contracts below it. The roster now lists what fits and says how
+  many it did not, because an agent handed a partial list and no count concludes
+  it is the whole one.
 - A manifest is never silently overwritten by a command that did not see the
   change it lands on. Eight `vat repo add` calls started together left a
   manifest holding two of them and reported eight successes: each read the whole

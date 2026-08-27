@@ -344,6 +344,13 @@ vat harness skill new <name> [--description ...] # create a runtime-neutral proc
 `vat repo add|new|adopt|rename|archive` re-renders automatically, so a new
 repository arrives with a contract already in it.
 
+The roster is bounded. A workspace large enough that listing every repository
+would push the file past the byte budget lists what fits and then says how many
+it did not — `vat repo list` is the whole roster. Silently dropping them would
+have an agent conclude they are not there; keeping them all would trip
+`harness/workspace-oversized` on output vat wrote itself, which is how a rule
+gets turned off.
+
 ## Adopting what you already have
 
 Nobody starts empty. If `.claude/agents/` or `.claude/skills/` already holds

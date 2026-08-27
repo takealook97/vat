@@ -43,11 +43,23 @@ func RenderWorkspace(m manifest.Manifest) string {
 	return b.String()
 }
 
+// rosterBudget is how much of the generated region the roster may occupy.
+//
+// The rest of the contract — precedence, trust, gates, commands — is fixed and
+// runs to roughly six kilobytes, and lint warns above twelve. A workspace of a
+// hundred repositories used to render fifteen kilobytes of roster and trip that
+// warning on output vat had written itself, with nothing a reader could remove
+// and no repair `vat lint --fix` could make. A rule that fires on a correct
+// workspace is a rule that gets turned off, so the roster is bounded here
+// instead.
+const rosterBudget = 4 * 1024
+
 func renderRoster(m manifest.Manifest) string {
 	var b strings.Builder
 	b.WriteString("### Repositories\n\n")
 	b.WriteString("| Repository | Role | Owns | Branch |\n")
 	b.WriteString("| --- | --- | --- | --- |\n")
+	listed := 0
 	for _, repo := range m.Repos {
 		owns := repo.Description
 		if owns == "" {
@@ -57,11 +69,25 @@ func renderRoster(m manifest.Manifest) string {
 		if repo.Archived {
 			name += " *(archived)*"
 		}
-		fmt.Fprintf(&b, "| %s | %s | %s | `%s` |\n",
+		row := fmt.Sprintf("| %s | %s | %s | `%s` |\n",
 			name, repo.Role, owns, repo.Branch(m.Workspace.DefaultBranch))
+		// The last row would take the roster past its share of the budget, and
+		// one more row is worth less than the per-repository contracts a
+		// truncated load would cost.
+		if b.Len()+len(row) > rosterBudget && listed > 0 {
+			break
+		}
+		b.WriteString(row)
+		listed++
 	}
-	if len(m.Repos) == 0 {
+	switch {
+	case len(m.Repos) == 0:
 		b.WriteString("| *(none yet)* | | Add one with `vat repo add`. | |\n")
+	case listed < len(m.Repos):
+		// Said, not silently dropped: an agent reading a partial roster must not
+		// conclude the rest are not there.
+		fmt.Fprintf(&b, "\nAnd %d more, not listed here to keep this file loadable. "+
+			"`vat repo list` is the whole roster.\n", len(m.Repos)-listed)
 	}
 	return b.String()
 }

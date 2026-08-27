@@ -385,6 +385,12 @@ window exists in which a consumer expects an interface that is already gone.
 .codex/agents/<name>.toml            generated adapter; `-` in the name becomes `_`
 ```
 
+A generated region **MUST** fit the budget the implementation itself enforces on
+the file holding it. Where a roster is too long to list, the implementation
+**MUST** state how many entries it did not list rather than dropping them
+silently: a reader given a partial list and no count concludes it is the whole
+one.
+
 An implementation **MUST NOT** silently overwrite a manifest that changed
 between reading it and writing it. Every command that changes the manifest reads
 the whole file, edits what it read, and writes the whole file back, so two of

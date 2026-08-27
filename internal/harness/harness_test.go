@@ -2,6 +2,7 @@ package harness_test
 
 import (
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -325,5 +326,53 @@ func TestTheWorkspaceContractPointsAtWhereProceduresLive(t *testing.T) {
 	// copy of a procedure is the drift this package exists to prevent.
 	if strings.Contains(rendered, "SKILL.md") {
 		t.Errorf("the contract reaches past a pointer into the procedures themselves:\n%s", rendered)
+	}
+}
+
+// The oversized rule warns that a bloated root contract silently truncates the
+// per-repository contracts an agent needs, and says "keep this file a map, not
+// a copy". A workspace of 120 repositories generated 15,195 bytes of map: every
+// byte written by vat, none of it removable, and `vat lint --fix` could not
+// help. A rule that fires on a correct workspace is a rule that gets turned off.
+//
+// So the roster is bounded by the budget the rule enforces, and says how many it
+// did not list — an agent that reads a partial roster must not conclude the rest
+// do not exist.
+func TestTheGeneratedContractStaysInsideTheBudgetItsOwnRuleEnforces(t *testing.T) {
+	// Arrange
+	for _, count := range []int{1, 40, 120, 500} {
+		m := manifest.Default("acme")
+		for i := 1; i <= count; i++ {
+			m = manifest.WithRepo(m, manifest.Repo{
+				Name:   fmt.Sprintf("service-number-%d", i),
+				Origin: fmt.Sprintf("https://example.invalid/acme/service-number-%d.git", i),
+				Role:   manifest.RoleProduct,
+			})
+		}
+
+		// Act
+		rendered := harness.RenderWorkspace(m)
+
+		// Assert
+		if len(rendered) > 12*1024 {
+			t.Errorf("%d repositories render %d bytes, past the budget the rule enforces",
+				count, len(rendered))
+		}
+		listed := strings.Count(rendered, "| `service-number-")
+		if listed == count {
+			continue
+		}
+		if listed > count {
+			t.Errorf("%d repositories produced %d rows", count, listed)
+		}
+		// Whatever was left out has to be said, or a reader concludes it is not
+		// there.
+		if !strings.Contains(rendered, fmt.Sprintf("%d more", count-listed)) {
+			t.Errorf("%d repositories rendered %d rows and the contract does not say how many it left out",
+				count, listed)
+		}
+		if !strings.Contains(rendered, "vat repo list") {
+			t.Errorf("%d repositories rendered a partial roster with no way to read the rest", count)
+		}
 	}
 }
