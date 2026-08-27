@@ -262,6 +262,11 @@ Notable changes to `vat`. The format follows
   projections whose absence that marker turns into drift — and nothing else,
   because the command's whole promise is that an existing repository is brought
   under the rules gradually rather than scaffolded in one pass.
+- The `.gitignore` managed region announced "Every repository below is an
+  independent git repository" and then listed none, in a workspace that governs
+  none. That text is committed into the repository of everybody adopting the
+  harness on its own, where it reads as a defect in the generated file rather
+  than as the state it describes.
 - `vat init` told a workspace that enrolled nothing that `vat status` would show
   "those repositories" as dirty, and offered `vat status` as a first step when
   there was nothing for it to report. Enrolling nothing is not a mistake — it is

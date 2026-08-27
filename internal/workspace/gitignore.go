@@ -32,13 +32,21 @@ func RenderGitignoreRegion(m manifest.Manifest) string {
 
 	var b strings.Builder
 	b.WriteString(ignoreBegin)
-	b.WriteString("\n# Every repository below is an independent git repository.\n")
-	b.WriteString("# The workspace tracks the manifest that governs them, never their trees.\n")
-	for _, dir := range dirs {
-		b.WriteString(dir)
+	b.WriteString("\n")
+	// A workspace that governs nothing is what adopting the harness for a single
+	// repository produces, and this text is committed into that repository.
+	// Announcing a list and printing none reads as a defect in the generated
+	// file rather than as the state it is describing.
+	if len(dirs) > 0 {
+		b.WriteString("# Every repository below is an independent git repository.\n")
+		b.WriteString("# The workspace tracks the manifest that governs them, never their trees.\n")
+		for _, dir := range dirs {
+			b.WriteString(dir)
+			b.WriteString("\n")
+		}
 		b.WriteString("\n")
 	}
-	b.WriteString("\n# vat's own derived, regenerable local state.\n")
+	b.WriteString("# vat's own derived, regenerable local state.\n")
 	b.WriteString(".vat/\n")
 	b.WriteString(ignoreEnd)
 	return b.String()

@@ -216,3 +216,43 @@ func TestSyncGitignoreKeepsWhatWasThereBefore(t *testing.T) {
 		t.Errorf("the governed repository was not excluded:\n%s", written)
 	}
 }
+
+// A workspace that governs nothing is what somebody adopting the harness for a
+// single repository ends up with, and this text is committed into their
+// repository. It promised a list — "Every repository below" — and then listed
+// none, which reads as a bug in the generated file rather than as the state it
+// actually describes.
+func TestTheManagedRegionDoesNotPromiseAListItHasNot(t *testing.T) {
+	// Arrange
+	empty := manifest.Manifest{Version: 1}
+
+	// Act
+	region := workspace.RenderGitignoreRegion(empty)
+
+	// Assert
+	if strings.Contains(region, "Every repository below") {
+		t.Errorf("the region announces repositories it does not list:\n%s", region)
+	}
+	if !strings.Contains(region, ".vat/") {
+		t.Errorf("the region stopped excluding vat's own local state:\n%s", region)
+	}
+}
+
+// The sentence exists for the case it was written for, and must survive.
+func TestTheManagedRegionStillExplainsWhyItExcludesTheRepositories(t *testing.T) {
+	// Arrange
+	governed := manifest.Manifest{Version: 1, Repos: []manifest.Repo{
+		{Name: "payments", Origin: "https://example.invalid/acme/payments.git"},
+	}}
+
+	// Act
+	region := workspace.RenderGitignoreRegion(governed)
+
+	// Assert
+	if !strings.Contains(region, "independent git repository") {
+		t.Errorf("the region no longer says why the directories are excluded:\n%s", region)
+	}
+	if !strings.Contains(region, "payments/") {
+		t.Errorf("the governed repository is not excluded:\n%s", region)
+	}
+}
