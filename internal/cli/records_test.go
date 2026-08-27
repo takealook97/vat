@@ -633,3 +633,45 @@ func TestABrainSelectorThatMatchesNoRuleIsRefused(t *testing.T) {
 		t.Errorf("the refusal does not name what was passed or how to find the real names:\n%s", output)
 	}
 }
+
+// A briefing that lists `make check` twice tells a worker nothing the line above
+// it did not. Two repositories in scope both declare it, and the packet records
+// the commands rather than the pairing, so the repetition carried no fact.
+func TestAnEvidencePacketDoesNotRepeatTheSameCheck(t *testing.T) {
+	// Arrange: both repositories declare the same canonical check.
+	h := adoptedFixture(t, "payments", "orders")
+	addCheck(t, h, "payments", "make check")
+	addCheck(t, h, "orders", "make check")
+
+	// Act
+	h.mustRun("evidence", "new", "EV-0001", "Ship it",
+		"--repos", "payments,orders", "--acceptance", "It ships.")
+	output := h.mustRun("evidence", "show", "EV-0001")
+
+	// Assert
+	if strings.Count(output, "make check") != 1 {
+		t.Errorf("the briefing repeats a check that is the same command:\n%s", output)
+	}
+	if !strings.Contains(output, "payments") || !strings.Contains(output, "orders") {
+		t.Errorf("the briefing does not say which repositories are in scope:\n%s", output)
+	}
+}
+
+func TestAnEvidencePacketKeepsChecksThatDiffer(t *testing.T) {
+	// Arrange
+	h := adoptedFixture(t, "payments", "orders")
+	addCheck(t, h, "payments", "make check")
+	addCheck(t, h, "orders", "pnpm test")
+
+	// Act
+	h.mustRun("evidence", "new", "EV-0001", "Ship it",
+		"--repos", "payments,orders", "--acceptance", "It ships.")
+	output := h.mustRun("evidence", "show", "EV-0001")
+
+	// Assert
+	for _, check := range []string{"make check", "pnpm test"} {
+		if !strings.Contains(output, check) {
+			t.Errorf("the briefing dropped %q:\n%s", check, output)
+		}
+	}
+}

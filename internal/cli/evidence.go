@@ -102,12 +102,22 @@ func runEvidenceNew(ctx context.Context, env *Env, args []string) error {
 	packet.ReleaseAuthority = *release
 	packet.RollbackPoints = map[string]string{}
 
+	seenChecks := map[string]bool{}
 	for _, name := range scope {
 		repo, ok := ws.Manifest.Find(name)
 		if !ok {
 			return usageErrorf("%q is not in %s", name, manifest.FileName)
 		}
-		packet.CanonicalChecks = append(packet.CanonicalChecks, repo.Checks...)
+		// The packet records the commands, not which repository each came from,
+		// so two repositories declaring the same check produced a briefing that
+		// listed it twice and told a worker nothing the scope line above had
+		// not. Distinct commands, in the order they were first met.
+		for _, check := range repo.Checks {
+			if !seenChecks[check] {
+				seenChecks[check] = true
+				packet.CanonicalChecks = append(packet.CanonicalChecks, check)
+			}
+		}
 		dir := ws.RepoPath(repo)
 		if gitx.IsRepository(dir) {
 			if revision, err := gitx.HeadRevision(ctx, dir); err == nil {

@@ -43,6 +43,11 @@ type Packet struct {
 	Acceptance []string `yaml:"acceptance" json:"acceptance"`
 	// CanonicalChecks are the commands that prove it, run by the coordinator
 	// rather than trusted from the worker's report.
+	//
+	// Distinct commands, not one entry per repository: the packet records what
+	// will be run and the scope records where, and listing the same command
+	// twice because two repositories declare it told a reader nothing the scope
+	// had not already said.
 	CanonicalChecks []string `yaml:"canonical_checks,omitempty" json:"canonical_checks,omitempty"`
 	// EvidenceRefs point at the decisions that authorised the work.
 	EvidenceRefs []string `yaml:"evidence_refs,omitempty" json:"evidence_refs,omitempty"`
