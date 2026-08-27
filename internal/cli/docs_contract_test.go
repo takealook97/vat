@@ -562,8 +562,11 @@ func TestTheDemoShowsTheFilesInitAlwaysWrites(t *testing.T) {
 		t.Skipf("%s no longer shows `vat init`; this test guards that block", demoPath)
 	}
 
-	written := []string{"vat.yaml", ".gitignore", "AGENTS.md", "CLAUDE.md"}
-	for _, skill := range harness.StarterSkills() {
+	unconditional := []string{"vat.yaml", ".gitignore", "AGENTS.md", "CLAUDE.md"}
+	starters := harness.StarterSkills()
+	written := make([]string, 0, len(unconditional)+2*len(starters))
+	written = append(written, unconditional...)
+	for _, skill := range starters {
 		written = append(written,
 			harness.SkillsDir+"/"+skill.Name+"/"+harness.SkillFile,
 			harness.ClaudeSkillDir+"/"+skill.Name+"/"+harness.SkillFile)
