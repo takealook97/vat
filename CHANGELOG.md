@@ -233,6 +233,11 @@ Notable changes to `vat`. The format follows
   should exist while the steps for building one sat in a skill it never named.
   A role is who is running and a skill is how a job is done; the pairs that
   overlap now point at each other.
+- The demo at the top of the README showed a `vat init` that no longer happens.
+  Its own comment says to regenerate it after changing any of the output it
+  shows, and nothing checked that — in the one asset a reader takes as evidence
+  the tool does what the page claims. A contract test now holds it to naming
+  every file `vat init` writes unconditionally, the seeded procedures included.
 - `vat changeset verify` counted a repository that declares no canonical checks
   as a failed check, and summarised them as "N check(s) failed; recorded against
   the revisions they ran on" when nothing had run. That phrase is the

@@ -14,6 +14,7 @@ import (
 	"testing"
 
 	"github.com/takealook97/vat/internal/brain"
+	"github.com/takealook97/vat/internal/harness"
 	"github.com/takealook97/vat/internal/lint"
 	"github.com/takealook97/vat/internal/manifest"
 	"github.com/takealook97/vat/internal/ui"
@@ -540,3 +541,41 @@ func stripComment(line string) string {
 	}
 	return line
 }
+
+// The demo at the top of the README is the first thing anybody sees, and its own
+// comment says to regenerate it after changing any of the output it shows.
+// Nothing checked that. `vat init` began seeding procedures and the demo went on
+// showing a session that no longer happens — in the one asset a reader takes as
+// evidence the tool does what the page claims.
+//
+// Checked against the files init writes unconditionally rather than against the
+// whole transcript: revisions and repository names in the recording are a
+// scenario, and asserting those would fail for reasons nobody should have to fix.
+func TestTheDemoShowsTheFilesInitAlwaysWrites(t *testing.T) {
+	// Arrange
+	content, err := os.ReadFile(demoPath)
+	if err != nil {
+		t.Fatalf("read %s: %v", demoPath, err)
+	}
+	demo := string(content)
+	if !strings.Contains(demo, "vat init") {
+		t.Skipf("%s no longer shows `vat init`; this test guards that block", demoPath)
+	}
+
+	written := []string{"vat.yaml", ".gitignore", "AGENTS.md", "CLAUDE.md"}
+	for _, skill := range harness.StarterSkills() {
+		written = append(written,
+			harness.SkillsDir+"/"+skill.Name+"/"+harness.SkillFile,
+			harness.ClaudeSkillDir+"/"+skill.Name+"/"+harness.SkillFile)
+	}
+
+	// Act & Assert
+	for _, path := range written {
+		if !strings.Contains(demo, path) {
+			t.Errorf("`vat init` writes %s and %s does not show it; re-record the demo",
+				path, demoPath)
+		}
+	}
+}
+
+const demoPath = "../../docs/assets/demo.svg"
