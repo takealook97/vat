@@ -239,3 +239,33 @@ func TestAGeneratedHeaderSurvivesWhateverADescriptionContains(t *testing.T) {
 		})
 	}
 }
+
+// The model is written into the same header the description is, and the
+// adoption path beside it escapes both. This one did not: a model name carrying
+// a colon would have produced a header the runtime cannot parse, which is the
+// same failure with a different field.
+func TestAModelNameIsEscapedIntoTheHeaderToo(t *testing.T) {
+	// Arrange
+	root := t.TempDir()
+	writeAt(t, root, ".agents/roles/planner.md",
+		"---\nname: planner\ndescription: Plans.\nmodels:\n  claude: \"vendor: preview\"\nruntimes: [claude]\n---\n\nBody.\n")
+	roles, _, err := harness.LoadRoles(root)
+	if err != nil {
+		t.Fatalf("LoadRoles: %v", err)
+	}
+
+	// Act
+	adapter := harness.RenderAdapters(roles[0])[0]
+	header, _, _ := strings.Cut(strings.TrimPrefix(adapter.Content, "---\n"), "\n---")
+
+	// Assert
+	var parsed struct {
+		Model string `yaml:"model"`
+	}
+	if err := yaml.Unmarshal([]byte(header), &parsed); err != nil {
+		t.Fatalf("the generated header does not parse: %v\n%s", err, header)
+	}
+	if parsed.Model != "vendor: preview" {
+		t.Errorf("model round-tripped as %q", parsed.Model)
+	}
+}

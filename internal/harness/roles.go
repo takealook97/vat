@@ -402,7 +402,7 @@ func renderClaudeAgent(role Role) string {
 	b.WriteString("name: " + role.Name + "\n")
 	b.WriteString("description: " + yamlScalar(role.Description) + "\n")
 	if model := role.ModelFor(runtimeClaude); model != "" {
-		b.WriteString("model: " + model + "\n")
+		b.WriteString("model: " + yamlScalar(model) + "\n")
 	}
 	b.WriteString("---\n\n")
 	// The Codex adapter and the Claude skill adapter both said this and this one
