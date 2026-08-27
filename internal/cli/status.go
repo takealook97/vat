@@ -42,6 +42,10 @@ type repoStatus struct {
 	Ahead    int    `json:"ahead"`
 	Behind   int    `json:"behind"`
 	Stashes  int    `json:"stashes,omitempty"`
+	// Interrupted names a git operation the repository stopped part of the way
+	// through. Reported as data rather than only in the note, because a job
+	// deciding whether a workspace is safe to act on needs to branch on it.
+	Interrupted string `json:"interrupted,omitempty"`
 	// Unreadable marks a repository git could not be questioned about. It is
 	// reported as its own state rather than folded into "clean".
 	Unreadable bool   `json:"unreadable,omitempty"`
@@ -148,6 +152,14 @@ func describeStatus(ctx context.Context, ws *workspace.Workspace, repo manifest.
 	}
 	if status.Stashes, err = gitx.StashCount(ctx, dir); err != nil {
 		status.Note = "stash list unavailable"
+	}
+	// Reported ahead of every other note, and ahead of "no upstream" or "not on
+	// main", because it is the one that changes what somebody should do next: a
+	// dirty tree invites committing your way out of it, and what gets committed
+	// is a file full of conflict markers.
+	if operation := gitx.InterruptedOperation(dir); operation != "" {
+		status.Interrupted = operation
+		status.Note = "unfinished " + operation
 	}
 
 	if branch != "" {

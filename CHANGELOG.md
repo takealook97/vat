@@ -246,6 +246,13 @@ Notable changes to `vat`. The format follows
   shows, and nothing checked that — in the one asset a reader takes as evidence
   the tool does what the page claims. A contract test now holds it to naming
   every file `vat init` writes unconditionally, the seeded procedures included.
+- `vat status` and `vat sync` name an operation git was left part of the way
+  through — a merge, rebase, cherry-pick, revert, or bisect. Every one of those
+  leaves an ordinary dirty tree, and reporting it as only that invites the
+  obvious reaction: commit the changes to clear the way. What gets committed is
+  a file full of conflict markers, or a rebase abandoned halfway. `vat status`
+  says it in the note and in `interrupted` under `--json`; `vat sync` says it in
+  the detail beside `DIRTY`.
 - `NO_REMOTE`, for a repository neither the clone nor the manifest names a
   remote for. `vat repo new --no-remote` produces exactly that, and `vat init
   --adopt` records it for any repository git has no origin for — and both

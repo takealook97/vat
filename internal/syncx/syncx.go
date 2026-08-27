@@ -250,7 +250,7 @@ func syncOne(ctx context.Context, ws *workspace.Workspace, repo manifest.Repo, r
 	}
 	if dirty {
 		return Result{Repo: name, State: StateDirty, Branch: displayBranch(current),
-			Revision: revision, Detail: "uncommitted changes; nothing advanced"}
+			Revision: revision, Detail: dirtyDetail(dir)}
 	}
 	if current == "" {
 		return Result{Repo: name, State: StateDetached, Revision: revision,
@@ -327,4 +327,16 @@ func SortResults(results []Result, order []manifest.Repo) []Result {
 		return position[sorted[i].Repo] < position[sorted[j].Repo]
 	})
 	return sorted
+}
+
+// dirtyDetail says why the tree is dirty when git left an operation unfinished.
+//
+// "uncommitted changes" invites committing your way out of it, and when the
+// tree is dirty because a merge or a rebase stopped part of the way through,
+// what that commits is a file full of conflict markers.
+func dirtyDetail(dir string) string {
+	if operation := gitx.InterruptedOperation(dir); operation != "" {
+		return "unfinished " + operation + "; resolve or abort it before committing"
+	}
+	return "uncommitted changes; nothing advanced"
 }

@@ -107,6 +107,12 @@ Fetches, then fast-forwards only what can be advanced without losing anything.
 | `DIVERGED` | both sides hold commits the other does not | yes |
 | `NO_UPSTREAM` | the default branch has no remote-tracking ref | yes |
 
+A repository left part of the way through a merge, rebase, cherry-pick, revert,
+or bisect is dirty, and `DIRTY` says which — because the obvious reaction to an
+uncommitted change is to commit it, and what that commits is a file full of
+conflict markers. `vat status` reports the same thing in its note, and in
+`interrupted` under `--json`.
+
 `--dry-run` contacts nothing at all. A dry run that fetches is not a dry run.
 
 `--offline` skips every network operation and reports local structure only.

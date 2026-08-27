@@ -399,3 +399,43 @@ func WithoutCredentials(url string) string {
 
 // SameRemote reports whether two URLs designate the same repository.
 func SameRemote(a, b string) bool { return NormaliseURL(a) == NormaliseURL(b) }
+
+// InterruptedOperation names a git operation the repository stopped part of the
+// way through — "merge", "rebase", "cherry-pick", "revert", or "bisect" — and
+// returns an empty string when there is none.
+//
+// Every one of these leaves an ordinary dirty tree behind, and reporting it as
+// only that invites the obvious reaction: commit the changes to clear the way.
+// What gets committed is a file full of conflict markers, or a rebase abandoned
+// halfway. git itself calls the state out; so should anything that reports on a
+// working tree.
+//
+// Read from the control files rather than by parsing `git status`, because those
+// are what git checks and their names have not moved in a decade.
+func InterruptedOperation(dir string) string {
+	gitDir := filepath.Join(dir, ".git")
+	// A worktree or submodule keeps a file here naming the real directory.
+	if content, err := os.ReadFile(gitDir); err == nil {
+		if pointed, ok := strings.CutPrefix(strings.TrimSpace(string(content)), "gitdir: "); ok {
+			gitDir = pointed
+			if !filepath.IsAbs(gitDir) {
+				gitDir = filepath.Join(dir, gitDir)
+			}
+		}
+	}
+	for _, operation := range []struct{ marker, name string }{
+		// Ordered by how specific the marker is: a rebase leaves a directory,
+		// and REVERT_HEAD and CHERRY_PICK_HEAD can both sit beside MERGE_HEAD.
+		{"rebase-merge", "rebase"},
+		{"rebase-apply", "rebase"},
+		{"CHERRY_PICK_HEAD", "cherry-pick"},
+		{"REVERT_HEAD", "revert"},
+		{"MERGE_HEAD", "merge"},
+		{"BISECT_LOG", "bisect"},
+	} {
+		if _, err := os.Stat(filepath.Join(gitDir, operation.marker)); err == nil {
+			return operation.name
+		}
+	}
+	return ""
+}

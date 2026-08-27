@@ -554,3 +554,43 @@ func TestFetchTreatsARemoteNameAsAValueNotAnOption(t *testing.T) {
 		t.Errorf("git parsed the remote name as one of its own options: %v", err)
 	}
 }
+
+func TestInterruptedOperationNamesWhatWasLeftUnfinished(t *testing.T) {
+	// Arrange: a merge that stopped on a conflict. Reporting only "dirty"
+	// invites somebody to commit their way out of it, and what they commit is a
+	// file full of conflict markers.
+	dir := newRepo(t)
+	run(t, dir, "checkout", "--quiet", "-b", "side")
+	writeFile(t, dir, "README.md", "side\n")
+	run(t, dir, "commit", "--quiet", "-am", "side")
+	run(t, dir, "checkout", "--quiet", "main")
+	writeFile(t, dir, "README.md", "main\n")
+	run(t, dir, "commit", "--quiet", "-am", "main")
+	// Expected to fail; that failure is the state under test.
+	merge := exec.Command("git", "merge", "side")
+	merge.Dir = dir
+	_ = merge.Run()
+
+	// Act & Assert
+	if operation := gitx.InterruptedOperation(dir); operation != "merge" {
+		t.Errorf("InterruptedOperation = %q, want \"merge\"", operation)
+	}
+}
+
+func TestInterruptedOperationIsEmptyForAnOrdinaryTree(t *testing.T) {
+	// Arrange
+	dir := newRepo(t)
+	writeFile(t, dir, "README.md", "dirty\n")
+
+	// Act & Assert
+	if operation := gitx.InterruptedOperation(dir); operation != "" {
+		t.Errorf("a merely dirty tree reports %q", operation)
+	}
+}
+
+func writeFile(t *testing.T, dir, name, content string) {
+	t.Helper()
+	if err := os.WriteFile(filepath.Join(dir, name), []byte(content), 0o644); err != nil {
+		t.Fatalf("write %s: %v", name, err)
+	}
+}

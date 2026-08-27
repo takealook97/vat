@@ -448,3 +448,30 @@ func TestTheStateNamesAreExactlyWhatTheReferenceDocuments(t *testing.T) {
 }
 
 var stateRow = regexp.MustCompile("^\\| `([A-Z_]+)` \\|")
+
+// A dirty tree invites committing your way out of it. When the tree is dirty
+// because a merge stopped part of the way through, what that commits is a file
+// full of conflict markers — so sync says which it is.
+func TestADirtyTreeSaysWhenAnOperationWasLeftUnfinished(t *testing.T) {
+	// Arrange
+	ws, _, clone := fixture(t)
+	git(t, clone, "checkout", "--quiet", "-b", "side")
+	commit(t, clone, "README.md", "side\n")
+	git(t, clone, "checkout", "--quiet", "main")
+	commit(t, clone, "README.md", "main\n")
+	merge := exec.Command("git", "merge", "side")
+	merge.Dir = clone
+	// Expected to fail; that failure is the state under test.
+	_ = merge.Run()
+
+	// Act
+	result := runSync(t, ws, syncx.Options{Offline: true})
+
+	// Assert
+	if result.State != syncx.StateDirty {
+		t.Fatalf("state = %s, want DIRTY (detail: %s)", result.State, result.Detail)
+	}
+	if !strings.Contains(result.Detail, "unfinished merge") {
+		t.Errorf("detail = %q; it does not say the merge was left unfinished", result.Detail)
+	}
+}
