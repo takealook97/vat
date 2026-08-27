@@ -18,6 +18,17 @@ LDFLAGS     := -s -w \
 # merge at a time. The figure was already within half a point of the line when
 # this gate was added, so the next uncovered branch would have crossed it
 # silently.
+# CI builds and tests on three operating systems; `make check` runs on one. So
+# `check` could pass on a change CI then rejected — the same hole the lint target
+# below describes, one layer down. On 2026-08-27 it did: five tests failed only
+# on Windows, one of them a real defect in the manifest lock.
+#
+# Vetting for each platform compiles every package for it, which catches an API
+# that does not exist there and an import left unused under a build tag. It
+# costs about three seconds and does not run the tests, so it cannot catch a
+# behaviour that differs at run time. CI is still the only thing that can.
+CI_PLATFORMS ?= linux darwin windows
+
 COVERAGE_MIN ?= 80
 
 # The total alone was hiding exactly what it was supposed to expose. At 80.5%
@@ -88,9 +99,13 @@ fmt:
 		echo "run: gofmt -w ."; exit 1; \
 	fi
 
-## vet: run go vet
+## vet: run go vet for this platform and for every platform CI builds on
 vet:
 	go vet ./...
+	@for os in $(CI_PLATFORMS); do \
+		printf 'go vet GOOS=%s\n' "$$os"; \
+		GOOS=$$os go vet ./... || exit 1; \
+	done
 
 # Part of `check`. CI runs golangci-lint and `check` did not, so `check` could
 # pass on a change CI then rejected — which makes it not the proof this file

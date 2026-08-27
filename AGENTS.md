@@ -108,8 +108,17 @@ a published tag can never be moved.
 make check
 ```
 
-Formatting, `go vet`, `golangci-lint` when it is installed, the race-enabled
-suite, and a build. Nothing else counts as proof.
+Formatting, `go vet` for this platform and for each of the three CI builds on,
+`golangci-lint` when it is installed, the race-enabled suite, and a build.
+Nothing else counts as proof.
+
+**It runs the suite on one operating system.** CI runs it on Linux, macOS, and
+Windows, so a green `make check` is not evidence that CI will pass. The
+cross-platform vet catches an API that does not exist elsewhere; it does not run
+a test, so it cannot catch a behaviour that differs at run time — a permission
+bit another platform ignores, an error the operating system words differently, a
+signal it cannot deliver. If a change touches paths, permissions, signals, or
+file locking, say that CI is the thing that will find out.
 
 New behaviour needs a test that fails without the change. A bug fix without a
 regression test is an invitation for the bug to return.

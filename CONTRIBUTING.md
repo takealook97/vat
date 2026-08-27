@@ -66,8 +66,15 @@ Commit messages, code, comments, and documentation are all in English.
 
 - **A test that fails without it.** New behaviour, and every bug fix, needs one.
   A bug fix without a regression test is an invitation for the bug to return.
-- **`make check` passing.** Formatting, vet, the linter, the race-enabled
-  suite, and a build. This is the canonical proof; nothing else counts as one.
+- **`make check` passing.** Formatting, vet for this platform and for each of
+  the three CI builds on, the linter, the race-enabled suite, and a build. This
+  is the canonical proof; nothing else counts as one — but it runs the *suite*
+  on one operating system only, so it is not evidence that CI will pass. The
+  cross-platform vet catches an API that does not exist elsewhere; nothing local
+  catches a behaviour that differs at run time. A permission bit one platform
+  ignores, an error another words differently, a signal a third cannot deliver:
+  CI is what finds those, and a change touching paths, permissions, signals, or
+  file locking should say so rather than claim more than was checked.
 - **Coverage holding.** `make cover` enforces 80% overall *and* a 75% floor per
   package. The second exists because the first was hiding what it was meant to
   expose: at 80.5% overall, the three packages holding nearly all the logic were

@@ -359,6 +359,12 @@ Notable changes to `vat`. The format follows
   shows, and nothing checked that — in the one asset a reader takes as evidence
   the tool does what the page claims. A contract test now holds it to naming
   every file `vat init` writes unconditionally, the seeded procedures included.
+- `make check` vets for every platform CI builds on, not only the one it runs
+  on. CI builds on three operating systems and `check` ran the suite on one, so
+  `check` could pass on a change CI then rejected — the hole the lint target
+  already described, one layer down. It costs about three seconds and catches an
+  API that does not exist elsewhere; it runs no test, so `AGENTS.md` and
+  `CONTRIBUTING.md` now say plainly what it cannot prove.
 - Contention on the manifest lock is decided by whether the lock file is there,
   not by the errno. Windows reports a name in delete-pending state — the instant
   between one holder releasing and the next acquiring — as a permission error
