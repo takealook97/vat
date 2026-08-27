@@ -377,6 +377,7 @@ func TestEmptyListingsSaySoRatherThanPrintingNothing(t *testing.T) {
 		{"harness roles", []string{"harness", "roles"}},
 		{"evidence list", []string{"evidence", "list"}},
 		{"changeset list", []string{"changeset", "list"}},
+		{"repo list", []string{"repo", "list"}},
 	}
 
 	for _, testCase := range cases {
@@ -1055,5 +1056,31 @@ func TestStatusSaysNothingIsEnrolledRatherThanNothingMatched(t *testing.T) {
 	}
 	if strings.TrimSpace(output) == "" {
 		t.Error("status printed nothing at all")
+	}
+}
+
+// A bare table header is the shape "an empty table and a silent success look
+// identical" takes when the workspace governs nothing. `vat repo list` and
+// `vat sync` both printed one, in the workspace somebody adopting the harness
+// alone is in.
+func TestListingsSaySomethingWhenTheWorkspaceGovernsNothing(t *testing.T) {
+	// Arrange
+	h := newFixture(t)
+	h.mustRun("init", "--name", "solo")
+
+	for _, args := range [][]string{{"repo", "list"}, {"sync", "--offline"}} {
+		t.Run(strings.Join(args, " "), func(t *testing.T) {
+			// Act
+			output := h.mustRun(args...)
+
+			// Assert: a header and nothing under it is not an answer.
+			if strings.Contains(output, "REPOSITORY") || strings.Contains(output, "NAME  ROLE") {
+				t.Errorf("`vat %s` printed a table header over nothing:\n%s",
+					strings.Join(args, " "), output)
+			}
+			if strings.TrimSpace(output) == "" {
+				t.Errorf("`vat %s` printed nothing at all", strings.Join(args, " "))
+			}
+		})
 	}
 }

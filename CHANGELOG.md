@@ -434,6 +434,10 @@ Notable changes to `vat`. The format follows
   none. That text is committed into the repository of everybody adopting the
   harness on its own, where it reads as a defect in the generated file rather
   than as the state it describes.
+- `vat repo list` and `vat sync` printed a bare table header in a workspace that
+  governs nothing. An empty table and a silent success look identical, which is
+  what the existing guard on the other listings says — it just did not cover
+  these two, and they are the ones somebody adopting the harness alone runs.
 - `vat status` told a workspace that governs nothing "No repositories match.",
   which blames a filter nobody gave. It is the second screen somebody adopting
   the harness for a single repository sees, after the first one this release

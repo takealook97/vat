@@ -64,6 +64,14 @@ func repoListCommand() *Command {
 				}
 				return emitJSON(env, repos)
 			}
+			// A header with nothing under it and a silent success look the same,
+			// which is what the workspace somebody adopts the harness alone into
+			// was answered with.
+			if len(repos) == 0 {
+				env.Printer.Println("No repositories are enrolled.")
+				env.Printer.Hint("Enrol one with `vat repo add <name> --origin <url>`.")
+				return nil
+			}
 			rows := make([][]string, 0, len(repos))
 			for _, repo := range repos {
 				state := "cloned"

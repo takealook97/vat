@@ -85,6 +85,11 @@ func runSync(ctx context.Context, env *Env, args []string) error {
 }
 
 func renderSyncReport(env *Env, report syncx.Report) {
+	if len(report.Results) == 0 {
+		env.Printer.Println("No repositories are enrolled.")
+		env.Printer.Hint("Enrol one with `vat repo add <name> --origin <url>`.")
+		return
+	}
 	rows := make([][]string, 0, len(report.Results))
 	for _, result := range report.Results {
 		rows = append(rows, []string{
