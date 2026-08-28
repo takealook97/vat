@@ -6,6 +6,8 @@ Notable changes to `vat`. The format follows
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-08-28
+
 ### Added
 
 - `requires.vat` in `vat.yaml`: a version constraint on the tool operating the
