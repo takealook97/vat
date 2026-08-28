@@ -250,9 +250,17 @@ func lockManifest(root string) (func(), error) {
 // commands surfaced as "Access is denied", which names nothing a person can act
 // on and stopped the write.
 //
-// Deciding by whether the lock is actually there gives the same answer on every
-// platform, and keeps a real permission problem a real error: with no lock file
-// present, a refusal to create one is not contention.
+// Deciding by whether the directory can be written gives the same answer on
+// every platform, and keeps a real permission problem a real error: where a
+// file cannot be created at all, a refusal to create the lock is not
+// contention.
+//
+// Asking whether the lock file exists is not enough, and this is the second
+// version of that idea. A name in delete-pending state answers "access denied"
+// to stat as readily as to open, and it stops existing entirely the moment the
+// holder's Remove lands — so both of the states this is meant to recognise can
+// present as "the lock is not there", and four writers racing on Windows had
+// three of them fail with a message naming nothing they could act on.
 func IsLockContention(err error, path string) bool {
 	if errors.Is(err, fs.ErrExist) {
 		return true
@@ -260,8 +268,21 @@ func IsLockContention(err error, path string) bool {
 	if !errors.Is(err, fs.ErrPermission) {
 		return false
 	}
-	_, statErr := os.Stat(path)
-	return statErr == nil
+	if _, statErr := os.Stat(path); statErr == nil {
+		return true
+	}
+	// The lock is not visible, so the question is whether this directory
+	// refuses writes or refuses only this name. A probe answers it without
+	// guessing: creating and removing a file of our own choosing exercises the
+	// same permission and none of the contention.
+	probe, probeErr := os.CreateTemp(filepath.Dir(path), "lock-probe-")
+	if probeErr != nil {
+		return false
+	}
+	name := probe.Name()
+	_ = probe.Close()
+	_ = os.Remove(name)
+	return true
 }
 
 // lockWait is how long a command waits for another to finish writing the

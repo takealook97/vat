@@ -6,6 +6,65 @@ Notable changes to `vat`. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- `vat changeset status <id>` — the preflight. Verification refuses a dirty
+  working tree on purpose, and adopting the harness dirties every governed
+  repository at once, so a first changeset meets that refusal everywhere and the
+  order to fix it in was discoverable only by running `verify` and reading the
+  failures. It distinguishes uncommitted, unverified, moved, unverifiable,
+  verified, and landed, prints the commits needed in enrolment order, and
+  commits nothing.
+- `vat brain adopt --plan` groups what adoption would find — how many records
+  cannot be read, how many carry a lifecycle status this schema does not have,
+  how many relations are one-sided, which projections vat did not write, which
+  directories under `memory/` are shaped like a session journal — with a count,
+  examples, and whether each shape is mechanical. It proposes no mapping and
+  writes nothing, including the marker and the manifest.
+- `vat repo list --format tsv` writes the roster as tab-separated rows with no
+  header, so replacing a hand-maintained roster file does not require a JSON
+  parser to read the roster that replaced it.
+- `vat repo rename --origin` records the URL a repository answers to after a
+  rename on the forge, and `--plan` reports every effect and writes nothing.
+- `workspace.checks` and `requires.vat` are joined by a bounded `Newest
+  decisions` section in the generated `CURRENT.md`, naming up to five recent
+  decisions the citation ranking left out. A decision taken yesterday is cited
+  by nothing yet, so ranking could only hide it, and an index that cannot show
+  the newest decision gets read as stale. The ranking is now stated in the file.
+- A failing check records a bounded, redacted tail of its output in the
+  changeset. `detail` alone is the command's first line, which for a test runner
+  is the progress bar, so a record could prove a failure and not explain it — the
+  failing test had to be reconstructed from the runner's discovery order.
+- A participant that declares no canonical checks is recorded as `unverifiable`
+  with the reason. An empty check list meant two different things — not verified
+  yet, and nothing here can be verified — and the record said neither.
+- `vat doctor` names remotes a clone keeps besides origin, at OK. A repository
+  renamed on the forge usually keeps the old URL so the old route still works;
+  the manifest still records one identity, and vat still never rewrites a
+  remote.
+- `vat doctor --offline` is accepted as the default it already is. `sync` and
+  `lint` both take the flag, so a script passing it everywhere failed on the one
+  command that was already offline.
+
+### Fixed
+
+- `vat repo rename` reaches everything that names the repository. It did not
+  move `policy.brain.repo`, so renaming an adopted knowledge repository produced
+  a manifest that failed its own validation — impossible to complete without
+  hand-editing vat.yaml, in the command that exists to avoid exactly that. It
+  now also refuses a repository enrolled in an open changeset, before anything
+  moves and naming the record: that record claims which revisions were proven
+  together, and a rename would either break it or rewrite a claim about the
+  past.
+
+### Changed
+
+- SPEC §5.6.1 states that extension keys in a record's front matter are
+  preserved and may never influence a lifecycle judgement. Mature gap systems
+  carry a human-readable progress note beside the status, and a generator that
+  read "resolved" out of such a note made partially resolved gaps vanish from
+  its own index.
+
 ## [0.3.0] - 2026-08-28
 
 ### Added

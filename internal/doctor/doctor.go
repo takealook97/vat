@@ -231,6 +231,22 @@ func checkRepos(ctx context.Context, ws *workspace.Workspace) []Finding {
 			})
 			continue
 		}
+		// A clone often keeps the URL a repository was renamed away from, so a
+		// forge redirect and the old route both stay usable. The manifest
+		// records one identity and that stays true — these are named, never
+		// compared to it, and never rewritten. Reported so a migration can see
+		// its own leftovers rather than being told the workspace is clean.
+		if extra := otherRemotes(ctx, dir); len(extra) > 0 {
+			// Reported at OK rather than as a new status value: the check
+			// passed, and this is the context beside it. A fourth status would
+			// be a change to what every consumer of `--json` switches on, for
+			// an observation that faults nothing.
+			findings = append(findings, Finding{
+				Section: sectionRepositories, Subject: repo.Name, Status: StatusOK,
+				Detail: "also has the remote " + strings.Join(extra, ", ") +
+					"; the manifest names origin only",
+			})
+		}
 		branch, err := gitx.CurrentBranch(ctx, dir)
 		if err != nil {
 			// A repository git cannot answer for is a finding, not a clean one.
@@ -703,4 +719,21 @@ func plural(count int, singular, many string) string {
 		return fmt.Sprintf("%d %s", count, singular)
 	}
 	return fmt.Sprintf("%d %s", count, many)
+}
+
+// otherRemotes returns the remotes a clone has besides origin. An error is
+// reported as none: the remote list is context a reader may find useful, and
+// failing the environment over it would make a diagnosis out of a diagnosis.
+func otherRemotes(ctx context.Context, dir string) []string {
+	names, err := gitx.RemoteNames(ctx, dir)
+	if err != nil {
+		return nil
+	}
+	var extra []string
+	for _, name := range names {
+		if name != "origin" {
+			extra = append(extra, name)
+		}
+	}
+	return extra
 }

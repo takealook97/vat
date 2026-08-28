@@ -616,6 +616,25 @@ a repair that destroys the thing it was pointed at is not one.
 
 ---
 
+## What the generated index shows
+
+`CURRENT.md` is bounded, so it ranks rather than lists. Two sections answer two
+different questions:
+
+- **Active decisions** keeps the fifteen the rest of the repository cites most,
+  and says so in the file. That is the right cut for "what does this place rest
+  on".
+- **Newest decisions** names up to five recent ones the ranking left out. A
+  decision taken yesterday is cited by nothing yet, so ranking can only hide it,
+  and an index that cannot show the newest decision gets read as stale.
+
+Above them, **Canonical views** links the maintained synthesis documents that
+exist — `STATUS.md`, `GOAL.md`, `ROADMAP.md` and the rest. An adopted repository
+keeping `PORTFOLIO_STATUS.md` is recognised under that name too, so adoption
+never requires renaming a document to be reachable from the index.
+
+---
+
 ## Working here
 
 ```bash

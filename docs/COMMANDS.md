@@ -40,6 +40,12 @@ Flags are accepted in any position, including after a positional argument.
 gives after succeeding. Nothing else, so `vat … --json | jq` is safe on every
 path: a command that fails writes nothing to stdout at all.
 
+A script reading vat must check the exit status, not only the output. A roster
+that could not be read prints nothing on stdout, and a loop over nothing looks
+exactly like a workspace governing nothing — so a wrapper that discards the
+status turns "vat failed" into "there are no repositories", and every check
+built on it passes. Capture the output, check the status, then iterate.
+
 **stderr is the diagnosis.** Errors, the `usage:` line beside one, and the
 advice that belongs to a failure. A consumer reads the exit code, then stderr.
 
@@ -174,7 +180,7 @@ conflict markers. `vat status` reports the same thing in its note, and in
 ## vat doctor
 
 ```
-vat doctor [--network] [--secret-max-age <days>]
+vat doctor [--network] [--offline] [--secret-max-age <days>]
 ```
 
 Judges the environment and stops. It never repairs anything and never prints a
@@ -204,6 +210,11 @@ writing outside the workspace root is the boundary everything else rests on. So
 this reports, like the rest of `doctor`, and stops.
 
 ---
+
+`--offline` is accepted and states the default: doctor reads the machine and the
+workspace and reaches the network only under `--network`. `sync` and `lint` both
+take the flag, and a script passing it everywhere failed on the one command that
+was already offline. Passing both is refused rather than resolved silently.
 
 ## vat lint
 
@@ -307,7 +318,7 @@ run — in CI an empty run is a green build that tested nothing.
 ## vat repo
 
 ```
-vat repo list    [--group <g>] [--role <r>] [--archived]
+vat repo list    [--group <g>] [--role <r>] [--archived] [--format tsv]
 vat repo add     <name> --origin <url> [--role <r>] [--group <g>] [--branch <b>]
                         [--checks <cmds>] [--access <a>] [--description <text>]
                         [--required=false] [--path <dir>] [--no-clone]
@@ -320,7 +331,7 @@ vat repo adopt   <directory> [--role <r>] [--group <g>] [--branch <b>]
 vat repo remove  <name> [--delete] [--force]
 vat repo archive <name>
 vat repo unarchive <name>
-vat repo rename  <old> <new> [--keep-path]
+vat repo rename  <old> <new> [--keep-path] [--origin <url>] [--plan]
 ```
 
 Every mutation moves the manifest, the `.gitignore` exclusion, and the generated
@@ -334,6 +345,27 @@ through `remote_template`, part of a URL.
 
 Every flag is validated before anything is created, so a typo cannot leave a
 directory behind that is in neither the manifest nor `.gitignore`.
+
+`rename` moves the manifest entry, the directory, the `.gitignore` exclusion,
+`policy.brain.repo` when the repository is the knowledge layer, and the
+generated contracts together. `--origin` records the URL a repository answers to
+after a rename on the forge; the clone's remote is never rewritten, because a
+remote that does not match the manifest is a supply-chain signal and vat reports
+it rather than smoothing it over. `--plan` reports every effect and writes
+nothing.
+
+A repository enrolled in an **open** changeset is refused. That record claims
+which revisions were proven together, so a rename would either leave it pointing
+at a repository that is gone or rewrite a claim about the past. A closed,
+rolled-back, or abandoned record describes the past under the name it used then
+and is left alone.
+
+`list --format tsv` writes name, role, group, branch, state, and origin
+separated by tabs, with no header and no alignment. The aligned table is for
+people and changes shape with its content; JSON needs a parser. A shell script
+replacing a hand-maintained roster file should not have to reach for one to read
+the roster that replaced it. Check the exit status: a roster that could not be
+read must not be indistinguishable from a workspace governing nothing.
 
 `new` initialises the repository locally with a starter harness, commits it,
 creates the remote through the GitHub CLI unless `--no-remote`, and enrols it.
@@ -476,6 +508,15 @@ quarantine or a revocation must state a reason: a withdrawal nobody explained
 cannot be reviewed later. An end state is one-way — none of these commands, and
 not `promote`, will reopen one.
 
+`adopt --plan` writes nothing at all — not the marker, not the projections, not
+the manifest — and groups what adoption would find: how many records cannot be
+read, how many carry a status this schema does not have, how many relations are
+one-sided, which projections vat did not write, and which directories under
+`memory/` are shaped like a session journal rather than a reusable observation.
+Each group says whether its shape is mechanical. It proposes no mapping: a
+knowledge repository is the one thing in a workspace whose content no tool
+should reinterpret, and the value is making the work countable.
+
 `adopt` declares which governed repository holds the knowledge layer. It writes
 the `.brain` marker, because a repository declared as the brain and left without
 one is a repository every other command still calls uninitialised, and it builds
@@ -531,6 +572,7 @@ See [BRAIN.md](BRAIN.md) for the record schema and the full lifecycle.
 vat changeset new       "<objective>" [--repos a,b] [--non-goal "..."]
                                       [--contract "..."] [--decision <ids>]
 vat changeset add       <id> <repo>...
+vat changeset status    <id>
 vat changeset verify    <id> [--timeout <duration>]
 vat changeset show      <id>
 vat changeset list      [--open]
@@ -558,6 +600,25 @@ its landing against the same `origin/<default_branch>` as any other participant.
 Because the record itself is written under `changesets/` in the workspace root,
 enrolling `.` means committing the record before `verify` — the same rule every
 other participant is held to, arriving one step earlier.
+
+`status` is the preflight. It reports where every participant stands and
+commits nothing, distinguishing six states: `uncommitted` (a dirty tree, so no
+result would describe a revision), `unverified`, `moved` (verified, and the
+repository has moved on since), `unverifiable` (no canonical checks declared),
+`verified`, and `landed`. When trees are dirty it prints the commits needed, in
+enrolment order — adopting the harness dirties every governed repository at
+once, and the order was previously discoverable only by running `verify` and
+reading the failures. It exits 0 either way: it is a report, not a gate.
+
+A failing check records a bounded tail of its output in the changeset, redacted
+and marked when it was cut. `detail` alone is the command's first line, which
+for most test runners is a progress bar, and a record that can prove a failure
+but not explain it has kept the half nobody needs. A passing check records no
+output: this is a completion record, not a log.
+
+A participant that declares no canonical checks is recorded as `unverifiable`
+with the reason, rather than left with an empty check list that reads the same
+as work in progress.
 
 `verify` runs each repository's canonical checks and records the outcome against
 the exact revision it ran on. Four conditions stop a repository being entered at

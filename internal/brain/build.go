@@ -134,15 +134,20 @@ func RenderCurrent(store *Store, now time.Time) string {
 	b.WriteString(renderCounts(store))
 	b.WriteString("\n")
 	b.WriteString(renderCanonicalViews(store.Root))
-	b.WriteString(renderSection(store, KindGoal, "Goals", "GOAL.md", func(r Record) bool {
+	goals, _ := renderSection(store, KindGoal, "Goals", "GOAL.md", func(r Record) bool {
 		return !r.Status.Terminal()
-	}))
-	b.WriteString(renderSection(store, KindGap, "Open gaps", "GAP_ANALYSIS.md", func(r Record) bool {
+	})
+	b.WriteString(goals)
+	gaps, _ := renderSection(store, KindGap, "Open gaps", "GAP_ANALYSIS.md", func(r Record) bool {
 		return !r.Status.Terminal()
-	}))
-	b.WriteString(renderSection(store, KindDecision, "Active decisions", "DECISIONS.md", func(r Record) bool {
-		return r.Status == StatusActive || r.Status == StatusProvisional
-	}))
+	})
+	b.WriteString(gaps)
+	decisions, shownDecisions := renderSection(store, KindDecision, "Active decisions", "DECISIONS.md",
+		func(r Record) bool {
+			return r.Status == StatusActive || r.Status == StatusProvisional
+		})
+	b.WriteString(decisions)
+	b.WriteString(renderNewestDecisions(store, shownDecisions))
 
 	b.WriteString(renderAttention(store, now))
 	b.WriteString(renderRecentMemory(store))
@@ -195,7 +200,7 @@ func renderCanonicalViews(root string) string {
 	b.WriteString("| Question | Maintained view |\n")
 	b.WriteString("| --- | --- |\n")
 	for _, view := range views {
-		fmt.Fprintf(&b, "| %s | [%s](%s) |\n", view.label, view.label, view.file)
+		fmt.Fprintf(&b, "| %s | [%s](%s) |\n", view.label, view.file, view.file)
 	}
 	b.WriteString("\n")
 	return b.String()
@@ -252,7 +257,9 @@ func statusMeaning(status Status) string {
 // arriving late — once the repository is finally big enough to be worth having.
 const sectionLimit = 15
 
-func renderSection(store *Store, kind Kind, heading, projection string, include func(Record) bool) string {
+// renderSection returns the rendered table and the records it listed, so a
+// caller can say what the ranking left out without ranking again.
+func renderSection(store *Store, kind Kind, heading, projection string, include func(Record) bool) (string, []Record) {
 	records := make([]Record, 0)
 	for _, record := range store.OfKind(kind) {
 		if include(record) && !record.Archived {
@@ -260,12 +267,17 @@ func renderSection(store *Store, kind Kind, heading, projection string, include 
 		}
 	}
 	if len(records) == 0 {
-		return ""
+		return "", nil
 	}
 	shown, remaining := mostDependedOn(store, records, sectionLimit)
 
 	var b strings.Builder
 	b.WriteString("\n## " + heading + "\n\n")
+	if remaining > 0 {
+		// The ranking was invisible, and a reader who could not find a decision
+		// they had just made concluded the index was stale rather than ranked.
+		b.WriteString("Ranked by how many records cite them.\n\n")
+	}
 	b.WriteString("| ID | Status | Title | Record |\n")
 	b.WriteString("| --- | --- | --- | --- |\n")
 	for _, record := range shown {
@@ -276,7 +288,7 @@ func renderSection(store *Store, kind Kind, heading, projection string, include 
 	if remaining > 0 {
 		fmt.Fprintf(&b, "\n%d more in [%s](%s).\n", remaining, projection, projection)
 	}
-	return b.String()
+	return b.String(), shown
 }
 
 // mostDependedOn keeps the records the rest of the repository leans on hardest
@@ -343,6 +355,51 @@ func renderAttention(store *Store, now time.Time) string {
 	}
 	if remaining > 0 {
 		fmt.Fprintf(&b, "\n%d more waiting on review. The full queue: `vat brain review`.\n", remaining)
+	}
+	return b.String()
+}
+
+// recencyLimit is how many newly recorded decisions the index names beside the
+// ranked table.
+const recencyLimit = 5
+
+// renderNewestDecisions names recent decisions the ranked table left out.
+//
+// The table keeps what the repository leans on hardest, which is the right cut
+// for a bounded index and exactly the wrong one for "what was decided lately":
+// a decision taken yesterday is cited by nothing yet, so ranking can only hide
+// it. Reaching for the newest decision and not finding it is how a generated
+// index gets read as stale and then stops being read.
+func renderNewestDecisions(store *Store, shown []Record) string {
+	listed := map[string]bool{}
+	for _, record := range shown {
+		listed[record.ID] = true
+	}
+	var candidates []Record
+	for _, record := range store.OfKind(KindDecision) {
+		if record.Archived || listed[record.ID] {
+			continue
+		}
+		if record.Status == StatusActive || record.Status == StatusProvisional {
+			candidates = append(candidates, record)
+		}
+	}
+	if len(candidates) == 0 {
+		return ""
+	}
+	// OfKind sorts by identifier, and identifiers are issued in order, so the
+	// tail is the newest. Dates are not used: they are optional, and a record
+	// with none would sort as the oldest thing in the repository.
+	sort.SliceStable(candidates, func(i, j int) bool { return candidates[i].ID > candidates[j].ID })
+	if len(candidates) > recencyLimit {
+		candidates = candidates[:recencyLimit]
+	}
+
+	var b strings.Builder
+	b.WriteString("\n## Newest decisions\n\n")
+	b.WriteString("Recorded most recently, and not yet cited enough to rank above.\n\n")
+	for _, record := range SortRecords(candidates) {
+		fmt.Fprintf(&b, "- `%s` [%s](%s)\n", record.ID, escapePipes(record.Title), record.Path)
 	}
 	return b.String()
 }

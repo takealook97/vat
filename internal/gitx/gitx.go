@@ -515,6 +515,24 @@ func WithoutCredentials(url string) string {
 // SameRemote reports whether two URLs designate the same repository.
 func SameRemote(a, b string) bool { return NormaliseURL(a) == NormaliseURL(b) }
 
+// RemoteNames returns the remotes configured in a clone, sorted as git reports
+// them. It is read-only, like everything else that touches a remote here: vat
+// never rewrites one, because a mismatch is a supply-chain signal rather than a
+// configuration error to smooth over.
+func RemoteNames(ctx context.Context, dir string) ([]string, error) {
+	out, err := Run(ctx, dir, "remote")
+	if err != nil {
+		return nil, err
+	}
+	var names []string
+	for _, line := range strings.Split(out, "\n") {
+		if name := strings.TrimSpace(line); name != "" {
+			names = append(names, name)
+		}
+	}
+	return names, nil
+}
+
 // InterruptedOperation names a git operation the repository stopped part of the
 // way through — "merge", "rebase", "cherry-pick", "revert", or "bisect" — and
 // returns an empty string when there is none.
