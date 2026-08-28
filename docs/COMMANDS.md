@@ -557,6 +557,7 @@ See [BRAIN.md](BRAIN.md) for the record schema and the full lifecycle.
 vat changeset new       "<objective>" [--repos a,b] [--non-goal "..."]
                                       [--contract "..."] [--decision <ids>]
 vat changeset add       <id> <repo>...
+vat changeset status    <id>
 vat changeset verify    <id> [--timeout <duration>]
 vat changeset show      <id>
 vat changeset list      [--open]
@@ -584,6 +585,25 @@ its landing against the same `origin/<default_branch>` as any other participant.
 Because the record itself is written under `changesets/` in the workspace root,
 enrolling `.` means committing the record before `verify` — the same rule every
 other participant is held to, arriving one step earlier.
+
+`status` is the preflight. It reports where every participant stands and
+commits nothing, distinguishing six states: `uncommitted` (a dirty tree, so no
+result would describe a revision), `unverified`, `moved` (verified, and the
+repository has moved on since), `unverifiable` (no canonical checks declared),
+`verified`, and `landed`. When trees are dirty it prints the commits needed, in
+enrolment order — adopting the harness dirties every governed repository at
+once, and the order was previously discoverable only by running `verify` and
+reading the failures. It exits 0 either way: it is a report, not a gate.
+
+A failing check records a bounded tail of its output in the changeset, redacted
+and marked when it was cut. `detail` alone is the command's first line, which
+for most test runners is a progress bar, and a record that can prove a failure
+but not explain it has kept the half nobody needs. A passing check records no
+output: this is a completion record, not a log.
+
+A participant that declares no canonical checks is recorded as `unverifiable`
+with the reason, rather than left with an empty check list that reads the same
+as work in progress.
 
 `verify` runs each repository's canonical checks and records the outcome against
 the exact revision it ran on. Four conditions stop a repository being entered at

@@ -424,6 +424,21 @@ exists to prevent.
 
 An implementation **MUST NOT** infer any of the three from another.
 
+An empty `checks` list states neither that a participant passed nor that it
+failed. It means two different things — nothing has been verified yet, and there
+is nothing here that can be verified — and a record **SHOULD** distinguish them
+with `unverifiable`, a string saying why no check ran. A tool **MUST NOT** read
+`unverifiable` as a pass. A workspace may deliberately accept a repository that
+declares no canonical checks; the record has to show that it did.
+
+A failing check **SHOULD** record `output`, a bounded tail of what the command
+printed. `detail` is its first line, which for most runners is a progress
+indicator, and a record able to prove a failure but not explain it has kept the
+half nobody needs: the failure was already in the exit code. The tail **MUST**
+be cut from the front, marked when anything was dropped, and redacted for
+credentials like every other captured string. A passing check **SHOULD NOT**
+record output: a completion record is not a log.
+
 ### 6.2 Landing
 
 `landed_on` names a ref the recorded `revision` was observed to be an ancestor

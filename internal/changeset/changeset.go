@@ -53,6 +53,14 @@ type CheckRun struct {
 	RanAt    string `yaml:"ran_at,omitempty" json:"ran_at,omitempty"`
 	Revision string `yaml:"revision,omitempty" json:"revision,omitempty"`
 	Detail   string `yaml:"detail,omitempty" json:"detail,omitempty"`
+	// Output is the tail of what a failing check printed.
+	//
+	// Detail is its first line, which for most runners is a progress bar. A
+	// record that can prove a check failed but cannot say which test, which
+	// assertion, or which file has kept the half of the evidence nobody needs:
+	// the failure was already visible in the exit code. Recorded only for a
+	// failure, bounded, and marked when it was cut.
+	Output string `yaml:"output,omitempty" json:"output,omitempty"`
 }
 
 // Passed reports whether the check succeeded.
@@ -93,6 +101,42 @@ type Participant struct {
 	// change. It is evidence, never the gate: every forge names it differently
 	// and vat refuses to depend on any of them.
 	Review string `yaml:"review,omitempty" json:"review,omitempty"`
+	// Unverifiable says why no check ran, when none did.
+	//
+	// An empty check list means two different things — nobody has verified this
+	// yet, and there is nothing here that can be verified — and the record said
+	// neither. A repository that declares no canonical checks is a decision a
+	// workspace may take deliberately; the completion record has to show that it
+	// did, rather than leaving a gap that reads as work in progress.
+	Unverifiable string `yaml:"unverifiable,omitempty" json:"unverifiable,omitempty"`
+}
+
+// OutputLimit is how many bytes of a failing check's output a record keeps.
+//
+// Large enough for a traceback and the assertion above it; small enough that a
+// changeset stays a record rather than a log. A run that printed more is cut
+// from the front, because the end of a failing command is where it says why.
+const OutputLimit = 4000
+
+// TruncationNotice is written above output that was cut, so a reader never
+// mistakes a fragment for the whole.
+const TruncationNotice = "[earlier output omitted]"
+
+// Tail returns the last OutputLimit bytes of text, marked when anything was
+// dropped. It cuts on a line boundary so the first kept line is a whole one.
+func Tail(text string) string {
+	trimmed := strings.TrimRight(text, "\n")
+	if trimmed == "" {
+		return ""
+	}
+	if len(trimmed) <= OutputLimit {
+		return trimmed
+	}
+	cut := trimmed[len(trimmed)-OutputLimit:]
+	if newline := strings.IndexByte(cut, '\n'); newline >= 0 {
+		cut = cut[newline+1:]
+	}
+	return TruncationNotice + "\n" + cut
 }
 
 // Landed reports whether the verified revision was observed on the branch this

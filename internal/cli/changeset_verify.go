@@ -114,6 +114,10 @@ func runChangesetVerify(ctx context.Context, env *Env, args []string) error {
 		updated.Checks = nil
 
 		if len(target.Checks) == 0 {
+			// Written into the record, not only printed. An empty check list
+			// meant two different things — not verified yet, and nothing here
+			// can be verified — and the record said neither.
+			updated.Unverifiable = "declares no canonical checks in vat.yaml"
 			env.Printer.Status(ui.LevelWarn, participant.Name,
 				"declares no canonical checks; nothing can be verified")
 			// Counted apart from a failed check. Both block the changeset, and
@@ -123,6 +127,7 @@ func runChangesetVerify(ctx context.Context, env *Env, args []string) error {
 			current = changeset.WithParticipant(current, updated)
 			continue
 		}
+		updated.Unverifiable = ""
 		for _, command := range target.Checks {
 			result := runner.RunOne(ctx, runner.Job{
 				Repo: participant.Name, Dir: dir, Command: command,
@@ -136,6 +141,13 @@ func runChangesetVerify(ctx context.Context, env *Env, args []string) error {
 			if !result.OK() {
 				run.Status = "fail"
 				run.Detail = result.FirstLine()
+				// The first line of a failing test run is usually a progress
+				// bar. Keeping only that produced a record that could prove the
+				// failure and not explain it, and the test that failed had to be
+				// reconstructed from the runner's discovery order. Redacted
+				// through the same rule that guards every other captured
+				// string: a check's output is not a place a token may surface.
+				run.Output = gitx.Redact(changeset.Tail(result.Output()))
 				failures++
 				env.Printer.Status(ui.LevelFail, participant.Name+" · "+command, run.Detail)
 			} else {
