@@ -174,7 +174,7 @@ conflict markers. `vat status` reports the same thing in its note, and in
 ## vat doctor
 
 ```
-vat doctor [--network] [--secret-max-age <days>]
+vat doctor [--network] [--offline] [--secret-max-age <days>]
 ```
 
 Judges the environment and stops. It never repairs anything and never prints a
@@ -204,6 +204,11 @@ writing outside the workspace root is the boundary everything else rests on. So
 this reports, like the rest of `doctor`, and stops.
 
 ---
+
+`--offline` is accepted and states the default: doctor reads the machine and the
+workspace and reaches the network only under `--network`. `sync` and `lint` both
+take the flag, and a script passing it everywhere failed on the one command that
+was already offline. Passing both is refused rather than resolved silently.
 
 ## vat lint
 
@@ -307,7 +312,7 @@ run — in CI an empty run is a green build that tested nothing.
 ## vat repo
 
 ```
-vat repo list    [--group <g>] [--role <r>] [--archived]
+vat repo list    [--group <g>] [--role <r>] [--archived] [--format tsv]
 vat repo add     <name> --origin <url> [--role <r>] [--group <g>] [--branch <b>]
                         [--checks <cmds>] [--access <a>] [--description <text>]
                         [--required=false] [--path <dir>] [--no-clone]
@@ -334,6 +339,13 @@ through `remote_template`, part of a URL.
 
 Every flag is validated before anything is created, so a typo cannot leave a
 directory behind that is in neither the manifest nor `.gitignore`.
+
+`list --format tsv` writes name, role, group, branch, state, and origin
+separated by tabs, with no header and no alignment. The aligned table is for
+people and changes shape with its content; JSON needs a parser. A shell script
+replacing a hand-maintained roster file should not have to reach for one to read
+the roster that replaced it. Check the exit status: a roster that could not be
+read must not be indistinguishable from a workspace governing nothing.
 
 `new` initialises the repository locally with a starter harness, commits it,
 creates the remote through the GitHub CLI unless `--no-remote`, and enrols it.

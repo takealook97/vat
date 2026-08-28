@@ -1,6 +1,7 @@
 package brain_test
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"slices"
@@ -25,8 +26,12 @@ func TestCurrentRoutesToCanonicalViewsThatExist(t *testing.T) {
 	index := brain.RenderCurrent(store, reference)
 
 	// Assert
-	for _, link := range []string{"[Current state](STATUS.md)", "[Execution order](ROADMAP.md)",
-		"[Agent operating model](AGENT_OPERATING_MODEL.md)"} {
+	// The link text is the file, as it is in every other table this index
+	// renders. The question is already the row's first column, and repeating it
+	// as the link made the row say the same thing twice.
+	for _, link := range []string{"| Current state | [STATUS.md](STATUS.md) |",
+		"| Execution order | [ROADMAP.md](ROADMAP.md) |",
+		"| Agent operating model | [AGENT_OPERATING_MODEL.md](AGENT_OPERATING_MODEL.md) |"} {
 		if !strings.Contains(index, link) {
 			t.Errorf("CURRENT.md does not route to %s:\n%s", link, index)
 		}
@@ -49,7 +54,7 @@ func TestCurrentRecognisesThePortfolioStatusNameUsedByAnAdoptedBrain(t *testing.
 	index := brain.RenderCurrent(store, reference)
 
 	// Assert
-	if !strings.Contains(index, "[Current state](PORTFOLIO_STATUS.md)") {
+	if !strings.Contains(index, "| Current state | [PORTFOLIO_STATUS.md](PORTFOLIO_STATUS.md) |") {
 		t.Errorf("CURRENT.md does not route to an adopted current-state view:\n%s", index)
 	}
 }
@@ -192,5 +197,43 @@ func TestUnmanagedSaysNothingAboutAProjectionThatIsNotThere(t *testing.T) {
 	}
 	if len(unmanaged) != 0 {
 		t.Errorf("Unmanaged = %v, want nothing for a directory with no projections", unmanaged)
+	}
+}
+
+func TestCurrentNamesNewDecisionsTheCitationRankingWouldHide(t *testing.T) {
+	// Arrange: the ranked table keeps what the repository leans on hardest,
+	// which is the right cut for a bounded index and the wrong one for "what
+	// was decided lately". A decision taken yesterday is cited by nothing yet,
+	// so ranking can only hide it — and an index that cannot show the newest
+	// decision gets read as stale.
+	root, _ := newStore(t)
+	for i := 1; i <= 20; i++ {
+		id := fmt.Sprintf("D-%04d", i)
+		writeRecord(t, root, "decisions/"+id+"-x.md",
+			"id: "+id+"\nstatus: active", "# "+id+" — Decision "+id)
+	}
+	// Every early decision is cited, so citation ranking fills the table with
+	// them and the newest twenty are pushed out.
+	refs := make([]string, 0, 15)
+	for i := 1; i <= 15; i++ {
+		refs = append(refs, fmt.Sprintf("D-%04d", i))
+	}
+	writeRecord(t, root, "goals/G-0001-x.md",
+		"id: G-0001\nstatus: active\nrefs: ["+strings.Join(refs, ", ")+"]", "# G-0001 — A goal")
+
+	// Act
+	index := brain.RenderCurrent(reload(t, root), reference)
+
+	// Assert
+	if !strings.Contains(index, "D-0020") {
+		t.Errorf("the newest decision is unreachable from the index:\n%s", index)
+	}
+	if !strings.Contains(index, "Ranked by how many records cite them.") {
+		t.Errorf("the ranking is applied but never stated:\n%s", index)
+	}
+	// Bounded, still. Returning to a row per record is the failure the index
+	// exists to prevent.
+	if newest := strings.Count(index, "\n- `D-"); newest > 5 {
+		t.Errorf("the recency list has %d entries, want at most 5:\n%s", newest, index)
 	}
 }

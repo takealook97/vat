@@ -13,7 +13,7 @@ func doctorCommand() *Command {
 	return &Command{
 		Name:    "doctor",
 		Summary: "Judge the workspace and the machine, without changing either",
-		Usage:   "vat doctor [--network] [--secret-max-age <days>]",
+		Usage:   "vat doctor [--network] [--offline] [--secret-max-age <days>]",
 		Long: `Diagnose the environment and stop there.
 
 doctor never repairs anything. A tool that silently fixes what it finds teaches
@@ -26,6 +26,7 @@ unchanged.`,
 		Examples: []string{
 			"vat doctor",
 			"vat doctor --network                # add read-only reachability checks",
+			"vat doctor --offline                # explicit: the default, and refuses --network",
 			"vat doctor --secret-max-age 90      # report credentials unrotated for 90 days",
 		},
 		Run: runDoctor,
@@ -35,9 +36,17 @@ unchanged.`,
 func runDoctor(ctx context.Context, env *Env, args []string) error {
 	set := newFlagSet("doctor")
 	network := set.Bool("network", false, "include read-only network and auth checks")
+	// `vat sync` and `vat lint` both take --offline and doctor did not, so a
+	// script that passed it everywhere failed on the one command that was
+	// already offline. Accepted as what it means here rather than rejected: the
+	// caller is asking for the default and is right to be able to say so.
+	offline := set.Bool("offline", false, "state explicitly that no network is to be used; doctor is offline unless --network")
 	secretAge := set.Int("secret-max-age", 180, "report credential material older than this many days (0 disables)")
 	if err := parseFlags(set, args); err != nil {
 		return err
+	}
+	if *offline && *network {
+		return usageErrorf("--offline and --network ask for opposite things")
 	}
 
 	ws, err := env.Workspace()
