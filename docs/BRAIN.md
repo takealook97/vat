@@ -418,6 +418,12 @@ The fifteen kept are the ones the rest of the repository cites most, the same
 measure the review queue uses. Truncating by identifier would keep whatever was
 written first and hide everything current.
 
+Before those bounded record sections, the index links the maintained root views
+that exist: current state, goals, gaps, execution order, decisions, reviewed
+observations, and the agent operating model. `STATUS.md` is the standard current
+state name; an adopted brain using `PORTFOLIO_STATUS.md` keeps that name and is
+routed there when `STATUS.md` is absent.
+
 An index that has to be read in full to be used is the summary file this layer
 was built to replace, arriving late — once the repository is finally large
 enough to be worth having.
@@ -436,7 +442,7 @@ knows to look for, so this table and `brain.RuleNames()` are compared by a test.
 | `brain/claim-source` | error | a current-state claim with no `source_ref`, or one that is not `<repo>@<revision>[:<path>]` |
 | `brain/claim-source-branch` | warn | evidence pinned to a branch, which keeps moving and takes the claim's meaning with it |
 | `brain/claim-stale` | warn | an active claim past the policy window; `vat brain sweep --apply` demotes it |
-| `brain/date-unreadable` | warn | a date no staleness rule can read, which exempts the record from all of them |
+| `brain/date-unreadable` | warn | a present but invalid date no staleness rule can read; an absent optional `date` is not an error |
 | `brain/id-duplicate` | error | two records claiming the same identifier, so a reference resolves to either |
 | `brain/id-missing` | error | a record with no identifier; nothing can cite it and nothing can supersede it |
 | `brain/link-broken` | error | a relative link in a record that resolves to nothing |

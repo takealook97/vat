@@ -366,6 +366,14 @@ distinct from drift, naming a remedy the reader can act on.
 An empty file at either name carries no claim and **MAY** be written over: it is
 what an interrupted write leaves behind.
 
+`CURRENT.md` **SHOULD** route to the maintained root views that exist beside the
+records, including current state, goals, gaps, execution order, decisions,
+reviewed observations, and the agent operating model. An adopted repository
+**MAY** call its current-state view `PORTFOLIO_STATUS.md`; a reader that supports
+adoption **SHOULD** recognise that name when `STATUS.md` is absent. These links
+do not make the views atomic canon: they keep the generated entry point from
+stranding the synthesis documents it tells readers to use.
+
 A retrieval or embedding layer built over a brain **MUST NOT** be treated as an
 authority on what is currently true. It finds records; §5.3 and §5.4 decide
 whether they may be cited.

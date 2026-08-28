@@ -265,11 +265,17 @@ func RenderRepo(m manifest.Manifest, repo manifest.Repo) string {
 
 	b.WriteString("### Reaching wider context\n\n")
 	if brain, ok := m.BrainRepo(); ok {
-		fmt.Fprintf(&b,
-			"Organisation-wide goals, decisions, and current state live in `../%s`.\n", brain.Dir())
-		b.WriteString("Start with `vat brain query <terms>`, then open only the records it\n")
-		b.WriteString("names. Do not read the whole repository to answer one question, and do\n")
-		b.WriteString("not write to it from here.\n\n")
+		if repo.Name == brain.Name {
+			b.WriteString("This repository is the organisation-wide knowledge layer. Start with\n")
+			b.WriteString("`vat brain query <terms>`, then open only the records it names. Do not\n")
+			b.WriteString("read the whole repository to answer one question.\n\n")
+		} else {
+			fmt.Fprintf(&b,
+				"Organisation-wide goals, decisions, and current state live in `../%s`.\n", brain.Dir())
+			b.WriteString("Start with `vat brain query <terms>`, then open only the records it\n")
+			b.WriteString("names. Do not read the whole repository to answer one question, and do\n")
+			b.WriteString("not write to it from here.\n\n")
+		}
 	}
 	b.WriteString("The workspace roster, precedence order, trust tiers, and gates are in\n")
 	b.WriteString("`../AGENTS.md`. Read it when a request reaches beyond this repository.\n\n")

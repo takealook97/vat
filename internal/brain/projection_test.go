@@ -4,10 +4,55 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"strings"
 	"testing"
 
 	"github.com/takealook97/vat/internal/brain"
 )
+
+func TestCurrentRoutesToCanonicalViewsThatExist(t *testing.T) {
+	// Arrange: these are the maintained views vat itself scaffolds around the
+	// atomic records. A generated entry point that does not name them strands
+	// current state and execution order outside its own reading contract.
+	root, store := newStore(t)
+	for _, name := range []string{"STATUS.md", "ROADMAP.md", "AGENT_OPERATING_MODEL.md"} {
+		if err := os.WriteFile(filepath.Join(root, name), []byte("# maintained view\n"), 0o644); err != nil {
+			t.Fatalf("write %s: %v", name, err)
+		}
+	}
+
+	// Act
+	index := brain.RenderCurrent(store, reference)
+
+	// Assert
+	for _, link := range []string{"[Current state](STATUS.md)", "[Execution order](ROADMAP.md)",
+		"[Agent operating model](AGENT_OPERATING_MODEL.md)"} {
+		if !strings.Contains(index, link) {
+			t.Errorf("CURRENT.md does not route to %s:\n%s", link, index)
+		}
+	}
+}
+
+func TestCurrentRecognisesThePortfolioStatusNameUsedByAnAdoptedBrain(t *testing.T) {
+	// Arrange: an adopted knowledge repository may already have a more precise
+	// name for the current-state view. Adoption must not require renaming its
+	// canonical document merely to make the new index route to it.
+	root, store := newStore(t)
+	if err := os.Remove(filepath.Join(root, "STATUS.md")); err != nil {
+		t.Fatalf("remove scaffolded status: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(root, "PORTFOLIO_STATUS.md"), []byte("# portfolio\n"), 0o644); err != nil {
+		t.Fatalf("write portfolio status: %v", err)
+	}
+
+	// Act
+	index := brain.RenderCurrent(store, reference)
+
+	// Assert
+	if !strings.Contains(index, "[Current state](PORTFOLIO_STATUS.md)") {
+		t.Errorf("CURRENT.md does not route to an adopted current-state view:\n%s", index)
+	}
+}
 
 // The case this file exists for: a knowledge repository that predates vat.
 // Adopting one used to overwrite whatever it already kept at CURRENT.md,

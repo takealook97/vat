@@ -111,6 +111,24 @@ func TestRenderRepoTellsACredentialRepositoryToCommitCiphertextOnly(t *testing.T
 	}
 }
 
+func TestBrainRepositoryDoesNotRouteToItselfAsWiderContext(t *testing.T) {
+	// Arrange
+	built := demoManifest()
+	brain, _ := built.Find("brain")
+
+	// Act
+	rendered := harness.RenderRepo(built, brain)
+
+	// Assert: telling a session in ../brain to go to ../brain and then not
+	// write there contradicts the write permit rendered a few lines above.
+	if strings.Contains(rendered, "live in `../brain`") {
+		t.Errorf("the brain repository routes to itself as another repository:\n%s", rendered)
+	}
+	if !strings.Contains(rendered, "This repository is the organisation-wide knowledge layer") {
+		t.Errorf("the brain repository does not identify its own role:\n%s", rendered)
+	}
+}
+
 func TestRenderRepoIncludesTheCanonicalChecks(t *testing.T) {
 	// Arrange
 	built := demoManifest()
