@@ -3,6 +3,7 @@ package brain
 import (
 	"encoding/json"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strings"
 
@@ -70,4 +71,38 @@ func writtenByVat(name string, content []byte) bool {
 	default:
 		return false
 	}
+}
+
+// CanonicalViews returns the maintained synthesis documents present in a brain,
+// in the order the generated index lists them.
+//
+// Exported because the index routes readers to these files and nothing checked
+// them: a repository could pass every schema rule while the documents its own
+// entry point recommends had not been revisited in months. Answering which
+// files those are belongs here, beside the render that names them; judging
+// whether they are current needs git, which this package deliberately cannot
+// reach.
+func CanonicalViews(root string) []string {
+	views := canonicalViewsPresent(root)
+	files := make([]string, 0, len(views))
+	for _, view := range views {
+		files = append(files, view.file)
+	}
+	return files
+}
+
+// RecordDirs returns the directories holding atomic records, relative to the
+// brain root. It is what "the records changed" means to anything asking git.
+func RecordDirs() []string {
+	dirs := make([]string, 0, len(Kinds()))
+	for _, kind := range Kinds() {
+		dirs = append(dirs, kind.Dir())
+	}
+	return dirs
+}
+
+// IsGeneratedProjection reports whether a file is one vat writes. A generated
+// file is checked for drift, which is a stronger claim than staleness.
+func IsGeneratedProjection(name string) bool {
+	return slices.Contains(Generated(), name)
 }
