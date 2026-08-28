@@ -36,6 +36,15 @@ func TestAConstraintAcceptsTheVersionsInsideItsRange(t *testing.T) {
 		{">=0.3.0-rc1", "0.3.0", true},
 		// Build metadata is not part of the ordering.
 		{">=0.3.0", "0.3.0+darwin", true},
+		// What `git describe` produces, which is what every build between two
+		// releases calls itself. "4 commits after v0.3.0" is not a candidate
+		// for 0.3.0: it has everything 0.3.0 has and more, and reading it as a
+		// prerelease would refuse the exact build somebody is dogfooding.
+		{">=0.3.0", "v0.3.0-4-g2ad652e", true},
+		{">=0.3.0", "v0.3.0-4-g2ad652e-dirty", true},
+		{">=0.3.0", "v0.3.0-dirty", true},
+		{">=0.3.0", "v0.2.9-4-g2ad652e", false},
+		{"<0.4.0", "v0.3.0-4-g2ad652e", true},
 	}
 
 	for _, c := range cases {

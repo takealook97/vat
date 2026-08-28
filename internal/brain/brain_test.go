@@ -438,8 +438,8 @@ func TestDriftIsReportedWhenAGeneratedFileIsEditedByHand(t *testing.T) {
 	if err != nil {
 		t.Fatalf("read: %v", err)
 	}
-	edited := append(generated, []byte("\nhand edited\n")...)
-	if err := os.WriteFile(path, edited, 0o644); err != nil {
+	edited := string(generated) + "\nhand edited\n"
+	if err := os.WriteFile(path, []byte(edited), 0o644); err != nil {
 		t.Fatalf("write: %v", err)
 	}
 

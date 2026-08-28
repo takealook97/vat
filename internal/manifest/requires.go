@@ -3,6 +3,7 @@ package manifest
 import (
 	"errors"
 	"fmt"
+	"regexp"
 	"strconv"
 	"strings"
 )
@@ -145,6 +146,10 @@ func CheckToolVersion(m Manifest, running string) error {
 		ErrToolTooOld, FileName, constraint, running)
 }
 
+// describeSuffix matches what `git describe --tags --dirty` appends to the
+// release it counts from: a commit count and hash, a dirty marker, or both.
+var describeSuffix = regexp.MustCompile(`^(dirty|[0-9]+-g[0-9a-f]{7,40}(-dirty)?)$`)
+
 // semver is the part of a version this comparison needs.
 type semver struct {
 	major, minor, patch int
@@ -165,6 +170,14 @@ func parseSemver(text string) (semver, error) {
 	if dash := strings.IndexByte(trimmed, '-'); dash >= 0 {
 		prerelease = trimmed[dash+1:]
 		trimmed = trimmed[:dash]
+		if describeSuffix.MatchString(prerelease) {
+			// `git describe` names a build by the release *behind* it:
+			// v0.3.0-4-g2ad652e is four commits after v0.3.0, not a candidate
+			// for it. Reading it as a prerelease would sort it below 0.3.0 and
+			// refuse the exact build somebody is running from main, which is
+			// how this field would first be met.
+			prerelease = ""
+		}
 	}
 	parts := strings.Split(trimmed, ".")
 	if len(parts) != 3 {

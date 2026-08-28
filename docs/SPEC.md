@@ -189,6 +189,11 @@ field was written.
 A prerelease sorts before the release it leads to: `0.3.0-rc1` does not satisfy
 `>=0.3.0`. Build metadata after `+` takes no part in the ordering.
 
+A `git describe` suffix is not a prerelease and **MUST NOT** be read as one:
+`v0.3.0-4-g2ad652e` and `v0.3.0-dirty` name builds *after* `v0.3.0`, carrying
+everything that release carries, and reading them as candidates for it would
+refuse the build somebody is running from the default branch.
+
 A tool too old to know this field refuses the manifest outright, because
 unknown keys are rejected. That is the same answer for a worse reason, and it is
 why the field is safe to add to version 1.

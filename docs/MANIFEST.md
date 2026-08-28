@@ -99,7 +99,9 @@ that with the schema version alone. `requires.vat` can.
 Space-separated comparison terms, all of which must hold: `>=`, `>`, `<=`, `<`,
 `=`. Caret and tilde ranges are refused rather than ignored, because a
 constraint nothing can parse permits every version. A prerelease sorts before
-its release, so `0.3.0-rc1` does not satisfy `>=0.3.0`.
+its release, so `0.3.0-rc1` does not satisfy `>=0.3.0` — but a `git describe`
+suffix is not a prerelease: `v0.3.0-4-g2ad652e` is four commits *after* v0.3.0
+and satisfies it.
 
 A vat that does not satisfy the constraint refuses to open the workspace at all,
 naming both versions — the same answer it gives to a manifest written against a

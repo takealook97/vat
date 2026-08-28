@@ -65,7 +65,8 @@ func TestBuildRewritesAProjectionCarryingItsOwnProvenance(t *testing.T) {
 	if err != nil {
 		t.Fatalf("read: %v", err)
 	}
-	if err := os.WriteFile(path, append(generated, []byte("\nedited by hand\n")...), 0o644); err != nil {
+	edited := string(generated) + "\nedited by hand\n"
+	if err := os.WriteFile(path, []byte(edited), 0o644); err != nil {
 		t.Fatalf("write: %v", err)
 	}
 
