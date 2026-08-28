@@ -287,9 +287,18 @@ func syncOne(ctx context.Context, ws *workspace.Workspace, repo manifest.Repo, r
 	}
 	switch {
 	case divergence.Diverged():
+		// Two different situations wear the same state, and their remedies are
+		// opposite: local commits to rebase or push, versus an upstream whose
+		// history was rewritten, where the only supported move is a fresh clone.
+		// The state stays one — nothing here is safe to update either way, which
+		// is what the state is for — and the detail says which it is.
+		detail := "history diverged; see git log --left-right HEAD..." + upstream
+		if shared, err := gitx.HaveCommonAncestor(ctx, dir, "HEAD", upstream); err == nil && !shared {
+			detail = "no commit in common with " + upstream +
+				"; the upstream history was replaced. Nothing here can be fast-forwarded onto it — clone again"
+		}
 		return Result{Repo: name, State: StateDiverged, Branch: branch, Revision: revision,
-			Ahead: divergence.Ahead, Behind: divergence.Behind,
-			Detail: "history diverged; see git log --left-right HEAD..." + upstream}
+			Ahead: divergence.Ahead, Behind: divergence.Behind, Detail: detail}
 	case divergence.Ahead > 0:
 		return Result{Repo: name, State: StateAhead, Branch: branch, Revision: revision,
 			Ahead: divergence.Ahead, Detail: "local commits not pushed"}

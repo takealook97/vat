@@ -549,3 +549,28 @@ func TestAModifiedTrackedFileStillBlocksAFastForward(t *testing.T) {
 		t.Errorf("uncommitted work was overwritten: %q", got)
 	}
 }
+
+func TestARewrittenUpstreamIsNamedRatherThanCalledOrdinaryDivergence(t *testing.T) {
+	// Arrange: a force-pushed upstream is not a divergence to reconcile. It is a
+	// different history under the same name, and the remedy is a fresh clone —
+	// telling somebody to inspect the difference sends them to compare two
+	// unrelated trees. This is what a repository whose history was rewritten
+	// looks like to everyone who already had a clone.
+	ws, upstream, clone := fixture(t)
+	git(t, upstream, "checkout", "--quiet", "--orphan", "rewritten")
+	commit(t, upstream, "README.md", "rewritten\n")
+	git(t, upstream, "branch", "--quiet", "-M", "rewritten", "main")
+	commit(t, clone, "LOCAL.md", "mine\n")
+
+	// Act
+	result := runSync(t, ws, syncx.Options{})
+
+	// Assert
+	if result.State != syncx.StateDiverged {
+		t.Fatalf("state = %s, want DIVERGED; nothing here can be fast-forwarded either way",
+			result.State)
+	}
+	if !strings.Contains(result.Detail, "clone again") {
+		t.Errorf("the detail does not name the only supported remedy: %q", result.Detail)
+	}
+}

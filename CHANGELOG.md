@@ -6,6 +6,25 @@ Notable changes to `vat`. The format follows
 
 ## [Unreleased]
 
+## [0.4.1] - 2026-08-28
+
+### Fixed
+
+- `changeset/rollback-point-missing` reports a recorded return point the
+  repository no longer holds. It is the one field in a completion record that
+  cannot be reconstructed — everything else can be read back off git — and a
+  rewritten history left the record asserting a way back that was gone, in
+  exactly the voice of one that was there. The knowledge layer has had this
+  check since it existed, as `brain/source-revision-drift`; the layer whose
+  whole promise is the return point did not. A repository that is not cloned is
+  not reported: its absence says nothing about what its history holds.
+- `vat sync` says when an upstream's history was replaced rather than calling it
+  ordinary divergence. Two situations wore one state and their remedies are
+  opposite: local commits to rebase or push, versus a force-pushed upstream
+  where the only supported move is cloning again. The state stays `DIVERGED` —
+  nothing is safe to update either way, which is what the state is for — and the
+  detail now says which of the two it is.
+
 ## [0.4.0] - 2026-08-28
 
 ### Added

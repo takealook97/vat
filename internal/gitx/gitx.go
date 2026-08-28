@@ -515,6 +515,26 @@ func WithoutCredentials(url string) string {
 // SameRemote reports whether two URLs designate the same repository.
 func SameRemote(a, b string) bool { return NormaliseURL(a) == NormaliseURL(b) }
 
+// HaveCommonAncestor reports whether two revisions share any history.
+//
+// They do not when the upstream was rewritten and force-pushed: the branch is
+// then not a divergence to reconcile but a different history under the same
+// name, and telling somebody to inspect the difference sends them to compare two
+// unrelated trees.
+func HaveCommonAncestor(ctx context.Context, dir, a, b string) (bool, error) {
+	out, err := Run(ctx, dir, "merge-base", "--", a, b)
+	if err != nil {
+		var cmdErr *CommandError
+		// git exits 1 with nothing on stderr when there is simply no base. That
+		// is the answer, not a failure to get one.
+		if errors.As(err, &cmdErr) && strings.TrimSpace(cmdErr.Stderr) == "" {
+			return false, nil
+		}
+		return false, err
+	}
+	return strings.TrimSpace(out) != "", nil
+}
+
 // RemoteNames returns the remotes configured in a clone, sorted as git reports
 // them. It is read-only, like everything else that touches a remote here: vat
 // never rewrites one, because a mismatch is a supply-chain signal rather than a
