@@ -96,6 +96,9 @@ directory.
 ```yaml
 version: 1
 
+requires:
+  vat: ">=0.3.0 <0.4.0"   # optional
+
 workspace:
   name: acme
   default_branch: main
@@ -122,6 +125,7 @@ repos:
 | Field | Required | Meaning |
 | --- | --- | --- |
 | `version` | yes | `1` |
+| `requires.vat` | no | version constraint on the tool operating this workspace (§4.4) |
 | `workspace.name` | yes | identifies the workspace |
 | `workspace.default_branch` | yes | the branch used when a repository declares none |
 | `workspace.remote_template` | no | expands `{name}`; the placeholder is required when present |
@@ -160,6 +164,33 @@ conforming, however useful it is.
   userinfo **MUST** be rejected or stripped before it is recorded.
 - It **MUST NOT** commit a governed repository into the workspace's own history.
   The root `.gitignore` **MUST** exclude every governed path.
+
+### 4.4 Requiring a version of the tool
+
+`version` states which file format this is. It does not state which commands
+exist, what they print, or what they refuse to write, and those are what a
+workspace comes to depend on: two tools reading the same `version: 1` may treat
+the same file differently.
+
+`requires.vat` is a constraint on the tool. It is space-separated comparison
+terms that **MUST** all hold, with the operators `>=`, `>`, `<=`, `<`, `=` — for
+example `">=0.3.0 <0.4.0"`. Caret and tilde ranges are not part of this format
+and an implementation **MUST** refuse them rather than ignore them: a constraint
+that cannot be parsed permits every version, which is worse than declaring none.
+
+An implementation **MUST** refuse to operate a workspace whose `requires.vat` it
+does not satisfy, and the refusal **MUST** name both the constraint and its own
+version. Where its own version cannot be read — a build carrying no stamp — it
+**MUST NOT** treat the constraint as violated: the requirement cannot be
+evaluated in either direction, and the workspace is no worse off than before the
+field was written.
+
+A prerelease sorts before the release it leads to: `0.3.0-rc1` does not satisfy
+`>=0.3.0`. Build metadata after `+` takes no part in the ordering.
+
+A tool too old to know this field refuses the manifest outright, because
+unknown keys are rejected. That is the same answer for a worse reason, and it is
+why the field is safe to add to version 1.
 
 ---
 

@@ -65,14 +65,41 @@ type Env struct {
 	// Yes answers confirmation prompts affirmatively. It exists for CI, and
 	// deliberately does not extend to destructive repository removal.
 	Yes bool
+	// ToolVersion is the version of vat this invocation reports itself as,
+	// injected so the requirement in vat.yaml is testable without building a
+	// stamped binary. Empty means the build's own version.
+	ToolVersion string
 }
 
 // Workspace opens the workspace this invocation applies to.
+//
+// A workspace that requires a vat this is not is refused here rather than in
+// each command, for the same reason a manifest written against a newer schema
+// is: every command past this point would otherwise act on a file whose rules
+// it does not implement. `vat --version` needs no workspace and still answers.
 func (e *Env) Workspace() (*workspace.Workspace, error) {
+	ws, err := e.open()
+	if err != nil {
+		return nil, err
+	}
+	if err := manifest.CheckToolVersion(ws.Manifest, e.version()); err != nil {
+		return nil, err
+	}
+	return ws, nil
+}
+
+func (e *Env) open() (*workspace.Workspace, error) {
 	if e.Root != "" {
 		return workspace.OpenAt(e.Root)
 	}
 	return workspace.Open(e.Cwd)
+}
+
+func (e *Env) version() string {
+	if e.ToolVersion != "" {
+		return e.ToolVersion
+	}
+	return version.Short()
 }
 
 // Command is one verb.
@@ -264,6 +291,11 @@ func dispatch(ctx context.Context, env *Env, command *Command, args []string, pa
 		if message := err.Error(); message != "" {
 			env.Printer.Hint("\n%s", message)
 		}
+		return ExitFindings
+	case errors.Is(err, manifest.ErrToolTooOld):
+		env.Printer.Errorf("%v", err)
+		env.Printer.ErrorHint(
+			"Upgrade vat, or change `requires.vat` in vat.yaml if the requirement is wrong.")
 		return ExitFindings
 	case errors.Is(err, workspace.ErrNoWorkspace), errors.Is(err, manifest.ErrNotFound):
 		env.Printer.Errorf("%v", err)

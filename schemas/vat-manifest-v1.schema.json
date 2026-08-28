@@ -13,6 +13,18 @@
       "minimum": 1,
       "maximum": 1
     },
+    "requires": {
+      "description": "What this workspace demands of the tool operating it, as opposed to `version`, which is what it demands of the reader of this file. A schema version does not pin command behaviour.",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "vat": {
+          "description": "Space-separated comparison terms that must all hold, e.g. \">=0.3.0 <0.4.0\". Operators are >=, >, <=, <, =. Caret and tilde ranges are not this format's and MUST be refused rather than ignored. A tool whose own version cannot be read MUST NOT treat the constraint as violated.",
+          "type": "string",
+          "pattern": "^\\s*(>=|<=|==|=|>|<)v?[0-9]+\\.[0-9]+\\.[0-9]+[0-9A-Za-z.+-]*(\\s+(>=|<=|==|=|>|<)v?[0-9]+\\.[0-9]+\\.[0-9]+[0-9A-Za-z.+-]*)*\\s*$"
+        }
+      }
+    },
     "workspace": {
       "type": "object",
       "required": ["name"],

@@ -69,8 +69,11 @@ func (r Role) Valid() bool {
 type Manifest struct {
 	Version   int       `yaml:"version" json:"version"`
 	Workspace Workspace `yaml:"workspace" json:"workspace"`
-	Policy    Policy    `yaml:"policy" json:"policy"`
-	Repos     []Repo    `yaml:"repos" json:"repos"`
+	// Requires is what this workspace demands of the tool operating it, as
+	// opposed to Version, which is what it demands of the reader of this file.
+	Requires Requires `yaml:"requires,omitempty" json:"requires,omitempty"`
+	Policy   Policy   `yaml:"policy" json:"policy"`
+	Repos    []Repo   `yaml:"repos" json:"repos"`
 }
 
 // Workspace holds identity and defaults that apply to every repository.

@@ -118,6 +118,12 @@ func Validate(m Manifest) error {
 	if strings.TrimSpace(m.Workspace.Name) == "" {
 		problems = append(problems, "workspace.name is required")
 	}
+	// Checked where it is written, not only on the machine whose version
+	// happens to fail it. A constraint nothing can parse allows every version,
+	// which is the one outcome this field must never have.
+	if _, err := ParseConstraint(m.Requires.Vat); err != nil {
+		problems = append(problems, fmt.Sprintf("requires.vat is not a version constraint: %v", err))
+	}
 	// A template without the placeholder is not a template: every repository
 	// created from it was handed the same origin, and two repositories sharing
 	// an upstream fetch and push over each other with nothing reporting it.

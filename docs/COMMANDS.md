@@ -13,6 +13,13 @@ Every command that prints a table also accepts `--json`.
 The distinction matters in CI: `1` means act on the findings, `2` means fix the
 pipeline.
 
+A workspace whose `requires.vat` this build does not satisfy is refused before
+the command runs, exiting `1` and naming both the constraint and the running
+version. See [MANIFEST.md](MANIFEST.md#requires); this applies to every command
+that opens a workspace, `vat doctor` included, for the same reason a manifest
+written against a newer schema is refused: a diagnosis produced by rules the
+file does not use is not a diagnosis.
+
 ## Global flags
 
 | Flag | Effect |

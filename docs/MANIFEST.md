@@ -80,6 +80,36 @@ repos:
 
 ---
 
+## `requires`
+
+```yaml
+requires:
+  vat: ">=0.3.0 <0.4.0"
+```
+
+| Key | Meaning |
+| --- | --- |
+| `vat` | version constraint on the tool operating this workspace; optional |
+
+`version: 1` says which file format this is. It does not say which commands
+exist or what they refuse to write, so a workspace whose layout depends on a
+behaviour — a projection left alone, a check that now fails — cannot express
+that with the schema version alone. `requires.vat` can.
+
+Space-separated comparison terms, all of which must hold: `>=`, `>`, `<=`, `<`,
+`=`. Caret and tilde ranges are refused rather than ignored, because a
+constraint nothing can parse permits every version. A prerelease sorts before
+its release, so `0.3.0-rc1` does not satisfy `>=0.3.0`.
+
+A vat that does not satisfy the constraint refuses to open the workspace at all,
+naming both versions — the same answer it gives to a manifest written against a
+newer schema, and for the same reason: every command past that point would be
+acting on rules it does not implement. A build whose own version cannot be read
+(`dev`, which is what `go build` produces) is not refused; the constraint cannot
+be evaluated either way.
+
+---
+
 ## `workspace`
 
 | Key | Meaning |
