@@ -198,6 +198,8 @@ func RuleNames() []string {
 		"brain/projection-unmanaged",
 		"brain/source-revision-drift",
 		"brain/source-repo-unknown",
+		"brain/source-external-governed",
+		ruleViewStale,
 		"changeset/open-too-long",
 		"changeset/invalid",
 		"changeset/closed-unlanded",
@@ -575,6 +577,10 @@ func checkBrain(ctx context.Context, ws *workspace.Workspace, opts Options, now 
 		})
 	}
 
+	// Before the offline gate: dating a file needs `git log`, which reads the
+	// clone and nothing else.
+	findings = append(findings, checkViews(ctx, root, ws.Manifest.Policy.Brain.ReviewSLADays)...)
+
 	if opts.Offline {
 		return findings, nil
 	}
@@ -599,10 +605,28 @@ func checkSourceRevisions(ctx context.Context, ws *workspace.Workspace, store *b
 			continue
 		}
 		repo, known := ws.Manifest.Find(repoName)
+		if record.SourceExternal {
+			// Declared as a system this workspace does not govern. Nothing here
+			// can resolve its revision, which is the point of saying so.
+			if known {
+				findings = append(findings, Finding{
+					Rule: "brain/source-external-governed", Severity: SeverityError, Subject: record.ID,
+					Message: fmt.Sprintf("source_external is set, but %q is governed by %s",
+						repoName, manifest.FileName),
+					Fix: "remove source_external, or point source_ref at the system that is actually external",
+				})
+			}
+			continue
+		}
 		if !known {
 			findings = append(findings, Finding{
 				Rule: "brain/source-repo-unknown", Severity: SeverityWarn, Subject: record.ID,
 				Message: fmt.Sprintf("source_ref names %q, which is not in %s", repoName, manifest.FileName),
+				// The remedy this rule used to leave unstated was the one people
+				// took: adding the system to the roster, which stops the warning
+				// by making the workspace claim to sync, diagnose, and ship a
+				// repository it does not own.
+				Fix: "set source_external: true if it is deliberately outside this workspace; enrol it only if the workspace really governs it",
 			})
 			continue
 		}

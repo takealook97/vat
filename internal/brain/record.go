@@ -197,6 +197,18 @@ type Metadata struct {
 	// read from. A revision, not a branch: a branch moves and takes the
 	// evidence with it.
 	SourceRef string `yaml:"source_ref,omitempty"`
+	// SourceExternal declares that SourceRef names a system this workspace does
+	// not govern, and deliberately so.
+	//
+	// Without it the only way to stop vat reporting an ungoverned source was to
+	// add that system to vat.yaml — which silences the warning by making the
+	// workspace claim to sync, diagnose, and ship a repository it does not own.
+	// A rule whose only remedy is the wrong action is worse than no rule.
+	//
+	// It suppresses nothing else. A claim about an external system still expires
+	// like any other; nothing here can re-read it for you, which is the reason
+	// to be explicit rather than quiet.
+	SourceExternal bool `yaml:"source_external,omitempty"`
 	// ObservedAt is the date the claim was last verified against its source.
 	ObservedAt string `yaml:"observed_at,omitempty"`
 	// RevalidateOn describes what should trigger a re-check.

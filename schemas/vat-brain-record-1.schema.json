@@ -26,6 +26,10 @@
       "type": "string",
       "pattern": "^[^@\\s]+@[^:\\s]+(?::.+)?$"
     },
+    "source_external": {
+      "description": "Declares that source_ref names a system this workspace does not govern, and deliberately so. Without it the only way to stop a tool reporting an ungoverned source is to enrol that system in the manifest, which silences the report by claiming to sync, diagnose, and ship a repository nobody owns. It suppresses nothing else: the claim still expires like any other. An implementation MUST refuse it when the named repository IS governed.",
+      "type": "boolean"
+    },
     "observed_at": { "type": "string" },
     "revalidate_on": { "type": "string" },
     "supersedes": { "type": "array", "items": { "type": "string" } },

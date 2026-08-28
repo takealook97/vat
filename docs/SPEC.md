@@ -337,6 +337,25 @@ Re-dating a record's `observed_at` is an assertion that somebody re-read the
 source. An implementation **MUST NOT** move `observed_at` forward automatically
 when the source revision has changed.
 
+### 5.5.1 Claims about systems the workspace does not govern
+
+`source_ref` names the repository a claim was read from, and a name the manifest
+does not govern **SHOULD** be reported: provenance pointing at nothing reads as
+verified.
+
+The report **MUST** name a remedy that does not widen the roster. Enrolling a
+system in the manifest to stop the report makes the workspace claim to sync,
+diagnose, and ship a repository nobody owns, and that is the action the report
+otherwise invites.
+
+`source_external: true` declares that the source is deliberately outside this
+workspace. An implementation **MUST NOT** report an ungoverned source for such a
+record, **MUST** refuse the field when the named repository *is* governed — it
+would exempt a checkable claim from every rule that makes it checkable — and
+**MUST** apply every other rule unchanged. A claim about an external system
+still expires: nothing here can re-read it, which is the reason to be explicit
+rather than quiet.
+
 ### 5.6.1 Extension keys
 
 A record's front matter **MAY** carry keys this specification does not define.

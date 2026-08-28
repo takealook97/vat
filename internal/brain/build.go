@@ -171,8 +171,7 @@ type canonicalView struct {
 // generated entry point. Atomic records answer which fact to open; these views
 // answer the wider questions vat's own scaffold creates them for, such as what
 // is running and what should happen next.
-func renderCanonicalViews(root string) string {
-	views := make([]canonicalView, 0, 7)
+func canonicalViewsPresent(root string) []canonicalView {
 	status := "STATUS.md"
 	if !fsx.Exists(filepath.Join(root, status)) && fsx.Exists(filepath.Join(root, "PORTFOLIO_STATUS.md")) {
 		status = "PORTFOLIO_STATUS.md"
@@ -186,11 +185,17 @@ func renderCanonicalViews(root string) string {
 		{label: "Reviewed observations", file: "MEMORY.md"},
 		{label: "Agent operating model", file: "AGENT_OPERATING_MODEL.md"},
 	}
+	views := make([]canonicalView, 0, len(candidates))
 	for _, candidate := range candidates {
 		if fsx.Exists(filepath.Join(root, candidate.file)) {
 			views = append(views, candidate)
 		}
 	}
+	return views
+}
+
+func renderCanonicalViews(root string) string {
+	views := canonicalViewsPresent(root)
 	if len(views) == 0 {
 		return ""
 	}

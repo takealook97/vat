@@ -616,6 +616,41 @@ a repair that destroys the thing it was pointed at is not one.
 
 ---
 
+## Claims about systems you do not govern
+
+A `source_ref` naming a repository outside `vat.yaml` is reported, because
+provenance pointing at nothing reads as verified. Do not silence it by enrolling
+the system: that stops the warning by making the workspace claim to sync,
+diagnose, and ship a repository it does not own, and widens `sync`, `doctor`,
+and every changeset with it.
+
+```yaml
+source_ref: hermes@abc1234
+source_external: true
+```
+
+Says it once. Nothing else is suppressed — the claim still expires on schedule,
+because nothing here can re-read it for you. Setting it for a repository the
+workspace *does* govern is an error: it would exempt a checkable claim from
+every rule that makes it checkable.
+
+---
+
+## Keeping the maintained views honest
+
+The generated index routes readers to `STATUS.md`, `ROADMAP.md`, `DECISIONS.md`
+and the rest. vat writes neither their content nor their judgements, so no
+schema rule reaches them — a repository can report zero findings while every
+document its own entry point recommends has gone months without being revisited.
+
+`brain/view-stale` reports a view the records left behind by more than
+`policy.brain.review_sla_days`. The window is not zero on purpose: every record
+change makes every view technically older, and a rule that fires on every commit
+is one people silence rather than act on. It judges dates, never content —
+whether a view is *correct* is not something a tool can say.
+
+---
+
 ## What the generated index shows
 
 `CURRENT.md` is bounded, so it ranks rather than lists. Two sections answer two
