@@ -53,6 +53,24 @@ vat doctor
 `--adopt` enrols what is already there, reading each repository's origin and
 current branch as they are. Nothing is moved or re-pointed.
 
+Two things worth setting once, at the start:
+
+```yaml
+requires:
+  vat: ">=0.4.0"            # the tool this workspace expects to be operated by
+
+workspace:
+  name: payments
+  vocabulary:
+    workspace: project      # if your company calls a bundle of repositories that
+```
+
+`requires.vat` refuses an older vat rather than letting it act on rules it does
+not implement. `vocabulary` renames the nouns in the generated contracts, so
+your people and your agents read your word rather than the tool's — the
+repository and directory names were always yours, and `vat repo rename` moves
+one later.
+
 Then correct what the guesses got wrong:
 
 ```yaml
@@ -136,12 +154,29 @@ there.
 No setup. On the next cross-repository change:
 
 ```bash
-vat changeset new "Move order cancellation to v2" --repos payments,console
+vat changeset new "Move order cancellation to v2" --repos .,payments,console
+git commit -m "chore: open CS-0001" changesets/
 # ... do the work ...
+vat changeset status CS-0001      # what still stands in the way
 vat changeset verify CS-0001
 vat ship CS-0001
 vat changeset close CS-0001 --acceptance "cancel-then-refund passes end to end"
 ```
+
+`.` is the workspace root itself. A contract change usually starts there — the
+manifest, a shared role, a generated region every repository reads — and a
+record naming only the products omits the revision that says what they were
+verified against. Give it checks of its own:
+
+```yaml
+workspace:
+  checks: [make check]
+```
+
+`status` is the preflight, and the first changeset needs it: verification
+refuses a dirty tree, adopting the harness dirtied every repository at once, and
+the record itself is written into the workspace root. It prints the commits
+needed, in order, and commits nothing.
 
 The value is not visible on the first one. It appears the first time someone
 asks "what did we ship together, and how do we get back?" and the answer takes
@@ -183,12 +218,38 @@ of unreviewed claims has no more authority than a wiki.
 ### Adopting an existing knowledge repository
 
 ```bash
+vat brain adopt cortex --plan     # what adoption would find, grouped
 vat brain adopt cortex
 vat brain check
 ```
 
 `vat` reads and reports; it never rewrites a record. Bring records up to schema
 in the order the review queue suggests, not all at once.
+
+Run `--plan` first on anything with history. It writes nothing at all — not the
+marker, not the manifest — and groups the work: how many records cannot be read,
+how many carry a lifecycle status this schema does not have, how many relations
+are one-sided, and which of those groups are mechanical. Two hundred findings
+read one file at a time tell you nothing about which conversions need a decision
+and which do not.
+
+Two things adoption will not do to a repository that predates vat:
+
+- It will not overwrite a `CURRENT.md` or `graph.json` it did not write. Those
+  are usually the most valuable files there. They are left exactly as found and
+  reported as `brain/projection-unmanaged`; move or delete the file when you are
+  ready to let vat own the name.
+- It will not move a dated tree under `memory/`. The plan names it as
+  journal-shaped — vat means a memory to be a reviewed observation worth citing
+  again, not a session log — and where that history belongs is your decision.
+
+A claim whose evidence lives outside this workspace says so once, rather than
+being silenced by enrolling a system nobody here governs:
+
+```yaml
+source_ref: hermes@abc1234
+source_external: true
+```
 
 ---
 

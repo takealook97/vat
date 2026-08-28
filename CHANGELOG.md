@@ -6,8 +6,19 @@ Notable changes to `vat`. The format follows
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-08-28
+
 ### Added
 
+- `workspace.vocabulary` renames the nouns vat uses in the documents people
+  read. A company that calls a bundle of repositories a "project" otherwise runs
+  two vocabularies in one team: its own, and the tool's. Display only — it never
+  reaches `role: brain`, the `policy.brain.*` keys, the name of a command, or a
+  field in `--json` output, because `vat.yaml` is a published format other tools
+  read by name. Omitting it renders exactly what omitting it rendered before.
+- `source_external: true` on a knowledge record declares that its source is
+  deliberately outside this workspace, so a claim about an external system can
+  stop being reported without enrolling that system in the roster.
 - `vat changeset status <id>` — the preflight. Verification refuses a dirty
   working tree on purpose, and adopting the harness dirties every governed
   repository at once, so a first changeset meets that refusal everywhere and the
@@ -48,6 +59,23 @@ Notable changes to `vat`. The format follows
 
 ### Fixed
 
+- `brain/source-repo-unknown` names a remedy that does not widen the roster. It
+  stated a problem and no remedy, so the remedy people found was to enrol the
+  system in `vat.yaml` — which stops the warning by making the workspace claim
+  to sync, diagnose, and ship a repository nobody owns. Declaring a governed
+  repository external is now an error in its own right.
+- `brain/view-stale` reports a maintained view the records left behind by more
+  than the review window. The generated index routes readers to `STATUS.md`,
+  `ROADMAP.md` and the rest, and nothing checked them: a repository could report
+  zero findings while every document its own entry point recommends had gone
+  months without a revisit.
+- Lock contention is recognised on Windows when the lock has already gone. Four
+  writers racing on the manifest had three fail with "Access is denied" for what
+  was an ordinary queue: a name in delete-pending state answers that to `stat`
+  as readily as to `open`, and stops existing entirely the moment the holder's
+  remove lands, so both states the rule was meant to recognise could present as
+  "the lock is not there". It now asks whether the directory takes a write at
+  all.
 - `vat repo rename` reaches everything that names the repository. It did not
   move `policy.brain.repo`, so renaming an adopted knowledge repository produced
   a manifest that failed its own validation — impossible to complete without
