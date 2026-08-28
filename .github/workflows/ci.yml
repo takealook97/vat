@@ -100,6 +100,31 @@ jobs:
             exit 1
           fi
 
+      # `go 1.25` in go.mod stops the compiler accepting newer *language*
+      # features. It does not stop a call to a stdlib function added after
+      # 1.25, so CI on `stable` compiled code that anyone building at the
+      # declared minimum could not — verified with `strings.CutLast`, which
+      # builds on 1.27 and does not exist in 1.25.
+      #
+      # The version is read from go.mod rather than written here twice, so
+      # raising the directive raises this with it.
+      - name: Build at the minimum toolchain go.mod declares
+        run: |
+          set -eu
+          declared=$(go mod edit -json | sed -n 's/.*"Go": "\([^"]*\)".*/\1/p')
+          case "$declared" in *.*.*) toolchain="go$declared" ;; *) toolchain="go$declared.0" ;; esac
+          echo "go.mod declares $declared; building with $toolchain"
+          GOTOOLCHAIN="$toolchain" go build ./...
+
+      # vat ships as prebuilt binaries, so a standard-library advisory is frozen
+      # inside every published archive: a user cannot upgrade their way out of
+      # it, they need a new release. govulncheck is call-graph aware, so it
+      # reports what is actually reachable rather than everything in the tree.
+      # Pinned to @latest on purpose — a vulnerability scanner wants the current
+      # tool and the current database, and it is a check, not a dependency.
+      - name: Check for known vulnerabilities
+        run: go run golang.org/x/vuln/cmd/govulncheck@latest ./...
+
       - name: Verify modules are tidy
         run: |
           go mod tidy

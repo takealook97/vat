@@ -113,6 +113,46 @@ jobs:
           sha256sum *.tar.gz *.zip *.cdx.json > checksums.txt
           cat checksums.txt
 
+      # Nothing here ran what it built. Five archives were packaged, checksummed,
+      # attested, and published without one of them being executed once, so a
+      # broken cross-compile or a renamed file inside the archive would publish
+      # green and be found by a user. The Homebrew formula installs by the paths
+      # below, so a rename there breaks `brew install` while the release still
+      # reports success.
+      #
+      # linux/amd64 is native to this runner, so it costs a few seconds. The
+      # other four cannot run here; this is one smoke test rather than none.
+      - name: Run what was built
+        working-directory: dist
+        run: |
+          set -eu
+          rm -rf smoke && mkdir smoke
+          tar -xzf vat_linux_amd64.tar.gz -C smoke
+          root="smoke/vat_linux_amd64"
+
+          # The layout the Homebrew formula's install block depends on.
+          for path in vat LICENSE README.md \
+                      completions/vat.bash completions/_vat completions/vat.fish; do
+            test -f "$root/$path" || { echo "archive is missing $path"; exit 1; }
+          done
+
+          # It runs, and it is the version this tag published.
+          reported=$("$root/vat" version)
+          echo "$reported"
+          case "$reported" in
+            *"${GITHUB_REF_NAME}"*) ;;
+            *) echo "binary reports \"$reported\", not ${GITHUB_REF_NAME}"; exit 1 ;;
+          esac
+
+          # And it does the one thing that writes, in a throwaway directory.
+          # An absolute path, so the check does not depend on where a shell
+          # happens to have left OLDPWD.
+          binary="$(pwd)/$root/vat"
+          work=$(mktemp -d)
+          (cd "$work" && git init --quiet . && "$binary" init --name smoke)
+          test -f "$work/vat.yaml" || { echo "vat init wrote no manifest"; exit 1; }
+          rm -rf smoke
+
       # Signed before publication, so nothing reaches the release page without a
       # statement of where it came from. The checksum file is a subject too: it
       # is the one artefact whose job is to describe the others, which makes an

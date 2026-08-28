@@ -6,6 +6,25 @@ Notable changes to `vat`. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- CI builds at the minimum toolchain `go.mod` declares. The `go` directive stops
+  the compiler accepting newer *language* features but not a call to a stdlib
+  function added later, so CI on `stable` compiled code that anyone building at
+  the declared minimum could not — verified with `strings.CutLast`, which builds
+  on 1.27 and does not exist in 1.25. The version is read from `go.mod`, so
+  raising the directive raises the check with it.
+- `govulncheck` in CI. vat ships as prebuilt binaries, so a standard-library
+  advisory is frozen inside every published archive: a user cannot upgrade their
+  way out of one, they need a new release.
+- The release workflow runs what it built. Five archives were packaged,
+  checksummed, attested, and published without one of them being executed once,
+  so a broken cross-compile or a renamed file inside the archive would publish
+  green and be found by a user — and the Homebrew formula installs by those
+  paths, so a rename there breaks `brew install` while the release still reports
+  success. linux/amd64 is native to the runner; the other four cannot run there,
+  so this is one smoke test rather than none.
+
 ### Removed
 
 - The Go Report Card badge. The service was sunset after a decade and its badge
