@@ -25,6 +25,23 @@ Notable changes to `vat`. The format follows
   success. linux/amd64 is native to the runner; the other four cannot run there,
   so this is one smoke test rather than none.
 
+### Changed
+
+- `docs-writer` runs on `sonnet` and `gpt-5.6-terra` rather than the top tier
+  both runtimes offer. All three of this repository's roles are read-only and
+  all three declared the most capable model available, which is a setting nobody
+  chose so much as never revisited. Keeping the documentation true to the code
+  is enforced mechanically here — the contract tests fail the build when a rule
+  table, a rule count, or a command reference falls out of step — so what is
+  left to the model is prose judgement, where a mistake is visible and cheap.
+  Reviewing Go against safety rules and deciding whether a convention can even
+  become a rule are not: there the judgement is the deliverable and a miss
+  ships, so those two stay at the top tier.
+- `docs-writer` gains `reasoning_effort: high`, which it lacked while declaring
+  the most capable model — a pair of settings that disagreed about how hard the
+  work is. Note that this reaches Codex only: the Claude adapter carries name,
+  description, and model, and nothing else.
+
 ### Removed
 
 - The Go Report Card badge. The service was sunset after a decade and its badge

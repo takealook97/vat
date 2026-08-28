@@ -3,8 +3,9 @@ name: docs-writer
 title: Documentation writer
 description: Keeps the documentation true to the code and free of restated obviousness.
 models:
-  claude: opus
-  codex: gpt-5.6-sol
+  claude: sonnet
+  codex: gpt-5.6-terra
+reasoning_effort: high
 reads: ["*"]
 runtimes: [claude, codex]
 ---
