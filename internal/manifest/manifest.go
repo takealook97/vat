@@ -90,11 +90,72 @@ type Workspace struct {
 	// Description is free text shown in the generated workspace harness.
 	Description string `yaml:"description,omitempty" json:"description,omitempty"`
 
+	// Vocabulary renames the nouns in generated prose, for an organisation that
+	// calls these things something else.
+	Vocabulary Vocabulary `yaml:"vocabulary,omitempty" json:"vocabulary,omitempty"`
+
 	// Checks are the canonical commands that prove the control plane itself is
 	// healthy. The workspace root is a repository too — it holds the manifest,
 	// the roles, and the contracts every governed repository reads — but it is
 	// not in `repos:` and cannot be, so its checks live here.
 	Checks []string `yaml:"checks,omitempty" json:"checks,omitempty"`
+}
+
+// Vocabulary renames the nouns vat uses in the documents people read.
+//
+// A company that calls a bundle of repositories a "project" and its knowledge
+// repository a "knowledge base" ends up with two vocabularies in one team: its
+// own, and the tool's. That is the same shape as two authorities for one fact,
+// which is what the knowledge layer exists to prevent.
+//
+// Display only, and deliberately narrow. It never reaches `role: brain`, the
+// `policy.brain.*` keys, the names of commands, or any field in --json output:
+// vat.yaml is a published format other tools read, so the machine-facing
+// vocabulary stays one vocabulary. What an organisation gets is its own word in
+// its own documents.
+type Vocabulary struct {
+	// Workspace is what to call a governed bundle of repositories.
+	Workspace string `yaml:"workspace,omitempty" json:"workspace,omitempty"`
+	// Brain is what to call the knowledge repository in prose. vat's generated
+	// documents never print the word "brain": they say "knowledge layer" and
+	// otherwise use the repository's own directory name, which is already the
+	// organisation's to choose. This renames the phrase, not the role.
+	Brain string `yaml:"brain,omitempty" json:"brain,omitempty"`
+}
+
+// WorkspaceNoun returns the word for a governed bundle of repositories.
+func (v Vocabulary) WorkspaceNoun() string { return nounOr(v.Workspace, "workspace") }
+
+// BrainNoun returns the phrase for the knowledge repository.
+func (v Vocabulary) BrainNoun() string { return nounOr(v.Brain, "knowledge layer") }
+
+func nounOr(value, fallback string) string {
+	if trimmed := strings.TrimSpace(value); trimmed != "" {
+		return trimmed
+	}
+	return fallback
+}
+
+// nounLimit is how long a replacement noun may be. It is rendered inside
+// sentences and table cells, and a paragraph pasted into this field produces a
+// contract nobody can read.
+const nounLimit = 40
+
+// ValidateNoun reports why a value cannot be a replacement noun.
+func ValidateNoun(field, value string) error {
+	if strings.TrimSpace(value) == "" {
+		return nil
+	}
+	if len(value) > nounLimit {
+		return fmt.Errorf("%s may not be longer than %d characters", field, nounLimit)
+	}
+	if strings.ContainsAny(value, "\n\r`|<>") {
+		// Backticks and pipes end a code span and a table cell; a newline ends
+		// the sentence it was substituted into. Each produces a generated
+		// document that is broken rather than renamed.
+		return fmt.Errorf("%s may not contain a newline, a backtick, a pipe, or an angle bracket", field)
+	}
+	return nil
 }
 
 // Policy is the machine-enforced half of the methodology. Anything expressed

@@ -41,6 +41,25 @@
           "pattern": "\\{name\\}"
         },
         "description": { "type": "string" },
+        "vocabulary": {
+          "description": "Renames the nouns a tool uses in the documents people read. Display only: it MUST NOT reach `role`, the `policy.brain.*` keys, the names of commands, or any field name in machine-readable output. vat.yaml is a published format other tools read by name, so the machine-facing vocabulary stays one vocabulary; what an organisation gets is its own word in its own documents.",
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "workspace": {
+              "description": "What to call a governed bundle of repositories. Default: workspace.",
+              "type": "string",
+              "maxLength": 40,
+              "pattern": "^[^\\n\\r`|<>]+$"
+            },
+            "brain": {
+              "description": "What to call the knowledge repository in prose. Default: knowledge layer.",
+              "type": "string",
+              "maxLength": 40,
+              "pattern": "^[^\\n\\r`|<>]+$"
+            }
+          }
+        },
         "checks": {
           "description": "Canonical commands that prove the control plane itself is healthy. The workspace root is a repository too, but it is not in `repos:` and cannot be, so its checks live here. Read when a changeset enrols the workspace as the participant named \".\".",
           "type": "array",

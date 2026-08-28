@@ -121,6 +121,14 @@ func Validate(m Manifest) error {
 	// Checked where it is written, not only on the machine whose version
 	// happens to fail it. A constraint nothing can parse allows every version,
 	// which is the one outcome this field must never have.
+	for field, value := range map[string]string{
+		"workspace.vocabulary.workspace": m.Workspace.Vocabulary.Workspace,
+		"workspace.vocabulary.brain":     m.Workspace.Vocabulary.Brain,
+	} {
+		if err := ValidateNoun(field, value); err != nil {
+			problems = append(problems, err.Error())
+		}
+	}
 	if _, err := ParseConstraint(m.Requires.Vat); err != nil {
 		problems = append(problems, fmt.Sprintf("requires.vat is not a version constraint: %v", err))
 	}

@@ -130,6 +130,7 @@ repos:
 | `workspace.default_branch` | yes | the branch used when a repository declares none |
 | `workspace.remote_template` | no | expands `{name}`; the placeholder is required when present |
 | `workspace.checks` | no | canonical commands proving the control plane itself is healthy (§6.5) |
+| `workspace.vocabulary` | no | renames the nouns in generated prose (§4.5) |
 | `repos[].name` | yes | unique; also the directory name unless `path` says otherwise |
 | `repos[].origin` | yes | the remote this repository is fetched from |
 | `repos[].role` | yes | one of §4.2 |
@@ -198,6 +199,41 @@ A tool too old to know this field refuses the manifest outright, because
 unknown keys are rejected. That is the same answer for a worse reason, and it is
 why the field is safe to add to version 1.
 
+
+### 4.5 Vocabulary
+
+An organisation that calls a governed bundle of repositories a "project", or its
+knowledge repository something other than a knowledge layer, ends up with two
+vocabularies in one team: its own and the tool's.
+
+`workspace.vocabulary` renames those nouns **in generated prose only**:
+
+```yaml
+workspace:
+  name: payments
+  vocabulary:
+    workspace: project        # default: workspace
+    brain: knowledge base     # default: knowledge layer
+```
+
+An implementation **MUST NOT** let these values reach `role`, the
+`policy.brain.*` keys, the name of any command, or any field name in
+machine-readable output. This file is a published format that other tools read
+by name; a role or a key that means something different per organisation is a
+format that has forked. What an organisation gets is its own word in its own
+documents.
+
+A value **MUST** be a single line and **MUST NOT** contain a backtick, a pipe,
+or an angle bracket: each ends a code span, a table cell, or a tag in the
+documents these nouns are substituted into, producing a contract that is broken
+rather than renamed.
+
+Omitting the field **MUST** produce exactly what omitting it produced before it
+existed. A default that renders differently would report generated-region drift
+in every workspace on upgrade.
+
+Repository and directory names are not vocabulary: they are already the
+organisation's to choose, and `vat repo rename` moves one after the fact.
 ---
 
 ## 5. The knowledge layer — schema 1
