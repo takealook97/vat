@@ -97,8 +97,22 @@ later run would undo a removal somebody meant.
 Commit the workspace repository and push it. That is what makes the workspace
 reproducible: a colleague runs `git clone` and then `vat sync`, and every
 repository the manifest names is cloned onto their machine, on the branch it
-records, with the contracts already in place. `vat doctor` tells them what their
-machine is missing before they find out the slow way.
+records, with the contracts already in place — including the ones written for
+a runtime they do not use, because the adapters are generated from one body
+rather than copied. `vat doctor` tells them what their machine is missing
+before they find out the slow way.
+
+```console
+$ git clone git@github.com:acme/workspace.git ~/work && cd ~/work
+$ vat sync
+REPOSITORY  STATE   BRANCH  REV      DETAIL
+brain       CLONED  main    9af189c
+console     CLONED  main    772418c
+docs        CLONED  main    1e5b9a0
+payments    CLONED  main    3bebc3c
+
+4 advanced · 0 already current · 0 left alone on purpose · 0 need attention
+```
 
 Replace whatever loop you were using with `vat sync`. That alone stops the
 category of accident where an update destroys uncommitted work.
