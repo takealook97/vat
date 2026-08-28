@@ -6,6 +6,19 @@ Notable changes to `vat`. The format follows
 
 ## [Unreleased]
 
+## [0.4.2] - 2026-08-28
+
+No change to what the program does. `internal/gitx` gained two functions in
+0.4.0 and 0.4.1 that were exercised only from the packages calling them, so the
+package's own coverage fell below the floor this project enforces and the tree
+v0.4.1 was tagged on does not pass `make cover`. The tests are direct now, and
+this is the version whose tree passes every gate.
+
+The branch worth having tested: git answers "no common ancestor" by exiting
+non-zero with nothing on stderr, and reading that as a failure would turn the
+answer into an error — which is what `vat sync` depends on to tell a rewritten
+upstream from an ordinary divergence.
+
 ## [0.4.1] - 2026-08-28
 
 ### Fixed
