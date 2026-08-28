@@ -133,6 +133,28 @@ repositories:
     landed_at: 2026-08-14
 ```
 
+## The control plane is a participant
+
+```console
+$ vat changeset new "Move order cancellation to v2" --repos .,payments,console
+```
+
+`.` is the workspace root. It holds `vat.yaml`, the roles, the skills, and the
+generated regions every governed repository reads, so a contract change usually
+starts there — and a record naming only the products leaves out the revision
+that describes what the others were verified against. That is the revision a
+rollback needs most.
+
+It is verified by `workspace.checks` in `vat.yaml`, since the root is not in
+`repos:` and cannot be, and `vat ship` judges its landing against
+`origin/<default_branch>` like any other participant. Declaring no checks makes
+it unverifiable rather than verified, which is the rule for everything else too.
+
+One consequence worth knowing before you meet it: the record is written under
+`changesets/` in that same root, so creating it dirties the tree its own checks
+are about to describe. Commit the record, then verify — the discipline every
+participant is held to, arriving one step earlier.
+
 `revision` is what the checks ran on. `landed_on` is where that revision was
 later observed. Keeping them apart is the whole point: one is "we proved it",
 the other is "it reached everyone", and collapsing them is how a workspace ends

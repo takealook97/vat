@@ -534,7 +534,19 @@ which is the same reason `--acceptance` may not be empty when closing.
 `new` and `add` record where each repository stands before the change begins,
 because after it lands that can no longer be observed. `add` refuses once the
 changeset is closed or abandoned: enrolling a repository afterwards rewrites the
-one claim the record exists to make.
+one claim the record exists to make. A repository with no commits is refused
+too: the return point is the one field enrolment exists to capture.
+
+The workspace root is enrolled as `.`, and it is the only name that resolves
+outside `repos:`. A contract change usually starts in the control plane — the
+manifest, a role, a generated region every repository reads — and recording the
+products without it left the one revision nothing could roll back to out of the
+record. It is verified by `workspace.checks` in vat.yaml, and `vat ship` judges
+its landing against the same `origin/<default_branch>` as any other participant.
+
+Because the record itself is written under `changesets/` in the workspace root,
+enrolling `.` means committing the record before `verify` — the same rule every
+other participant is held to, arriving one step earlier.
 
 `verify` runs each repository's canonical checks and records the outcome against
 the exact revision it ran on. Four conditions stop a repository being entered at

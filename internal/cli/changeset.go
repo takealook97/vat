@@ -119,17 +119,23 @@ func runChangesetNew(ctx context.Context, env *Env, args []string) error {
 // enrol records where a repository stands before the change begins. Captured
 // now because after the change lands it can no longer be observed.
 func enrol(ctx context.Context, ws *workspace.Workspace, name string) (changeset.Participant, error) {
-	repo, ok := ws.Manifest.Find(name)
+	target, ok := resolveParticipant(ws, name)
 	if !ok {
-		return changeset.Participant{}, usageErrorf("%q is not in %s", name, manifest.FileName)
+		return changeset.Participant{}, usageErrorf(
+			"%q is not in %s; the workspace root itself is %q",
+			name, manifest.FileName, changeset.WorkspaceParticipant)
 	}
-	dir := ws.RepoPath(repo)
+	dir := target.Dir
 	if !gitx.IsRepository(dir) {
 		return changeset.Participant{}, usageErrorf("%s is not cloned", name)
 	}
 	revision, err := gitx.HeadRevision(ctx, dir)
 	if err != nil {
-		return changeset.Participant{}, err
+		// A repository with no commits has no revision to return to, and the
+		// rollback point is the one field enrolment exists to capture. Git says
+		// this as "ambiguous argument 'HEAD'", which reads as a bug in vat.
+		return changeset.Participant{}, usageErrorf(
+			"%s has no commits yet, so there is no revision to return to; commit first", name)
 	}
 	branch, _ := gitx.CurrentBranch(ctx, dir)
 	return changeset.Participant{Name: name, RollbackPoint: revision, Branch: branch}, nil

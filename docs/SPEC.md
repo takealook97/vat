@@ -129,6 +129,7 @@ repos:
 | `workspace.name` | yes | identifies the workspace |
 | `workspace.default_branch` | yes | the branch used when a repository declares none |
 | `workspace.remote_template` | no | expands `{name}`; the placeholder is required when present |
+| `workspace.checks` | no | canonical commands proving the control plane itself is healthy (§6.5) |
 | `repos[].name` | yes | unique; also the directory name unless `path` says otherwise |
 | `repos[].origin` | yes | the remote this repository is fetched from |
 | `repos[].role` | yes | one of §4.2 |
@@ -431,6 +432,29 @@ the change completes: after the change lands it can no longer be observed.
 
 A generated return plan **MUST** be ordered in reverse enrolment order, so no
 window exists in which a consumer expects an interface that is already gone.
+
+### 6.5 The control plane as a participant
+
+`repositories[].name` names a repository in the manifest, with one exception:
+the name `.` denotes the workspace root itself.
+
+A contract change usually begins in the control plane — the manifest, a shared
+role, a generated region every repository reads — and a record naming only the
+products omits the revision that describes what the others were verified
+against. That is the one revision a rollback most needs.
+
+The workspace root cannot appear in `repos:`, so an implementation supporting
+this **MUST** read its checks from `workspace.checks` and **MUST** treat
+`workspace.default_branch` as the branch it ships from. Every other unresolvable
+name **MUST** stay an error: `.` is the exception, not a general escape, and the
+manifest already refuses a repository name beginning with `.` so the two cannot
+collide.
+
+An implementation **MUST NOT** treat the workspace as verified because it
+declares no checks — the same rule §6.1 states for any participant. The record
+lives under `changesets/` in that same root, so writing it dirties the tree the
+checks describe; the record **MUST** be committed before the workspace can be
+verified, exactly as for any other participant.
 
 ---
 

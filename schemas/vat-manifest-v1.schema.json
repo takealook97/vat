@@ -40,7 +40,12 @@
           "type": "string",
           "pattern": "\\{name\\}"
         },
-        "description": { "type": "string" }
+        "description": { "type": "string" },
+        "checks": {
+          "description": "Canonical commands that prove the control plane itself is healthy. The workspace root is a repository too, but it is not in `repos:` and cannot be, so its checks live here. Read when a changeset enrols the workspace as the participant named \".\".",
+          "type": "array",
+          "items": { "type": "string" }
+        }
       }
     },
     "policy": {

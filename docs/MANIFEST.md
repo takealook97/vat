@@ -118,6 +118,13 @@ be evaluated either way.
 | `default_branch` | the branch `sync` fast-forwards when a repository does not declare its own |
 | `remote_template` | expands `{name}` into an origin URL for `vat repo new`; the placeholder is required |
 | `description` | rendered into the workspace contract |
+| `checks` | the canonical commands that prove the control plane itself is healthy |
+
+`checks` here is the workspace's own, not a default for `repos[]`. The workspace
+root is a repository too — it holds this file, the roles, the skills, and the
+generated contracts every governed repository reads — but it is not in `repos:`
+and cannot be. A changeset enrols it as the participant named `.`, and these are
+the commands `vat changeset verify` runs against it.
 
 ---
 

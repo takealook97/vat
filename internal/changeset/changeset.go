@@ -58,8 +58,20 @@ type CheckRun struct {
 // Passed reports whether the check succeeded.
 func (c CheckRun) Passed() bool { return c.Status == "pass" }
 
+// WorkspaceParticipant is the name the workspace root answers to.
+//
+// The control plane is a repository too: it holds the manifest, the roles, the
+// skills, and the generated contracts every governed repository reads. A
+// contract change that spans it and two products used to be recordable only in
+// part, and the revision nothing could roll back to was the one describing what
+// the others were verified against. It cannot collide with a repository name,
+// because a name beginning with "." is refused by the manifest.
+const WorkspaceParticipant = "."
+
 // Participant is one repository's part in the change.
 type Participant struct {
+	// Name is a repository in the manifest, or WorkspaceParticipant for the
+	// workspace root itself.
 	Name string `yaml:"name" json:"name"`
 	// RollbackPoint is the revision before the change began. Recorded at
 	// enrolment, because after the change lands it can no longer be observed.

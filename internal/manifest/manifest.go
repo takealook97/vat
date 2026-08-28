@@ -89,6 +89,12 @@ type Workspace struct {
 	RemoteTemplate string `yaml:"remote_template,omitempty" json:"remote_template,omitempty"`
 	// Description is free text shown in the generated workspace harness.
 	Description string `yaml:"description,omitempty" json:"description,omitempty"`
+
+	// Checks are the canonical commands that prove the control plane itself is
+	// healthy. The workspace root is a repository too — it holds the manifest,
+	// the roles, and the contracts every governed repository reads — but it is
+	// not in `repos:` and cannot be, so its checks live here.
+	Checks []string `yaml:"checks,omitempty" json:"checks,omitempty"`
 }
 
 // Policy is the machine-enforced half of the methodology. Anything expressed
