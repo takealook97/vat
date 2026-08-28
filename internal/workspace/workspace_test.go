@@ -6,6 +6,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"sync"
 	"testing"
@@ -238,8 +239,12 @@ func TestALockSomebodyIsHoldingIsWaitedOnAndThenReported(t *testing.T) {
 // turned an ordinary race between two vat commands into "Access is denied",
 // which names nothing a person can act on and stopped the write entirely.
 //
-// The rule is decided by whether the lock is there, so it is the same answer on
-// every platform rather than a branch nobody can test from the other one.
+// Deciding on the lock file's presence was the first attempt and was not
+// enough: a name in delete-pending state answers "access denied" to stat as
+// readily as to open, and it stops existing the moment the holder's Remove
+// lands — so pure contention can present as "the lock is not there". The rule
+// is now whether the directory takes a write at all, which is the same question
+// on every platform rather than a branch nobody can test from the other one.
 func TestContentionIsDecidedByTheLockBeingThereNotByTheErrno(t *testing.T) {
 	// Arrange
 	dir := t.TempDir()
@@ -257,7 +262,9 @@ func TestContentionIsDecidedByTheLockBeingThereNotByTheErrno(t *testing.T) {
 	}{
 		{"exists, which is what POSIX reports", fs.ErrExist, present, true},
 		{"permission denied while the lock is there", fs.ErrPermission, present, true},
-		{"permission denied and no lock: a real problem", fs.ErrPermission, absent, false},
+		// The holder released the lock between the failed open and this
+		// question. Nothing is wrong; the next attempt takes it.
+		{"permission denied, no lock, and the directory takes writes", fs.ErrPermission, absent, true},
 		{"any other failure", errors.New("disk on fire"), present, false},
 	}
 
@@ -271,5 +278,37 @@ func TestContentionIsDecidedByTheLockBeingThereNotByTheErrno(t *testing.T) {
 				t.Errorf("IsLockContention(%v) = %v, want %v", tc.err, got, tc.want)
 			}
 		})
+	}
+}
+
+func TestAPermissionProblemStaysAPermissionProblem(t *testing.T) {
+	// Arrange: a directory that cannot be written at all is not a lock somebody
+	// else holds, and reporting it as one would send the reader looking for a
+	// command that is not running.
+	if runtime.GOOS == "windows" {
+		// A directory mode does not deny a write there, so the arrangement this
+		// test needs cannot be built. The case it guards is POSIX-shaped
+		// anyway: Windows reaches this path through delete-pending, which the
+		// test above covers on every platform.
+		t.Skip("directory modes do not deny writes on Windows")
+	}
+	if os.Getuid() == 0 {
+		t.Skip("root writes to a directory regardless of its mode")
+	}
+	dir := t.TempDir()
+	sealed := filepath.Join(dir, "sealed")
+	if err := os.Mkdir(sealed, 0o500); err != nil {
+		t.Fatalf("mkdir: %v", err)
+	}
+	t.Cleanup(func() { _ = os.Chmod(sealed, 0o700) })
+	path := filepath.Join(sealed, "manifest.lock")
+
+	// Act
+	contention := workspace.IsLockContention(
+		&fs.PathError{Op: "open", Path: path, Err: fs.ErrPermission}, path)
+
+	// Assert
+	if contention {
+		t.Error("an unwritable directory was reported as a lock somebody else holds")
 	}
 }
