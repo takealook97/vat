@@ -57,6 +57,10 @@
       "additionalProperties": false,
       "properties": {
         "name": { "type": "string", "minLength": 1 },
+        "unverifiable": {
+          "description": "Why no check ran, when none did. An empty `checks` list means two different things — not verified yet, and nothing here can be verified — and a completion record MUST be able to say which. A tool MUST NOT read this as a pass.",
+          "type": "string"
+        },
         "rollback_point": {
           "description": "The revision to return to. Recorded before the change, because afterwards nobody can tell which commit was the last good one.",
           "type": "string"
@@ -83,7 +87,11 @@
         "status": { "type": "string" },
         "ran_at": { "type": "string" },
         "revision": { "type": "string" },
-        "detail": { "type": "string" }
+        "detail": { "type": "string" },
+        "output": {
+          "description": "Bounded tail of what a failing check printed, kept so the record can explain a failure and not merely assert it. Recorded for a failure only. Cut from the front, marked with `[earlier output omitted]` when anything was dropped, and redacted for credentials like every other captured string.",
+          "type": "string"
+        }
       }
     }
   }

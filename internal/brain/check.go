@@ -20,6 +20,11 @@ const (
 	SeverityWarn Severity = "warn"
 )
 
+// ruleClaimSource is named because it is reported from two places and listed in
+// two more, and a rule name that drifts between them is a rule `--only` cannot
+// select.
+const ruleClaimSource = "brain/claim-source"
+
 // Finding is one rule violation.
 type Finding struct {
 	Rule     string   `json:"rule"`
@@ -67,7 +72,7 @@ func RuleNames() []string {
 	return []string{
 		"brain/claim-observed",
 		"brain/claim-owner",
-		"brain/claim-source",
+		ruleClaimSource,
 		"brain/claim-source-branch",
 		"brain/claim-stale",
 		"brain/date-unreadable",
@@ -238,12 +243,12 @@ func checkProvenance(store *Store, policy CheckPolicy, now time.Time) []Finding 
 		}
 		if strings.TrimSpace(record.SourceRef) == "" {
 			findings = append(findings, Finding{
-				Rule: "brain/claim-source", Severity: SeverityError, Path: record.Path, ID: record.ID,
+				Rule: ruleClaimSource, Severity: SeverityError, Path: record.Path, ID: record.ID,
 				Message: "a current-state claim must record source_ref as <repo>@<revision>[:<path>]",
 			})
 		} else if _, revision, _, ok := record.SourceParts(); !ok {
 			findings = append(findings, Finding{
-				Rule: "brain/claim-source", Severity: SeverityError, Path: record.Path, ID: record.ID,
+				Rule: ruleClaimSource, Severity: SeverityError, Path: record.Path, ID: record.ID,
 				Message: fmt.Sprintf("source_ref %q is not <repo>@<revision>[:<path>]", record.SourceRef),
 			})
 		} else if isBranchName(revision) {
