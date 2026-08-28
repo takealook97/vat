@@ -6,6 +6,8 @@ Notable changes to `vat`. The format follows
 
 ## [Unreleased]
 
+## [0.2.1] - 2026-08-28
+
 ### Fixed
 
 - `reasoning_effort` reaches the Claude adapter. It was written to Codex as
