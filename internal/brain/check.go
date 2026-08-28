@@ -453,11 +453,12 @@ func checkReviewQueue(store *Store, policy CheckPolicy, now time.Time) []Finding
 			//
 			// brain/claim-observed already reports this for a current-state
 			// claim, and says something more specific, so it keeps that case.
-			if !record.IsCurrentStateClaim() {
+			date := firstNonEmpty(record.ObservedAt, record.Date)
+			if !record.IsCurrentStateClaim() && date != "" {
 				findings = append(findings, Finding{
 					Rule: "brain/date-unreadable", Severity: SeverityWarn, Path: record.Path, ID: record.ID,
 					Message: fmt.Sprintf("date %q cannot be read, so no staleness rule can judge this record; write it as YYYY-MM-DD",
-						firstNonEmpty(record.ObservedAt, record.Date)),
+						date),
 				})
 			}
 			continue

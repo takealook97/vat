@@ -835,6 +835,31 @@ func TestARecordWhoseDateCannotBeReadIsReported(t *testing.T) {
 	}
 }
 
+// Date is optional in schema 1. Absence cannot be called unreadable: doing so
+// makes every adopted intent record look malformed even though the published
+// format deliberately permits it. Review age is simply unknown until a date is
+// supplied.
+func TestARecordWithNoOptionalDateIsNotReportedAsUnreadable(t *testing.T) {
+	// Arrange
+	root := newStore(t)
+	path := filepath.Join(root, "goals", "O-0001-undated.md")
+	if err := os.WriteFile(path,
+		[]byte("---\nid: O-0001\nstatus: provisional\nclaim_kind: intent\n---\n\n# O-0001 — Undated intent\n"),
+		0o644); err != nil {
+		t.Fatalf("write: %v", err)
+	}
+
+	// Act
+	findings := Check(mustLoad(t, root), defaultPolicy(), longAfter)
+
+	// Assert
+	for _, finding := range findings {
+		if finding.Rule == "brain/date-unreadable" && finding.ID == "O-0001" {
+			t.Errorf("an optional absent date was called unreadable: %+v", finding)
+		}
+	}
+}
+
 // A record whose date reads fine must not be reported, or the rule fires on
 // every workspace and gets turned off.
 func TestARecordWithAReadableDateIsNotReported(t *testing.T) {

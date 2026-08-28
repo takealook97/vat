@@ -133,6 +133,7 @@ func RenderCurrent(store *Store, now time.Time) string {
 
 	b.WriteString(renderCounts(store))
 	b.WriteString("\n")
+	b.WriteString(renderCanonicalViews(store.Root))
 	b.WriteString(renderSection(store, KindGoal, "Goals", "GOAL.md", func(r Record) bool {
 		return !r.Status.Terminal()
 	}))
@@ -153,6 +154,50 @@ func RenderCurrent(store *Store, now time.Time) string {
 	b.WriteString("   it. A record states when it was last observed, not that it is still true.\n")
 	b.WriteString("4. Open `history/`, `archive/`, and long-form analysis only when asked for\n")
 	b.WriteString("   past reasoning.\n")
+	return b.String()
+}
+
+type canonicalView struct {
+	label string
+	file  string
+}
+
+// renderCanonicalViews keeps maintained synthesis documents reachable from the
+// generated entry point. Atomic records answer which fact to open; these views
+// answer the wider questions vat's own scaffold creates them for, such as what
+// is running and what should happen next.
+func renderCanonicalViews(root string) string {
+	views := make([]canonicalView, 0, 7)
+	status := "STATUS.md"
+	if !fsx.Exists(filepath.Join(root, status)) && fsx.Exists(filepath.Join(root, "PORTFOLIO_STATUS.md")) {
+		status = "PORTFOLIO_STATUS.md"
+	}
+	candidates := []canonicalView{
+		{label: "Current state", file: status},
+		{label: "Goals and acceptance criteria", file: "GOAL.md"},
+		{label: "Distance from the goals", file: "GAP_ANALYSIS.md"},
+		{label: "Execution order", file: "ROADMAP.md"},
+		{label: "Decisions", file: "DECISIONS.md"},
+		{label: "Reviewed observations", file: "MEMORY.md"},
+		{label: "Agent operating model", file: "AGENT_OPERATING_MODEL.md"},
+	}
+	for _, candidate := range candidates {
+		if fsx.Exists(filepath.Join(root, candidate.file)) {
+			views = append(views, candidate)
+		}
+	}
+	if len(views) == 0 {
+		return ""
+	}
+
+	var b strings.Builder
+	b.WriteString("## Canonical views\n\n")
+	b.WriteString("| Question | Maintained view |\n")
+	b.WriteString("| --- | --- |\n")
+	for _, view := range views {
+		fmt.Fprintf(&b, "| %s | [%s](%s) |\n", view.label, view.label, view.file)
+	}
+	b.WriteString("\n")
 	return b.String()
 }
 

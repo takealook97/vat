@@ -68,6 +68,11 @@ as soon as it is committed.
 | workspace | repository roster with roles and ownership; the pre-edit routine; precedence order; trust tiers; gates; the command list |
 | repository | write boundary; default branch; canonical checks; how to reach the knowledge layer; the trust restatement |
 
+The brain repository identifies itself as the knowledge layer instead of
+routing to `../<itself>` and forbidding writes there. Other repositories receive
+the relative pointer and the reminder that reading it is not permission to edit
+it.
+
 Anything a repository knows about itself stays outside the region, owned by the
 repository.
 

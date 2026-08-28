@@ -369,6 +369,11 @@ vat harness adopt [--apply]
 `render` writes the generated region of every `AGENTS.md` and every runtime
 adapter. Content outside a generated region is never touched.
 
+Repository regions point to the workspace's brain for wider context. The brain
+repository instead identifies itself as that layer; it never emits a circular
+`../<brain>` pointer or tells a session not to write to the repository whose
+working permit it is reading.
+
 A repository's `AGENTS.md` belongs in that repository's history: it is the
 contract a session opened inside it reads, and it only travels with the clone
 once it is committed. vat writes it and commits nothing, so every command that
@@ -485,6 +490,12 @@ it is typically the most valuable file in it. Such a file is reported as left
 alone and kept exactly as it was found; `vat lint` reports the same state as
 `brain/projection-unmanaged`, whose remedy is to move or delete the file, not to
 run a build that will not touch it.
+
+The generated `CURRENT.md` also routes to each maintained root view that exists:
+current state, goals, gaps, execution order, decisions, reviewed observations,
+and the agent operating model. `STATUS.md` is the standard current-state name;
+an adopted brain that already uses `PORTFOLIO_STATUS.md` keeps that name and is
+routed there when `STATUS.md` is absent.
 
 Every `vat brain` command refuses a repository that has no marker, naming
 `vat brain init` and `vat brain adopt`. Without that refusal `vat brain build`
