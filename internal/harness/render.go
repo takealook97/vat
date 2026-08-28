@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"sort"
 	"strings"
+	"unicode"
 
 	"github.com/takealook97/vat/internal/manifest"
 )
@@ -19,11 +20,12 @@ import (
 func RenderWorkspace(m manifest.Manifest) string {
 	var b strings.Builder
 
-	b.WriteString("## Workspace\n\n")
+	nouns := m.Workspace.Vocabulary
+	fmt.Fprintf(&b, "## %s\n\n", capitalise(nouns.WorkspaceNoun()))
 	if m.Workspace.Description != "" {
 		b.WriteString(m.Workspace.Description + "\n\n")
 	}
-	b.WriteString("This directory is a `vat` workspace: independent git repositories cloned\n")
+	fmt.Fprintf(&b, "This directory is a `vat` %s: independent git repositories cloned\n", nouns.WorkspaceNoun())
 	b.WriteString("side by side under one root. The root repository tracks the manifest that\n")
 	b.WriteString("governs them and nothing of their trees.\n\n")
 	b.WriteString("Being able to read every repository is not permission to write to every\n")
@@ -110,6 +112,7 @@ func defaultOwnership(role manifest.Role) string {
 }
 
 func renderRouting(m manifest.Manifest) string {
+	nouns := m.Workspace.Vocabulary
 	var b strings.Builder
 	b.WriteString("### Before editing anything\n\n")
 	b.WriteString("1. Classify the request: organisation-wide judgement, or work inside one repository.\n")
@@ -130,7 +133,7 @@ func renderRouting(m manifest.Manifest) string {
 	// budget; a procedure copied into it is both a second copy to drift and a
 	// paragraph every session pays for whether or not the job ever comes up.
 	b.WriteString("\n")
-	b.WriteString("This file states what is true of the workspace. A procedure that applies\n")
+	fmt.Fprintf(&b, "This file states what is true of the %s. A procedure that applies\n", nouns.WorkspaceNoun())
 	b.WriteString("only sometimes — how a release is cut, what has to change together when a\n")
 	fmt.Fprintf(&b, "contract does — belongs in `%s/`. Read one when its job comes\n", SkillsDir)
 	b.WriteString("up; `vat harness skills` lists them.\n")
@@ -230,13 +233,14 @@ func renderCommands(m manifest.Manifest) string {
 func RenderRepo(m manifest.Manifest, repo manifest.Repo) string {
 	var b strings.Builder
 
-	b.WriteString("## Workspace context\n\n")
-	fmt.Fprintf(&b, "`%s` is one repository in the `%s` workspace, governed by `vat`.\n\n",
-		repo.Name, m.Workspace.Name)
+	nouns := m.Workspace.Vocabulary
+	fmt.Fprintf(&b, "## %s context\n\n", capitalise(nouns.WorkspaceNoun()))
+	fmt.Fprintf(&b, "`%s` is one repository in the `%s` %s, governed by `vat`.\n\n",
+		repo.Name, m.Workspace.Name, nouns.WorkspaceNoun())
 
 	b.WriteString("### Boundary\n\n")
 	fmt.Fprintf(&b, "- Write only inside `%s`.\n", repo.Dir())
-	b.WriteString("- Other repositories in this workspace are readable so you can compare\n")
+	fmt.Fprintf(&b, "- Other repositories in this %s are readable so you can compare\n", nouns.WorkspaceNoun())
 	b.WriteString("  contracts. Reading them is not permission to edit them; name the file that\n")
 	b.WriteString("  needs to change and stop there.\n")
 	fmt.Fprintf(&b, "- Default branch: `%s`.\n", repo.Branch(m.Workspace.DefaultBranch))
@@ -266,7 +270,7 @@ func RenderRepo(m manifest.Manifest, repo manifest.Repo) string {
 	b.WriteString("### Reaching wider context\n\n")
 	if brain, ok := m.BrainRepo(); ok {
 		if repo.Name == brain.Name {
-			b.WriteString("This repository is the organisation-wide knowledge layer. Start with\n")
+			fmt.Fprintf(&b, "This repository is the organisation-wide %s. Start with\n", nouns.BrainNoun())
 			b.WriteString("`vat brain query <terms>`, then open only the records it names. Do not\n")
 			b.WriteString("read the whole repository to answer one question.\n\n")
 		} else {
@@ -307,4 +311,16 @@ func RepoNames(m manifest.Manifest) []string {
 func tableCell(value string) string {
 	escaped := strings.ReplaceAll(value, "|", `\|`)
 	return strings.Join(strings.Fields(escaped), " ")
+}
+
+// capitalise raises the first letter of a heading noun. The nouns are written
+// as they appear mid-sentence, and a heading that reads "## project" beside
+// every other capitalised heading looks like a defect in the generator.
+func capitalise(noun string) string {
+	if noun == "" {
+		return noun
+	}
+	runes := []rune(noun)
+	runes[0] = unicode.ToUpper(runes[0])
+	return string(runes)
 }

@@ -121,6 +121,34 @@ be evaluated either way.
 | `remote_template` | expands `{name}` into an origin URL for `vat repo new`; the placeholder is required |
 | `description` | rendered into the workspace contract |
 | `checks` | the canonical commands that prove the control plane itself is healthy |
+| `vocabulary` | renames the nouns vat uses in generated prose |
+
+### `vocabulary`
+
+```yaml
+workspace:
+  name: payments
+  vocabulary:
+    workspace: project        # default: workspace
+    brain: knowledge base     # default: knowledge layer
+```
+
+A company that calls a bundle of repositories a "project" otherwise runs two
+vocabularies in one team: its own, and the tool's. These nouns are substituted
+into the generated contracts — `AGENTS.md` and the runtime adapters — which is
+what its people and its agents actually read.
+
+Display only. It never reaches `role: brain`, the `policy.brain.*` keys, the
+name of a command, or a field in `--json` output. `vat.yaml` is a published
+format other tools read by name, and a role that means something different per
+organisation is a format that has forked.
+
+Repository and directory names are not vocabulary: those are already yours, and
+`vat repo rename` moves one after the fact. Changing a noun later is the same —
+edit it, and `vat lint` reports the generated regions as drift until
+`vat lint --fix` or `vat harness render` rewrites them.
+
+---
 
 `checks` here is the workspace's own, not a default for `repos[]`. The workspace
 root is a repository too — it holds this file, the roles, the skills, and the
