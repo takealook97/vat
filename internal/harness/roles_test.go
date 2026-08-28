@@ -273,3 +273,56 @@ func TestAModelNameIsEscapedIntoTheHeaderToo(t *testing.T) {
 		t.Errorf("model round-tripped as %q", parsed.Model)
 	}
 }
+
+// A role declaring reasoning_effort reached Codex as model_reasoning_effort and
+// reached Claude as nothing at all: the field was written, the adapter was
+// generated, and one runtime silently ignored it. That is the shape of setting
+// this repository keeps finding — deliberate to read, inert in effect.
+//
+// Claude Code spells it `effort` on a subagent, so the canonical field is
+// translated per runtime exactly as the model name already is.
+func TestReasoningEffortReachesEveryRuntimeThatHasAWordForIt(t *testing.T) {
+	// Arrange
+	role := harness.Role{
+		Name: "reviewer", Description: "Reviews changes.",
+		ReasoningEffort: "high",
+		Runtimes:        []string{"claude", "codex"},
+	}
+
+	// Act
+	adapters := harness.RenderAdapters(role)
+
+	// Assert
+	if len(adapters) != 2 {
+		t.Fatalf("rendered %d adapters, want 2", len(adapters))
+	}
+	for _, adapter := range adapters {
+		field := "effort: high"
+		if adapter.Runtime == "codex" {
+			field = `model_reasoning_effort = "high"`
+		}
+		if !strings.Contains(adapter.Content, field) {
+			t.Errorf("the %s adapter does not carry the declared effort:\n%s", adapter.Runtime, adapter.Content)
+		}
+	}
+}
+
+// And a role that declares none must not have one invented for it: an effort
+// nobody chose is a setting nobody can account for.
+func TestNoEffortIsWrittenWhenNoneIsDeclared(t *testing.T) {
+	// Arrange
+	role := harness.Role{
+		Name: "reviewer", Description: "Reviews changes.",
+		Runtimes: []string{"claude", "codex"},
+	}
+
+	// Act
+	adapters := harness.RenderAdapters(role)
+
+	// Assert
+	for _, adapter := range adapters {
+		if strings.Contains(adapter.Content, "effort") {
+			t.Errorf("the %s adapter invented an effort:\n%s", adapter.Runtime, adapter.Content)
+		}
+	}
+}

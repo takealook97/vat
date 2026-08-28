@@ -404,6 +404,18 @@ func renderClaudeAgent(role Role) string {
 	if model := role.ModelFor(runtimeClaude); model != "" {
 		b.WriteString("model: " + yamlScalar(model) + "\n")
 	}
+	// Claude Code spells this `effort` on a subagent; Codex spells it
+	// `model_reasoning_effort`. Emitting it for one runtime and not the other
+	// left a role declaring how hard to think and one adapter silently
+	// ignoring it — a setting deliberate to read and inert in effect.
+	//
+	// The value is passed through unvalidated, for the same reason a model name
+	// is: a vocabulary this tool guesses at is a second source of truth, and a
+	// word the runtime does not know is better refused by the runtime than
+	// quietly replaced here.
+	if role.ReasoningEffort != "" {
+		b.WriteString("effort: " + yamlScalar(role.ReasoningEffort) + "\n")
+	}
 	b.WriteString("---\n\n")
 	// The Codex adapter and the Claude skill adapter both said this and this one
 	// did not, which left the file people open most often as the only generated

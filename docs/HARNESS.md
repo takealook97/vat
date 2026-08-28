@@ -143,10 +143,16 @@ runtimes: [claude, codex]
 | `description` | how the runtime advertises the role |
 | `models` | the model each runtime should use, one entry per runtime |
 | `model` | shorthand for `models`, honoured only when the role targets **one** runtime |
-| `reasoning_effort` | passed through where a runtime accepts it |
+| `reasoning_effort` | how hard to think; spelled `effort` for Claude and `model_reasoning_effort` for Codex |
 | `writes` | repositories this role may modify. **empty means read-only** |
 | `reads` | repositories it needs; `*` means the workspace |
 | `runtimes` | which adapters to generate; omitted means all |
+
+Each runtime has its own word for the effort field, so the canonical name is
+translated the way the model name is. Writing it for one adapter and not the
+other left a role stating how hard to think while one runtime silently ignored
+it — a setting deliberate to read and inert in effect. The value itself is
+passed through unvalidated, for the same reason a model name is.
 
 ### A model name belongs to one vendor
 

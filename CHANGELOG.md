@@ -6,6 +6,16 @@ Notable changes to `vat`. The format follows
 
 ## [Unreleased]
 
+### Fixed
+
+- `reasoning_effort` reaches the Claude adapter. It was written to Codex as
+  `model_reasoning_effort` and to Claude as nothing at all, so a role stating how
+  hard to think had that ignored by one of the two runtimes it targeted — the
+  shape of setting this project keeps finding, deliberate to read and inert in
+  effect. Claude Code spells it `effort` on a subagent, so the canonical field is
+  translated per runtime exactly as the model name already is, and the value is
+  passed through unvalidated for the same reason.
+
 ### Added
 
 - CI builds at the minimum toolchain `go.mod` declares. The `go` directive stops
