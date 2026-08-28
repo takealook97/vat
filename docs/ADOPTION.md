@@ -139,6 +139,7 @@ No setup. On the next cross-repository change:
 vat changeset new "Move order cancellation to v2" --repos payments,console
 # ... do the work ...
 vat changeset verify CS-0001
+vat ship CS-0001
 vat changeset close CS-0001 --acceptance "cancel-then-refund passes end to end"
 ```
 

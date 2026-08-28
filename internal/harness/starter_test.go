@@ -34,6 +34,23 @@ func TestEveryStarterSkillCanBeAdvertisedAndRendered(t *testing.T) {
 	}
 }
 
+func TestCrossRepoStarterShipsBeforeItCloses(t *testing.T) {
+	// A seeded procedure that closes first sends every new adopter into a command
+	// the CLI must refuse, because close requires landing evidence from ship.
+	var body string
+	for _, skill := range harness.StarterSkills() {
+		if skill.Name == "before-cross-repo-work" {
+			body = skill.Body
+			break
+		}
+	}
+	ship := strings.Index(body, "vat ship <id>")
+	close := strings.Index(body, "vat changeset close <id>")
+	if ship < 0 || close < 0 || ship > close {
+		t.Fatalf("starter does not follow verify -> ship -> close:\n%s", body)
+	}
+}
+
 func TestWriteStarterSkillsNeverOverwritesWhatIsAlreadyThere(t *testing.T) {
 	// Arrange: the seed is the user's file the moment it lands. Rewriting an
 	// edited procedure on some later run would make vat the author of a document
