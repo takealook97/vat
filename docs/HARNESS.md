@@ -244,6 +244,8 @@ and `consult-the-brain-first`. They describe vat's own command sequences and
 nothing else: a procedure vat writes once and never maintains would be a second
 source of truth of the kind this tool exists to remove. They are canonical files
 from the moment they land — edit them, or delete them, with no consequence.
+The cross-repository procedure follows the enforced order: verify, land the
+commits, record landing with `vat ship`, then close with end-to-end acceptance.
 
 ```console
 $ vat lint
