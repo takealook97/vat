@@ -106,6 +106,46 @@ func TestAGeneratedProjectionThatNoLongerMatchesItsRecordsIsAnError(t *testing.T
 	}
 }
 
+func TestAProjectionVatDidNotWriteIsReportedApartFromDrift(t *testing.T) {
+	// Arrange: a knowledge repository that kept its own index long before vat
+	// existed. Reporting it as drift would offer `vat brain build` as the
+	// repair, and the repair would delete the file.
+	ws, root := withBrain(t)
+	if _, err := brain.Init(root, reference); err != nil {
+		t.Fatalf("brain init: %v", err)
+	}
+	store, err := brain.Load(root)
+	if err != nil {
+		t.Fatalf("load: %v", err)
+	}
+	if _, err := brain.Build(store, reference); err != nil {
+		t.Fatalf("build: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(root, brain.CurrentFile),
+		[]byte("# Current state\n\nMaintained by hand.\n"), 0o644); err != nil {
+		t.Fatalf("write: %v", err)
+	}
+
+	// Act
+	report := run(t, ws)
+
+	// Assert
+	finding, found := rules(report)["brain/projection-unmanaged"]
+	if !found {
+		t.Fatalf("a foreign projection went unreported: %+v", report.Findings)
+	}
+	if finding.Severity != lint.SeverityError {
+		t.Errorf("severity = %s, want error; nothing vat generates can be trusted while it stands",
+			finding.Severity)
+	}
+	if finding.Fixable {
+		t.Error("marked fixable, but no fix vat can perform leaves the file intact")
+	}
+	if _, drifted := rules(report)["brain/generated-drift"]; drifted {
+		t.Error("the same file was reported as drift as well, which names a repair that does nothing")
+	}
+}
+
 func TestAClaimNamingARepositoryTheWorkspaceDoesNotGovernIsReported(t *testing.T) {
 	// Arrange: provenance pointing at nothing reads as verified, which is worse
 	// than provenance that is absent.

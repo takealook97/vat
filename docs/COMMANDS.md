@@ -13,6 +13,13 @@ Every command that prints a table also accepts `--json`.
 The distinction matters in CI: `1` means act on the findings, `2` means fix the
 pipeline.
 
+A workspace whose `requires.vat` this build does not satisfy is refused before
+the command runs, exiting `1` and naming both the constraint and the running
+version. See [MANIFEST.md](MANIFEST.md#requires); this applies to every command
+that opens a workspace, `vat doctor` included, for the same reason a manifest
+written against a newer schema is refused: a diagnosis produced by rules the
+file does not use is not a diagnosis.
+
 ## Global flags
 
 | Flag | Effect |
@@ -239,6 +246,7 @@ The rules, and what each one prevents:
 | `brain/schema-newer` | error | a knowledge layer written against a schema this build cannot read, which these checks would otherwise certify |
 | `brain/unreferenced` | warn | a scaffolded brain the manifest never adopted, which no `vat brain` command can reach |
 | `brain/generated-drift` | error | a hand-edited projection contradicting the records |
+| `brain/projection-unmanaged` | error | a file holding the name of a generated projection that vat did not write, which no build will overwrite |
 | `brain/source-revision-drift` | warn | a claim whose evidence moved on months ago |
 | `brain/source-repo-unknown` | warn | a claim pointing at a repository that is not governed |
 | `changeset/invalid` | error | a completion record that cannot be acted on |
@@ -470,6 +478,14 @@ the projections, because marking it makes their absence into drift and a
 generated file is vat's to write. Nothing else is written: an existing
 repository is brought under the rules gradually, not scaffolded in one pass.
 
+`build` and `adopt` write a projection only when the file already at that name
+is empty or carries vat's own provenance — see [SPEC.md](SPEC.md) §5.7. A
+knowledge repository older than vat usually keeps a `CURRENT.md` of its own, and
+it is typically the most valuable file in it. Such a file is reported as left
+alone and kept exactly as it was found; `vat lint` reports the same state as
+`brain/projection-unmanaged`, whose remedy is to move or delete the file, not to
+run a build that will not touch it.
+
 Every `vat brain` command refuses a repository that has no marker, naming
 `vat brain init` and `vat brain adopt`. Without that refusal `vat brain build`
 wrote an index into a directory that is not a brain.
@@ -518,7 +534,19 @@ which is the same reason `--acceptance` may not be empty when closing.
 `new` and `add` record where each repository stands before the change begins,
 because after it lands that can no longer be observed. `add` refuses once the
 changeset is closed or abandoned: enrolling a repository afterwards rewrites the
-one claim the record exists to make.
+one claim the record exists to make. A repository with no commits is refused
+too: the return point is the one field enrolment exists to capture.
+
+The workspace root is enrolled as `.`, and it is the only name that resolves
+outside `repos:`. A contract change usually starts in the control plane — the
+manifest, a role, a generated region every repository reads — and recording the
+products without it left the one revision nothing could roll back to out of the
+record. It is verified by `workspace.checks` in vat.yaml, and `vat ship` judges
+its landing against the same `origin/<default_branch>` as any other participant.
+
+Because the record itself is written under `changesets/` in the workspace root,
+enrolling `.` means committing the record before `verify` — the same rule every
+other participant is held to, arriving one step earlier.
 
 `verify` runs each repository's canonical checks and records the outcome against
 the exact revision it ran on. Four conditions stop a repository being entered at

@@ -195,6 +195,7 @@ func RuleNames() []string {
 		"brain/schema-newer",
 		ruleUnreferencedBrain,
 		"brain/generated-drift",
+		"brain/projection-unmanaged",
 		"brain/source-revision-drift",
 		"brain/source-repo-unknown",
 		"changeset/open-too-long",
@@ -548,6 +549,20 @@ func checkBrain(ctx context.Context, ws *workspace.Workspace, opts Options, now 
 	}
 
 	var findings []Finding
+	// Reported before drift, and never as drift: vat refuses to write these,
+	// so offering `vat brain build` would name a repair that does nothing.
+	// This is the state a knowledge repository older than vat starts in.
+	unmanaged, err := brain.Unmanaged(root)
+	if err != nil {
+		return nil, err
+	}
+	for _, name := range unmanaged {
+		findings = append(findings, Finding{
+			Rule: "brain/projection-unmanaged", Severity: SeverityError, Subject: name,
+			Message: "occupies the name of a generated projection but was not written by vat",
+			Fix:     "move or delete it, then `vat brain build`",
+		})
+	}
 	drifted, err := brain.Drift(store, now)
 	if err != nil {
 		return nil, err

@@ -69,8 +69,11 @@ func (r Role) Valid() bool {
 type Manifest struct {
 	Version   int       `yaml:"version" json:"version"`
 	Workspace Workspace `yaml:"workspace" json:"workspace"`
-	Policy    Policy    `yaml:"policy" json:"policy"`
-	Repos     []Repo    `yaml:"repos" json:"repos"`
+	// Requires is what this workspace demands of the tool operating it, as
+	// opposed to Version, which is what it demands of the reader of this file.
+	Requires Requires `yaml:"requires,omitempty" json:"requires,omitempty"`
+	Policy   Policy   `yaml:"policy" json:"policy"`
+	Repos    []Repo   `yaml:"repos" json:"repos"`
 }
 
 // Workspace holds identity and defaults that apply to every repository.
@@ -86,6 +89,12 @@ type Workspace struct {
 	RemoteTemplate string `yaml:"remote_template,omitempty" json:"remote_template,omitempty"`
 	// Description is free text shown in the generated workspace harness.
 	Description string `yaml:"description,omitempty" json:"description,omitempty"`
+
+	// Checks are the canonical commands that prove the control plane itself is
+	// healthy. The workspace root is a repository too — it holds the manifest,
+	// the roles, and the contracts every governed repository reads — but it is
+	// not in `repos:` and cannot be, so its checks live here.
+	Checks []string `yaml:"checks,omitempty" json:"checks,omitempty"`
 }
 
 // Policy is the machine-enforced half of the methodology. Anything expressed

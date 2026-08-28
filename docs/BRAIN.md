@@ -577,8 +577,9 @@ in a week.
 $ vat brain adopt cortex
 OK    cortex        adopted as the brain repository
 OK    cortex/.brain  written
-OK    cortex/CURRENT.md  generated
 OK    cortex/graph.json  generated
+WARN  cortex/CURRENT.md  left alone; vat did not write it
+      → Move or delete it to let vat own the name, then `vat brain build`.
 INFO  records       178 found
 WARN  schema        12 records need attention; run `vat brain check` for the list
       → Nothing was rewritten. Bring them up one at a time.
@@ -592,6 +593,20 @@ Two files are written: the marker that makes the directory a brain, and the
 generated projections whose absence that marker turns into drift. Nothing else.
 Adoption that reported success and left `vat lint` answering "run vat brain
 init" about the same directory had not finished.
+
+A projection is written only when the name is free — empty, or already holding
+a file that carries vat's own provenance line. A repository that has kept a
+`CURRENT.md` by hand for years keeps it, and the file is reported rather than
+replaced. That state is `brain/projection-unmanaged` in `vat lint`; the remedy
+is yours to choose, because the file is yours:
+
+- move it (`git mv CURRENT.md STATE.md`) and let vat generate the index beside
+  it, or
+- delete it once its content has been broken into atomic records, which is the
+  conversion this layer exists for.
+
+Running `vat brain build` while the file stands does nothing to it, by design:
+a repair that destroys the thing it was pointed at is not one.
 
 ---
 
