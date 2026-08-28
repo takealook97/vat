@@ -40,6 +40,12 @@ Flags are accepted in any position, including after a positional argument.
 gives after succeeding. Nothing else, so `vat … --json | jq` is safe on every
 path: a command that fails writes nothing to stdout at all.
 
+A script reading vat must check the exit status, not only the output. A roster
+that could not be read prints nothing on stdout, and a loop over nothing looks
+exactly like a workspace governing nothing — so a wrapper that discards the
+status turns "vat failed" into "there are no repositories", and every check
+built on it passes. Capture the output, check the status, then iterate.
+
 **stderr is the diagnosis.** Errors, the `usage:` line beside one, and the
 advice that belongs to a failure. A consumer reads the exit code, then stderr.
 
@@ -501,6 +507,15 @@ gate rather than becoming canonical on its way past.
 quarantine or a revocation must state a reason: a withdrawal nobody explained
 cannot be reviewed later. An end state is one-way — none of these commands, and
 not `promote`, will reopen one.
+
+`adopt --plan` writes nothing at all — not the marker, not the projections, not
+the manifest — and groups what adoption would find: how many records cannot be
+read, how many carry a status this schema does not have, how many relations are
+one-sided, which projections vat did not write, and which directories under
+`memory/` are shaped like a session journal rather than a reusable observation.
+Each group says whether its shape is mechanical. It proposes no mapping: a
+knowledge repository is the one thing in a workspace whose content no tool
+should reinterpret, and the value is making the work countable.
 
 `adopt` declares which governed repository holds the knowledge layer. It writes
 the `.brain` marker, because a repository declared as the brain and left without

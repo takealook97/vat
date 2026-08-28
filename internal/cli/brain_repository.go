@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/takealook97/vat/internal/brain"
+	"github.com/takealook97/vat/internal/fsx"
 	"github.com/takealook97/vat/internal/manifest"
 	"github.com/takealook97/vat/internal/ui"
 	"github.com/takealook97/vat/internal/workspace"
@@ -226,14 +227,28 @@ func brainAdoptCommand() *Command {
 	return &Command{
 		Name:    "adopt",
 		Summary: "Point the workspace at an existing knowledge repository",
-		Usage:   "vat brain adopt <repository-name>",
+		Usage:   "vat brain adopt <repository-name> [--plan]",
 		Long: `Declare which governed repository holds the knowledge layer.
 
 Nothing is moved or rewritten. vat reads what is there and reports which records
 do not yet meet the schema, so an existing repository can be brought under the
-rules gradually rather than converted in one pass.`,
+rules gradually rather than converted in one pass.
+
+--plan writes nothing at all — not the marker, not the projections, not the
+manifest. It groups what adoption would find: how many records cannot be read,
+how many carry a lifecycle status this schema does not have, how many relations
+are one-sided, and which groups are mechanical. It proposes no mapping, because
+a knowledge repository is the one thing in a workspace whose content no tool
+should reinterpret. It makes the work countable, which is what deciding how to
+migrate needs and what a list of two hundred findings does not give.`,
+		Examples: []string{
+			"vat brain adopt cortex --plan          # what adoption would find",
+			"vat brain adopt cortex --plan --json   # the same, for a script",
+			"vat brain adopt cortex",
+		},
 		Run: func(ctx context.Context, env *Env, args []string) error {
 			set := newFlagSet("brain adopt")
+			plan := set.Bool("plan", false, "group what adoption would find, and write nothing")
 			if err := parseFlags(set, args); err != nil {
 				return err
 			}
@@ -249,6 +264,9 @@ rules gradually rather than converted in one pass.`,
 			if !ok {
 				return usageErrorf("%q is not in %s; add it with `vat repo add` or `vat repo adopt`",
 					name, manifest.FileName)
+			}
+			if *plan {
+				return reportAdoptionPlan(env, ws, repo)
 			}
 			repo.Role = manifest.RoleBrain
 			next := manifest.WithRepo(ws.Manifest, repo)
@@ -322,4 +340,45 @@ func reportUnmanagedProjections(env *Env, prefix string, skipped []string) {
 	if len(skipped) > 0 {
 		env.Printer.Hint("      → Move or delete it to let vat own the name, then `vat brain build`.")
 	}
+}
+
+// reportAdoptionPlan groups what adopting a repository would find, and writes
+// nothing — including the marker and the manifest, which the applying path
+// writes before it reads anything.
+func reportAdoptionPlan(env *Env, ws *workspace.Workspace, repo manifest.Repo) error {
+	root := ws.RepoPath(repo)
+	if !fsx.IsDir(root) {
+		return usageErrorf("%s is not cloned, so there is nothing to read", repo.Name)
+	}
+	store, err := brain.Load(root)
+	if err != nil {
+		return err
+	}
+	plan := brain.BuildPlan(store, brainPolicy(ws), env.Now)
+	if env.JSON {
+		return emitJSON(env, plan)
+	}
+
+	env.Printer.Status(ui.LevelInfo, repo.Name, fmt.Sprintf("%d records read", plan.Records))
+	if len(plan.Groups) == 0 {
+		env.Printer.Status(ui.LevelOK, "schema", "every record already conforms")
+		env.Printer.Hint("\nNothing was written. Run again without --plan to adopt.")
+		return nil
+	}
+	rows := make([][]string, 0, len(plan.Groups))
+	for _, group := range plan.Groups {
+		effort := "decide"
+		if group.Mechanical {
+			effort = "mechanical"
+		}
+		rows = append(rows, []string{
+			group.Kind, fmt.Sprintf("%d", group.Count), effort,
+			strings.Join(group.Examples, ", "), group.Summary,
+		})
+	}
+	env.Printer.Table([]string{"GROUP", "COUNT", "EFFORT", "EXAMPLES", "MEANING"}, rows)
+	env.Printer.Hint("\n%d items across %d groups. `mechanical` means the shape can be converted\nwithout deciding what a record means; it is not permission to do it.",
+		plan.Total(), len(plan.Groups))
+	env.Printer.Hint("\nNothing was written. Adoption rewrites no record either — it marks the\nrepository and reports the same findings one at a time through `vat brain check`.")
+	return nil
 }

@@ -337,6 +337,25 @@ Re-dating a record's `observed_at` is an assertion that somebody re-read the
 source. An implementation **MUST NOT** move `observed_at` forward automatically
 when the source revision has changed.
 
+### 5.6.1 Extension keys
+
+A record's front matter **MAY** carry keys this specification does not define.
+An implementation **MUST** preserve them and **MUST NOT** let one influence any
+lifecycle judgement: whether a record is answerable, terminal, stale, or due for
+review is decided by `status` and the fields §5.3 and §5.4 name, and by nothing
+else.
+
+This exists because mature knowledge repositories carry a human-readable
+progress note beside the status — "partly resolved, waiting on operational
+samples" — and collapsing that into `status` is what the strict lifecycle
+prevents. Keep the text; keep it out of the classification. A generator that
+read `resolved` out of such a note and treated the record as terminal made
+partially resolved gaps disappear from its own index.
+
+An extension key is display-only by definition. A key that a workspace wants
+enforced is a rule, and a rule belongs in this specification or in that
+workspace's own checks — not in a field every reader interprets differently.
+
 ### 5.7 Generated projections
 
 `CURRENT.md` and `graph.json` are **derived** and **MUST NOT** be authoritative.
