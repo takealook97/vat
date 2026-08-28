@@ -239,6 +239,7 @@ The rules, and what each one prevents:
 | `brain/schema-newer` | error | a knowledge layer written against a schema this build cannot read, which these checks would otherwise certify |
 | `brain/unreferenced` | warn | a scaffolded brain the manifest never adopted, which no `vat brain` command can reach |
 | `brain/generated-drift` | error | a hand-edited projection contradicting the records |
+| `brain/projection-unmanaged` | error | a file holding the name of a generated projection that vat did not write, which no build will overwrite |
 | `brain/source-revision-drift` | warn | a claim whose evidence moved on months ago |
 | `brain/source-repo-unknown` | warn | a claim pointing at a repository that is not governed |
 | `changeset/invalid` | error | a completion record that cannot be acted on |
@@ -469,6 +470,14 @@ one is a repository every other command still calls uninitialised, and it builds
 the projections, because marking it makes their absence into drift and a
 generated file is vat's to write. Nothing else is written: an existing
 repository is brought under the rules gradually, not scaffolded in one pass.
+
+`build` and `adopt` write a projection only when the file already at that name
+is empty or carries vat's own provenance — see [SPEC.md](SPEC.md) §5.7. A
+knowledge repository older than vat usually keeps a `CURRENT.md` of its own, and
+it is typically the most valuable file in it. Such a file is reported as left
+alone and kept exactly as it was found; `vat lint` reports the same state as
+`brain/projection-unmanaged`, whose remedy is to move or delete the file, not to
+run a build that will not touch it.
 
 Every `vat brain` command refuses a repository that has no marker, naming
 `vat brain init` and `vat brain adopt`. Without that refusal `vat brain build`

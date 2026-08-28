@@ -542,6 +542,16 @@ func checkBrain(ws *workspace.Workspace, now time.Time) []Finding {
 			Fix:    "vat brain build",
 		})
 	}
+	// Separate from drift because the repair is: a build will not touch these,
+	// so telling somebody to run one would send them round a loop.
+	unmanaged, err := brain.Unmanaged(store.Root)
+	if err == nil && len(unmanaged) > 0 {
+		findings = append(findings, Finding{
+			Section: sectionBrain, Subject: "generated files", Status: StatusWarn,
+			Detail: strings.Join(unmanaged, ", ") + " not written by vat; left alone",
+			Fix:    "move or delete it, then `vat brain build`",
+		})
+	}
 	return findings
 }
 

@@ -233,6 +233,43 @@ func TestBrainAdoptTakesOverADirectoryThatIsAlreadyThere(t *testing.T) {
 	}
 }
 
+func TestBrainAdoptKeepsAnIndexTheRepositoryAlreadyHad(t *testing.T) {
+	// Arrange: the case adoption exists for. A knowledge repository older than
+	// vat keeps its own current-state document, and it is usually the most
+	// valuable file in it. Adoption used to render over it, because the only
+	// question asked was whether the bytes matched what vat would produce.
+	h := adoptedFixture(t, "payments", "notes")
+	handWritten := "# Notes — current state\n\nMaintained by hand since 2023.\n"
+	if err := os.WriteFile(h.path("notes", "CURRENT.md"), []byte(handWritten), 0o644); err != nil {
+		t.Fatalf("write: %v", err)
+	}
+
+	// Act
+	output := h.mustRun("brain", "adopt", "notes")
+
+	// Assert
+	after, err := os.ReadFile(h.path("notes", "CURRENT.md"))
+	if err != nil {
+		t.Fatalf("read: %v", err)
+	}
+	if string(after) != handWritten {
+		t.Fatalf("adoption rewrote a file it did not write:\n%s", after)
+	}
+	if !strings.Contains(output, "left alone") {
+		t.Errorf("adoption overwrote nothing but did not say so:\n%s", output)
+	}
+	// The state is reported where CI reads it, and as the rule whose fix is
+	// possible: a build will never touch this file, so naming one would send
+	// the reader round a loop.
+	report := h.lint(t, "--offline")
+	if !report.reports("brain/projection-unmanaged") {
+		t.Error("lint does not report the file adoption refused to write")
+	}
+	if report.reports("brain/generated-drift") {
+		t.Error("the same file is also reported as drift, whose fix would delete it")
+	}
+}
+
 func TestBrainSweepApplyDemotesRatherThanDeletes(t *testing.T) {
 	// Arrange: an unverified claim is not a false one. Deleting it destroys the
 	// reasoning; demoting it stops it being cited.
