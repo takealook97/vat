@@ -106,7 +106,10 @@ jobs:
             cp -r ../completions "stage/$name/completions"
             case "$os" in
               windows) (cd stage && zip -qr "../${name}.zip" "$name") ;;
-              *) tar -czf "${name}.tar.gz" -C stage "$name" ;;
+              # Without --owner/--group the archive embeds the runner's own
+              # uid/gid, and a container that maps neither refuses to extract
+              # it. Nobody who downloads a release is that runner.
+              *) tar --owner=0 --group=0 --numeric-owner -czf "${name}.tar.gz" -C stage "$name" ;;
             esac
             rm -rf stage
           done

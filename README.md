@@ -23,12 +23,13 @@ they last checked.*
 
 **Two ways in.**
 
+**Several repositories, worked in together.** One manifest, one place to run
+from, and a record of which revisions were verified together — the problem
+below. → keep reading.
+
 **One repository, with an agent working in it.** `vat harness` keeps one role
 body and one procedure body, generates each runtime's file from them, and fails
 the build the day a copy diverges. → [The agent harness](#the-agent-harness)
-
-**Several repositories, worked in together.** One manifest, one place to run
-from, and a record of which revisions were verified together. → keep reading.
 
 `vat fit` will tell you which of the five layers you do not need yet.
 
