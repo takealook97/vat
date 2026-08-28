@@ -843,3 +843,35 @@ func TestTheReadmeWalkthroughDoesNotShowARecordPromotedByNobody(t *testing.T) {
 
 // newRecordID picks the identifier out of the line `vat brain new` prints.
 var newRecordID = regexp.MustCompile(`OK  +((?:D|G|GO|M)-\d+) `)
+
+// The reference tells a consumer that stdout is safe to pipe into a parser on
+// every path. That is a promise about every command, not about the two a test
+// happened to try, and it held for neither until the usage line moved to
+// stderr. Walking the tree keeps a command added later from quietly breaking it.
+func TestNoCommandWritesToStdoutWhenItRefusesTheInvocation(t *testing.T) {
+	// Arrange
+	reference := readReference(t)
+	if !strings.Contains(reference, "stdout is the data") {
+		t.Fatal("the reference no longer states which stream carries what; this test stopped checking anything")
+	}
+
+	// Act & Assert: every leaf command, called with an argument shape it
+	// refuses. A command that accepts this is skipped rather than guessed at.
+	h := newFixture(t)
+	h.mustRun("init", "--name", "acme")
+	walkCommands(Root(), nil, func(command *Command, path []string) {
+		if command.Run == nil {
+			return
+		}
+		args := append(append([]string{}, path...), "--vat-no-such-flag")
+		code, out, _ := h.runSplit(args...)
+		// A command that somehow accepts this is not the case under test.
+		if code != ExitUsage {
+			return
+		}
+		if strings.TrimSpace(out) != "" {
+			t.Errorf("`vat %s` refused the invocation and still wrote to stdout:\n%s",
+				strings.Join(path, " "), out)
+		}
+	})
+}

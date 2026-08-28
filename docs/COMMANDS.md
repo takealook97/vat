@@ -27,6 +27,19 @@ pipeline.
 
 Flags are accepted in any position, including after a positional argument.
 
+### Which stream carries what
+
+**stdout is the data.** Tables, `--json` payloads, and the guidance a command
+gives after succeeding. Nothing else, so `vat … --json | jq` is safe on every
+path: a command that fails writes nothing to stdout at all.
+
+**stderr is the diagnosis.** Errors, the `usage:` line beside one, and the
+advice that belongs to a failure. A consumer reads the exit code, then stderr.
+
+The `usage:` line used to go to stdout, which made a failing `--json` run hand
+its consumer a parse error while the reason sat on the stream nothing was
+reading — and `vat … > out.json` wrote the usage line into the file.
+
 ---
 
 ## vat init

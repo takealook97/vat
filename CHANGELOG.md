@@ -359,6 +359,9 @@ Notable changes to `vat`. The format follows
   shows, and nothing checked that — in the one asset a reader takes as evidence
   the tool does what the page claims. A contract test now holds it to naming
   every file `vat init` writes unconditionally, the seeded procedures included.
+- The reference states which stream carries what, and a test walks every
+  command to hold it: stdout is the data, so `vat … --json | jq` is safe on
+  every path, and a command that refuses its invocation writes nothing there.
 - Guidance printed beside a failure goes to stderr, not stdout. The `usage:`
   line and "Run `vat init` here" were written to the data stream: under `--json`
   a consumer piping stdout into a parser got a syntax error while the real
