@@ -123,8 +123,11 @@ func brainBuildCommand() *Command {
 			if err != nil {
 				return err
 			}
+			reportUnmanagedProjections(env, "", result.Skipped)
 			if len(result.Changed) == 0 {
-				env.Printer.Status(ui.LevelOK, "build", "already current")
+				if len(result.Skipped) == 0 {
+					env.Printer.Status(ui.LevelOK, "build", "already current")
+				}
 				return nil
 			}
 			for _, file := range result.Changed {
@@ -284,6 +287,7 @@ rules gradually rather than converted in one pass.`,
 			for _, file := range built.Changed {
 				env.Printer.Status(ui.LevelOK, filepath.Join(repo.Name, file), "generated")
 			}
+			reportUnmanagedProjections(env, repo.Name, built.Skipped)
 			findings := brain.Check(store, brainPolicy(ws), env.Now)
 			env.Printer.Status(ui.LevelInfo, "records", fmt.Sprintf("%d found", len(store.Records)))
 			if len(findings) == 0 {
@@ -296,5 +300,26 @@ rules gradually rather than converted in one pass.`,
 			}
 			return renderAfterChange(env, ws.Root)
 		},
+	}
+}
+
+// reportUnmanagedProjections says which projections were left exactly as they
+// were found.
+//
+// This is the first thing somebody adopting an existing knowledge repository
+// needs to know, and the reason it is a status line rather than a failure: the
+// files are intact, the rest of the build ran, and the choice of what to do
+// with them belongs to whoever wrote them. `vat lint` reports the same state as
+// an error, which is where CI reads it.
+func reportUnmanagedProjections(env *Env, prefix string, skipped []string) {
+	for _, file := range skipped {
+		subject := file
+		if prefix != "" {
+			subject = filepath.Join(prefix, file)
+		}
+		env.Printer.Status(ui.LevelWarn, subject, "left alone; vat did not write it")
+	}
+	if len(skipped) > 0 {
+		env.Printer.Hint("      → Move or delete it to let vat own the name, then `vat brain build`.")
 	}
 }

@@ -183,15 +183,14 @@ func judgeLanding(
 	// could put it back.
 	updated := participant
 	result := landing{Repo: participant.Name, Revision: participant.Revision}
-	repo, ok := ws.Manifest.Find(participant.Name)
+	target, ok := resolveParticipant(ws, participant.Name)
 	if !ok {
 		result.Detail = "no longer in the manifest, so there is no branch to look on"
 		return result, updated
 	}
-	branch := repo.Branch(ws.Manifest.Workspace.DefaultBranch)
-	result.Ref = remote + "/" + branch
+	result.Ref = remote + "/" + target.Branch
 
-	dir := ws.RepoPath(repo)
+	dir := target.Dir
 	if !gitx.IsRepository(dir) {
 		result.Detail = "not cloned, so nothing can be observed"
 		return result, updated

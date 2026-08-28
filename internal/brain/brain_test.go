@@ -424,14 +424,22 @@ func TestBuildIsDeterministicAndDriftIsDetected(t *testing.T) {
 }
 
 func TestDriftIsReportedWhenAGeneratedFileIsEditedByHand(t *testing.T) {
-	// Arrange
+	// Arrange: an edit inside vat's own output, which keeps the provenance
+	// line. A file that loses that line is no longer drift but an unmanaged
+	// projection, and TestAForeignProjectionIsReportedAsUnmanagedRatherThanDrift
+	// covers that case.
 	root, _ := newStore(t)
 	writeRecord(t, root, "decisions/D-0001-x.md", "id: D-0001\nstatus: active", "# D-0001 — Something")
 	if _, err := brain.Build(reload(t, root), reference); err != nil {
 		t.Fatalf("Build returned an error: %v", err)
 	}
 	path := filepath.Join(root, brain.CurrentFile)
-	if err := os.WriteFile(path, []byte("# hand edited\n"), 0o644); err != nil {
+	generated, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("read: %v", err)
+	}
+	edited := string(generated) + "\nhand edited\n"
+	if err := os.WriteFile(path, []byte(edited), 0o644); err != nil {
 		t.Fatalf("write: %v", err)
 	}
 

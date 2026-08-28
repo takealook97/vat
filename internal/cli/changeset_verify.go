@@ -64,13 +64,13 @@ func runChangesetVerify(ctx context.Context, env *Env, args []string) error {
 	failures := 0
 	unverifiable := 0
 	for _, participant := range current.Repositories {
-		repo, ok := ws.Manifest.Find(participant.Name)
+		target, ok := resolveParticipant(ws, participant.Name)
 		if !ok {
 			env.Printer.Status(ui.LevelFail, participant.Name, "no longer in the manifest")
 			unverifiable++
 			continue
 		}
-		dir := ws.RepoPath(repo)
+		dir := target.Dir
 		if !gitx.IsRepository(dir) {
 			env.Printer.Status(ui.LevelFail, participant.Name, "not cloned")
 			unverifiable++
@@ -113,7 +113,7 @@ func runChangesetVerify(ctx context.Context, env *Env, args []string) error {
 		}
 		updated.Checks = nil
 
-		if len(repo.Checks) == 0 {
+		if len(target.Checks) == 0 {
 			env.Printer.Status(ui.LevelWarn, participant.Name,
 				"declares no canonical checks; nothing can be verified")
 			// Counted apart from a failed check. Both block the changeset, and
@@ -123,7 +123,7 @@ func runChangesetVerify(ctx context.Context, env *Env, args []string) error {
 			current = changeset.WithParticipant(current, updated)
 			continue
 		}
-		for _, command := range repo.Checks {
+		for _, command := range target.Checks {
 			result := runner.RunOne(ctx, runner.Job{
 				Repo: participant.Name, Dir: dir, Command: command,
 			}, *timeout)

@@ -66,13 +66,21 @@ func newFixture(t *testing.T, repos ...string) *workspaceFixture {
 // run executes one vat invocation and returns its exit code and output.
 func (h *workspaceFixture) run(args ...string) (int, string) {
 	h.t.Helper()
+	return h.runAs("", args...)
+}
+
+// runAs executes one invocation while vat reports itself as a given version.
+// An empty version means the build's own, which is what every other test wants.
+func (h *workspaceFixture) runAs(toolVersion string, args ...string) (int, string) {
+	h.t.Helper()
 	var out, errOut bytes.Buffer
 	env := &Env{
-		Printer: ui.NewWith(&out, &errOut, false),
-		Now:     testNow,
-		Cwd:     h.root,
-		Root:    h.root,
-		Yes:     true,
+		Printer:     ui.NewWith(&out, &errOut, false),
+		Now:         testNow,
+		Cwd:         h.root,
+		Root:        h.root,
+		Yes:         true,
+		ToolVersion: toolVersion,
 	}
 	code := dispatch(context.Background(), env, Root(), args, nil)
 	return code, out.String() + errOut.String()

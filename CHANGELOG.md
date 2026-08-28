@@ -6,8 +6,37 @@ Notable changes to `vat`. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- `requires.vat` in `vat.yaml`: a version constraint on the tool operating the
+  workspace. `version: 1` says which file format this is and nothing about which
+  commands exist or what they refuse to write, so a workspace whose layout
+  depends on a behaviour could not say so — the vat that would get it wrong read
+  the same `version: 1`. A vat that does not satisfy the constraint refuses to
+  open the workspace, naming both versions. A build whose own version cannot be
+  read is never refused, and a `git describe` suffix is read as the release it
+  counts from, so building from the default branch is not a refusal.
+- A changeset can enrol the workspace root itself, as `.`. A contract change
+  usually starts in the control plane — the manifest, a shared role, a generated
+  region every repository reads — and the record described the products while
+  omitting the revision that says what they were verified against, which is the
+  one a rollback needs most. Its checks come from a new `workspace.checks`,
+  because the root is not in `repos:` and cannot be.
+
 ### Fixed
 
+- A projection is never written over a file vat did not produce. `vat brain
+  adopt` rendered `CURRENT.md` and `graph.json` unconditionally, and the only
+  question a build asked was whether the bytes matched what the records would
+  render — which a file vat never wrote never does. Adopting a knowledge
+  repository that had kept its own index for years destroyed it on the first
+  run, which is the command's purpose reversed. Projections now carry
+  provenance, a file without it is left exactly as found and reported by
+  `build`, `adopt`, `doctor`, and as `brain/projection-unmanaged` in lint.
+  Deliberately not drift: drift names `vat brain build` as the fix, and here
+  that fix would delete the file.
+- Enrolling a repository with no commits says so, rather than passing on git's
+  "ambiguous argument 'HEAD'", which reads as a defect in vat.
 - CI no longer cancels a run on `main`. Superseding is right on a branch, where
   only the latest commit is under review, and wrong on `main`, where every
   commit is something somebody may install. Three commits went through
