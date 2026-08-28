@@ -24,8 +24,8 @@ func TestAClaimAboutAnUngovernedSourceIsToldHowToSayItIsExternal(t *testing.T) {
 		t.Fatalf("brain init: %v", err)
 	}
 	writeBrainRecord(t, root, "gaps/G-0001-x.md",
-		"id: G-0001\nstatus: active\nclaim_kind: current-state\nowned_by: hermes\n"+
-			"source_ref: hermes@abc1234\nobserved_at: \"2026-08-25\"")
+		"id: G-0001\nstatus: active\nclaim_kind: current-state\nowned_by: legacy-crm\n"+
+			"source_ref: legacy-crm@abc1234\nobserved_at: \"2026-08-25\"")
 
 	// Act: these rules read the manifest and the clone, and the source-ref
 	// family sits behind the offline gate, so the non-offline runner is the one
@@ -54,8 +54,8 @@ func TestADeclaredExternalSourceIsNotReported(t *testing.T) {
 		t.Fatalf("brain init: %v", err)
 	}
 	writeBrainRecord(t, root, "gaps/G-0001-x.md",
-		"id: G-0001\nstatus: active\nclaim_kind: current-state\nowned_by: hermes\n"+
-			"source_ref: hermes@abc1234\nsource_external: true\nobserved_at: \"2026-08-25\"")
+		"id: G-0001\nstatus: active\nclaim_kind: current-state\nowned_by: legacy-crm\n"+
+			"source_ref: legacy-crm@abc1234\nsource_external: true\nobserved_at: \"2026-08-25\"")
 
 	// Act: these rules read the manifest and the clone, and the source-ref
 	// family sits behind the offline gate, so the non-offline runner is the one

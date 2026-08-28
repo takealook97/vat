@@ -625,7 +625,7 @@ diagnose, and ship a repository it does not own, and widens `sync`, `doctor`,
 and every changeset with it.
 
 ```yaml
-source_ref: hermes@abc1234
+source_ref: legacy-crm@abc1234
 source_external: true
 ```
 

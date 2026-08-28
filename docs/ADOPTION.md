@@ -247,7 +247,7 @@ A claim whose evidence lives outside this workspace says so once, rather than
 being silenced by enrolling a system nobody here governs:
 
 ```yaml
-source_ref: hermes@abc1234
+source_ref: legacy-crm@abc1234
 source_external: true
 ```
 
