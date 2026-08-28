@@ -129,7 +129,7 @@ func Run(ctx context.Context, ws *workspace.Workspace, opts Options) (Report, er
 	add(brainFindings...)
 	add(checkUnreferencedBrain(ws)...)
 
-	changesetFindings, err := checkChangesets(ws, now)
+	changesetFindings, err := checkChangesets(ctx, ws, now)
 	if err != nil {
 		return report, err
 	}
@@ -203,6 +203,7 @@ func RuleNames() []string {
 		"changeset/open-too-long",
 		"changeset/invalid",
 		"changeset/closed-unlanded",
+		"changeset/rollback-point-missing",
 	}
 }
 
@@ -662,7 +663,51 @@ func checkSourceRevisions(ctx context.Context, ws *workspace.Workspace, store *b
 	return findings
 }
 
-func checkChangesets(ws *workspace.Workspace, now time.Time) ([]Finding, error) {
+// checkRollbackPoints reports a recorded return point the repository no longer
+// holds.
+//
+// It is the one field in a changeset that cannot be reconstructed: every other
+// value can be read back off git, and the revision a repository stood at before
+// the change began cannot, which is why it is captured at enrolment. A rewritten
+// history leaves the record asserting a way back that is gone, in exactly the
+// voice of one that is there. The knowledge layer has had this check since it
+// existed — brain/source-revision-drift — and the completion layer, whose whole
+// promise is the return point, did not.
+func checkRollbackPoints(ctx context.Context, ws *workspace.Workspace, set changeset.Changeset) []Finding {
+	var findings []Finding
+	for _, participant := range set.Repositories {
+		if participant.RollbackPoint == "" {
+			// Absent is changeset/invalid's finding, under the workspace's own
+			// policy. Reporting it twice says nothing new.
+			continue
+		}
+		repo, governed := ws.Manifest.Find(participant.Name)
+		if !governed {
+			continue
+		}
+		dir := ws.RepoPath(repo)
+		if !gitx.IsRepository(dir) {
+			// A repository that is not on this machine says nothing about
+			// whether its history still holds the revision. Reporting it would
+			// fail lint for every changeset naming a clone somebody has not
+			// made yet.
+			continue
+		}
+		if gitx.RevisionExists(ctx, dir, participant.RollbackPoint) {
+			continue
+		}
+		findings = append(findings, Finding{
+			Rule: "changeset/rollback-point-missing", Severity: SeverityError,
+			Subject: set.ID + " · " + participant.Name,
+			Message: fmt.Sprintf("return point %s is not in this repository any more, so the recorded way back does not exist",
+				short(participant.RollbackPoint)),
+			Fix: "recover the revision, or record why the way back was lost",
+		})
+	}
+	return findings
+}
+
+func checkChangesets(ctx context.Context, ws *workspace.Workspace, now time.Time) ([]Finding, error) {
 	sets, err := changeset.LoadAll(ws.Root)
 	if err != nil {
 		return nil, err
@@ -670,6 +715,7 @@ func checkChangesets(ws *workspace.Workspace, now time.Time) ([]Finding, error) 
 	policy := ws.Manifest.Policy.Changeset
 	var findings []Finding
 	for _, set := range sets {
+		findings = append(findings, checkRollbackPoints(ctx, ws, set)...)
 		for _, problem := range changeset.Validate(set, policy.RequireRollbackPoint) {
 			findings = append(findings, Finding{
 				Rule: "changeset/invalid", Severity: SeverityError, Subject: set.ID,

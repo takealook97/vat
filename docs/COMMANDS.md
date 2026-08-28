@@ -263,6 +263,7 @@ The rules, and what each one prevents:
 | `brain/view-stale` | warn | a maintained view the generated index routes to, left behind by the records for longer than the review window |
 | `brain/source-external-governed` | error | a claim declaring its source external while the workspace governs it, which would exempt a checkable claim from every check |
 | `changeset/invalid` | error | a completion record that cannot be acted on |
+| `changeset/rollback-point-missing` | error | a recorded return point the repository no longer holds, so the way back the record promises does not exist |
 | `changeset/closed-unlanded` | warn | a changeset whose closing waived the landing gate, so the waiver stays visible |
 | `changeset/open-too-long` | warn | repositories mid-contract-change with no closing evidence |
 

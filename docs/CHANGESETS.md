@@ -166,6 +166,24 @@ checks it.
 
 ---
 
+## When the way back stops existing
+
+`rollback_point` is the one field in the record that cannot be reconstructed.
+Everything else can be read back off git; the revision a repository stood at
+before the change began cannot, which is why it is captured at enrolment.
+
+A rewritten history takes it away — a force-push, a squashed branch, a pruned
+object — and the record goes on asserting a return point in exactly the voice of
+one that is there. `vat lint` reports that as
+`changeset/rollback-point-missing`. There is no fix line worth printing: no
+command recovers a revision the repository does not hold. Recover it from a
+mirror or a bundle, or record why the way back was lost.
+
+A repository that is not cloned on this machine is not reported. Its absence
+says nothing about whether the history still holds the revision.
+
+---
+
 ## The return plan
 
 ```console
