@@ -22,7 +22,6 @@ a hope.
 
 [![CI](https://github.com/takealook97/vat/actions/workflows/ci.yml/badge.svg)](https://github.com/takealook97/vat/actions/workflows/ci.yml)
 [![Go Reference](https://pkg.go.dev/badge/github.com/takealook97/vat.svg)](https://pkg.go.dev/github.com/takealook97/vat)
-[![Go Report Card](https://goreportcard.com/badge/github.com/takealook97/vat)](https://goreportcard.com/report/github.com/takealook97/vat)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![Release](https://img.shields.io/github/v/release/takealook97/vat?sort=semver)](https://github.com/takealook97/vat/releases)
 

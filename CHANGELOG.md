@@ -6,6 +6,14 @@ Notable changes to `vat`. The format follows
 
 ## [Unreleased]
 
+### Removed
+
+- The Go Report Card badge. The service was sunset after a decade and its badge
+  endpoint now returns the word `retired` in place of a grade, which on a
+  project's front page reads as the project being retired rather than the
+  service. Its authors point to `golangci-lint` as the successor, which this
+  repository's CI has run all along — so nothing was lost but the badge.
+
 ## [0.2.0] - 2026-08-28
 
 ### Fixed
