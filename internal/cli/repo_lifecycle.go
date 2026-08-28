@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/takealook97/vat/internal/changeset"
 	"github.com/takealook97/vat/internal/fsx"
 	"github.com/takealook97/vat/internal/gitx"
 	"github.com/takealook97/vat/internal/lint"
@@ -80,13 +81,31 @@ func repoRenameCommand() *Command {
 	return &Command{
 		Name:    "rename",
 		Summary: "Rename a repository in the manifest and on disk",
-		Usage:   "vat repo rename <old> <new> [--keep-path]",
+		Usage:   "vat repo rename <old> <new> [--keep-path] [--origin <url>] [--plan]",
 		Long: `Rename a governed repository.
 
-The manifest entry, the directory, the .gitignore exclusion, and the generated
-harness move together. --keep-path renames only the manifest entry and records
-the existing directory as an explicit path, which is what you want when other
-tooling depends on the folder name.`,
+The manifest entry, the directory, the .gitignore exclusion, the brain policy if
+this repository is the knowledge layer, and the generated harness move together.
+--keep-path renames only the manifest entry and records the existing directory
+as an explicit path, which is what you want when other tooling depends on the
+folder name.
+
+A rename on the forge changes the URL the repository answers to, so --origin
+records the new identity. The clone's remote is never rewritten: a remote that
+does not match the manifest is a supply-chain signal, and vat reports it rather
+than smoothing it over. Rename the remote yourself, or keep the old one — a
+forge redirect means both routes work, and vat doctor names any extra remote it
+finds.
+
+--plan reports every effect and writes nothing.
+
+A repository enrolled in an open changeset is refused. That record claims which
+revisions were proven together, and renaming a participant out from under it
+either breaks the record or rewrites a claim about the past.`,
+		Examples: []string{
+			"vat repo rename cortex brain --plan",
+			"vat repo rename cortex brain --origin https://github.com/acme/brain.git",
+		},
 		Run: runRepoRename,
 	}
 }
@@ -94,6 +113,8 @@ tooling depends on the folder name.`,
 func runRepoRename(ctx context.Context, env *Env, args []string) error {
 	set := newFlagSet("repo rename")
 	keepPath := set.Bool("keep-path", false, "rename the manifest entry only, leaving the directory alone")
+	origin := set.String("origin", "", "record a new origin URL, as after a rename on the forge")
+	plan := set.Bool("plan", false, "report every effect and write nothing")
 	if err := parseFlags(set, args); err != nil {
 		return err
 	}
@@ -113,10 +134,35 @@ func runRepoRename(ctx context.Context, env *Env, args []string) error {
 	if _, taken := ws.Manifest.Find(newName); taken {
 		return usageErrorf("%s is already in %s", newName, manifest.FileName)
 	}
+	if *origin != "" {
+		if err := manifest.ValidateRepoOrigin(*origin); err != nil {
+			return usageErrorf("--origin: %v", err)
+		}
+		if manifest.HasEmbeddedCredential(*origin) {
+			// Neither branch quotes the value: an origin is the field most
+			// likely to hold a token, and an error message is not where that
+			// surfaces.
+			return usageErrorf("--origin embeds a credential; store it in your git credential helper and pass the plain URL")
+		}
+	}
+	// Asked before anything is validated or moved. A changeset names its
+	// participants by the manifest name, so a rename either leaves the record
+	// pointing at a repository that is gone or rewrites what it claims was
+	// verified — and the second is worse.
+	if blocking := openChangesetsNaming(ws, oldName); len(blocking) > 0 {
+		return usageErrorf(
+			"%s is enrolled in %s, which is still open.\n"+
+				"  A completion record names which revisions were proven together, so it is not\n"+
+				"  rewritten by a rename. Close or abandon it first.",
+			oldName, strings.Join(blocking, ", "))
+	}
 
 	oldDir := ws.RepoPath(repo)
 	updated := repo
 	updated.Name = newName
+	if *origin != "" {
+		updated.Origin = *origin
+	}
 	if *keepPath {
 		updated.Path = repo.Dir()
 	} else {
@@ -129,8 +175,20 @@ func runRepoRename(ctx context.Context, env *Env, args []string) error {
 	// it — `vat repo rename payments ../../payments` did exactly that.
 	without, _ := manifest.WithoutRepo(ws.Manifest, oldName)
 	next := manifest.WithRepo(without, updated)
+	// The knowledge layer is named twice: once as a repository and once as the
+	// policy that points at it. Moving only the first made the manifest invalid,
+	// so renaming an adopted brain was impossible without editing vat.yaml by
+	// hand — in the one command that exists to avoid exactly that.
+	if next.Policy.Brain.Repo == oldName {
+		next.Policy.Brain.Repo = newName
+	}
 	if err := manifest.Validate(next); err != nil {
 		return usageErrorf("%v", err)
+	}
+
+	if *plan {
+		reportRenamePlan(env, ws, repo, updated, *keepPath)
+		return nil
 	}
 
 	moved := false
@@ -258,4 +316,60 @@ func reportUncommittedContracts(env *Env, ws *workspace.Workspace) {
 		sentence = "Commit %s in their repositories. They are the contract a session opened in one reads."
 	}
 	env.Printer.Hint(sentence, strings.Join(pending, ", "))
+}
+
+// openChangesetsNaming returns the identifiers of open changesets that enrol a
+// repository. A record that is closed, rolled back, or abandoned describes the
+// past under the name it used then, and is left exactly as it is.
+func openChangesetsNaming(ws *workspace.Workspace, name string) []string {
+	sets, err := changeset.LoadAll(ws.Root)
+	if err != nil {
+		// Unreadable records are `vat lint`'s finding. Refusing a rename over
+		// one would make an unrelated defect look like a rule about renaming.
+		return nil
+	}
+	var blocking []string
+	for _, set := range sets {
+		if !set.Status.Open() {
+			continue
+		}
+		if _, enrolled := set.Participant(name); enrolled {
+			blocking = append(blocking, set.ID)
+		}
+	}
+	return blocking
+}
+
+// reportRenamePlan says what a rename would touch, in the order it would touch
+// it. Nothing is written.
+func reportRenamePlan(
+	env *Env, ws *workspace.Workspace, from, to manifest.Repo, keepPath bool,
+) {
+	env.Printer.Status(ui.LevelInfo, manifest.FileName,
+		fmt.Sprintf("repos entry %s → %s", from.Name, to.Name))
+	if from.Origin != to.Origin {
+		env.Printer.Status(ui.LevelInfo, manifest.FileName,
+			fmt.Sprintf("origin %s → %s", gitx.Redact(from.Origin), gitx.Redact(to.Origin)))
+	}
+	if ws.Manifest.Policy.Brain.Repo == from.Name {
+		env.Printer.Status(ui.LevelInfo, manifest.FileName,
+			fmt.Sprintf("policy.brain.repo %s → %s", from.Name, to.Name))
+	}
+	switch {
+	case keepPath:
+		env.Printer.Status(ui.LevelSkip, ws.Rel(ws.RepoPath(from)),
+			"left where it is; recorded as an explicit path")
+	case fsx.Exists(ws.RepoPath(from)):
+		env.Printer.Status(ui.LevelInfo, ws.Rel(ws.RepoPath(from)),
+			"directory moves to "+ws.Rel(ws.RepoPath(to)))
+	default:
+		env.Printer.Status(ui.LevelSkip, from.Name, "not cloned, so no directory moves")
+	}
+	env.Printer.Status(ui.LevelInfo, ".gitignore", "exclusion follows the directory")
+	env.Printer.Status(ui.LevelInfo, "AGENTS.md", "generated regions are rewritten from the manifest")
+	// Said even when there is no remote to speak of: the reader is deciding
+	// what to do on the forge, and the answer is the same either way.
+	env.Printer.Hint("\nvat never rewrites a remote. Rename it yourself, or keep the old one:\n"+
+		"  git -C %s remote set-url origin <new-url>", ws.Rel(ws.RepoPath(to)))
+	env.Printer.Hint("\nNothing was written. Run again without --plan to apply.")
 }

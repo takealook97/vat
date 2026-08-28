@@ -325,7 +325,7 @@ vat repo adopt   <directory> [--role <r>] [--group <g>] [--branch <b>]
 vat repo remove  <name> [--delete] [--force]
 vat repo archive <name>
 vat repo unarchive <name>
-vat repo rename  <old> <new> [--keep-path]
+vat repo rename  <old> <new> [--keep-path] [--origin <url>] [--plan]
 ```
 
 Every mutation moves the manifest, the `.gitignore` exclusion, and the generated
@@ -339,6 +339,20 @@ through `remote_template`, part of a URL.
 
 Every flag is validated before anything is created, so a typo cannot leave a
 directory behind that is in neither the manifest nor `.gitignore`.
+
+`rename` moves the manifest entry, the directory, the `.gitignore` exclusion,
+`policy.brain.repo` when the repository is the knowledge layer, and the
+generated contracts together. `--origin` records the URL a repository answers to
+after a rename on the forge; the clone's remote is never rewritten, because a
+remote that does not match the manifest is a supply-chain signal and vat reports
+it rather than smoothing it over. `--plan` reports every effect and writes
+nothing.
+
+A repository enrolled in an **open** changeset is refused. That record claims
+which revisions were proven together, so a rename would either leave it pointing
+at a repository that is gone or rewrite a claim about the past. A closed,
+rolled-back, or abandoned record describes the past under the name it used then
+and is left alone.
 
 `list --format tsv` writes name, role, group, branch, state, and origin
 separated by tabs, with no header and no alignment. The aligned table is for
