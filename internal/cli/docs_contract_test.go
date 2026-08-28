@@ -456,8 +456,12 @@ func TestEveryRetractedVersionIsExplainedInTheChangelog(t *testing.T) {
 			t.Errorf("go.mod retracts %s and %s has no section for it", version, changelogPath)
 			continue
 		}
-		if !strings.Contains(body, "Retracted") {
-			t.Errorf("%s documents %s without saying it was retracted", changelogPath, version)
+		// The heading, not the word. A section that retracts *other* versions
+		// mentions "Retracted" too, and 0.1.7's did — so a version that
+		// retracted its predecessors and was later retracted itself passed
+		// this check while telling a reader nothing about itself.
+		if !strings.Contains(body, "### Retracted") {
+			t.Errorf("%s documents %s without a Retracted section of its own", changelogPath, version)
 		}
 	}
 }

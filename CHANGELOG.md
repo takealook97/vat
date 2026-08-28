@@ -6,6 +6,27 @@ Notable changes to `vat`. The format follows
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-08-28
+
+### Retracted
+
+`0.1.6` and `0.1.7`, which leaves every version before this one retracted.
+
+Two commands running at once each read `vat.yaml` and each wrote it back whole,
+so one repository silently vanished from the manifest with nothing reported — a
+loss of the record this tool exists to keep. A directory inside the workspace
+that is a symlink out of it satisfied every check those versions made, so
+`repo add` and `lint --fix` rendered `AGENTS.md` into a repository vat does not
+govern. And `vat lint --only <typo>` matched no rule, checked nothing, and
+exited `0` — the flag this project's own adoption guide puts in CI, so a build
+could stay green for as long as nobody looked.
+
+`proxy.golang.org` freezes a version's content on first fetch and offers no
+deletion, so retraction is the only thing that stops the toolchain offering
+them. A retraction takes effect only once published in a version above the ones
+it names, which is why it ships here. Naming a retracted version explicitly
+still installs it; what stops is automatic selection.
+
 ### Added
 
 - `vat harness adopt`, which moves a runtime's hand-written agent files into
@@ -832,7 +853,12 @@ Notable changes to `vat`. The format follows
 
 ### Retracted
 
-Every version before this one. `proxy.golang.org` freezes a version's content on
+**This version is itself retracted**, for the defects listed under 0.1.6: a
+manifest write lost with no report, a write outside the workspace through a
+symlink, and `vat lint --only <typo>` checking nothing and exiting `0`. Fixed in
+0.2.0.
+
+It also retracted every version before it. `proxy.golang.org` freezes a version's content on
 first fetch and offers no deletion, so `go install` would keep serving code with
 a disclosed credential or a workspace escape in it forever. Retraction is the
 only thing that stops the toolchain offering them: `go get` refuses a retracted
@@ -844,6 +870,16 @@ defect.
 Upgrade to 0.1.7 or later. The reason for each is recorded under it below.
 
 ## [0.1.6] - 2026-08-26
+
+### Retracted
+
+Loses a manifest write with no report, and writes outside the workspace. Two
+commands running at once each read `vat.yaml` and each wrote it back whole, so
+one repository silently vanished from the manifest. A directory inside the
+workspace that is a symlink out of it satisfied every check, so `repo add` and
+`lint --fix` rendered `AGENTS.md` into a repository vat does not govern. And
+`vat lint --only <typo>` matched no rule, checked nothing, and exited `0`.
+Fixed in 0.2.0.
 
 ### Fixed
 
