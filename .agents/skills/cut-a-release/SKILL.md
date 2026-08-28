@@ -32,7 +32,13 @@ on-disk format is a breaking change even when no Go symbol moved.
    empty above it. The heading carries no `v`; the tag does.
 2. Commit: `chore: release vX.Y.Z`.
 3. Tag: `git tag vX.Y.Z`. The workflow triggers on `v*` and on nothing else.
-4. `git push origin main --follow-tags`.
+4. `git push origin main` **and then** `git push origin vX.Y.Z`.
+
+   Push the tag by name. `--follow-tags` pushes only *annotated* tags, and every
+   tag this repository has is lightweight, so it skipped the tag in silence:
+   main moved, the workflow never triggered, and the push reported success.
+   Confirm with `git ls-remote --tags origin | grep vX.Y.Z` before believing the
+   release happened.
 5. The workflow then builds the five targets in its `TARGETS` list, writes a
    CycloneDX SBOM per target, generates the shell completions, packages and
    checksums the archives, attests them **and** `checksums.txt`, and publishes
@@ -80,7 +86,9 @@ Not for a typo.
 ## When it must stop
 
 Stop before pushing if `make check` is red, if the working tree is dirty, or if
-the version cannot be justified from the diff. None of those is recoverable
+the version cannot be justified from the diff. Stop after pushing, too, until
+`git ls-remote --tags origin` shows the tag: a push that moved main and left the
+tag behind reports success and publishes nothing. None of those is recoverable
 afterwards, because the push is the publication.
 
 Deciding that a defect is severe enough to retract is a judgement about other

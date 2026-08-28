@@ -8,6 +8,13 @@ Notable changes to `vat`. The format follows
 
 ## [0.2.0] - 2026-08-28
 
+### Fixed
+
+- The release procedure pushed the tag with `--follow-tags`, which pushes only
+  *annotated* tags. Every tag this repository has is lightweight, so the command
+  moved `main`, skipped the tag in silence, and reported success — the workflow
+  never triggered and nothing was published. Found by following the procedure.
+
 ### Retracted
 
 `0.1.6` and `0.1.7`, which leaves every version before this one retracted.
