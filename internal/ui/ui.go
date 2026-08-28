@@ -164,6 +164,22 @@ func (p *Printer) Hint(format string, args ...any) {
 	_, _ = fmt.Fprintf(p.out, "%s\n", p.paint(colorGray, multiLine(fmt.Sprintf(format, args...))))
 }
 
+// ErrorHint writes guidance that belongs to a failure.
+//
+// It goes to stderr because stdout is the data stream: under --json a consumer
+// pipes stdout straight into a parser, and a usage line there makes the parser
+// fail on syntax while the real reason sits on stderr where nothing is looking.
+// The plain case breaks the same way — `vat ... > out.json` wrote the usage
+// line into the file.
+//
+// Hint stays on stdout: it is what a command says after succeeding.
+func (p *Printer) ErrorHint(format string, args ...any) {
+	if p.quiet {
+		return
+	}
+	_, _ = fmt.Fprintf(p.err, "%s\n", p.paint(colorGray, multiLine(fmt.Sprintf(format, args...))))
+}
+
 // Status writes one observation as "LEVEL  subject  detail".
 func (p *Printer) Status(level Level, subject, detail string) {
 	if p.quiet && (level == LevelOK || level == LevelInfo) {

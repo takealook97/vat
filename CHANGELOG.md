@@ -359,6 +359,12 @@ Notable changes to `vat`. The format follows
   shows, and nothing checked that — in the one asset a reader takes as evidence
   the tool does what the page claims. A contract test now holds it to naming
   every file `vat init` writes unconditionally, the seeded procedures included.
+- Guidance printed beside a failure goes to stderr, not stdout. The `usage:`
+  line and "Run `vat init` here" were written to the data stream: under `--json`
+  a consumer piping stdout into a parser got a syntax error while the real
+  reason sat on stderr where nothing was looking, and `vat ... > out.json` wrote
+  the usage line into the file. `Hint` stays on stdout — it is what a command
+  says after succeeding.
 - The CI and release workflows use current actions. Every one was several
   majors behind and three pinned a Node 20 runtime the runners have already
   begun forcing onto Node 24. `softprops/action-gh-release` is held at v2 on

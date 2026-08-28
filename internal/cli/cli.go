@@ -257,7 +257,7 @@ func dispatch(ctx context.Context, env *Env, command *Command, args []string, pa
 		return ExitOK
 	case isUsageError(err):
 		env.Printer.Errorf("%v", err)
-		env.Printer.Hint("\n%s", usageLine(command))
+		env.Printer.ErrorHint("%s", usageLine(command))
 		return ExitUsage
 	case isFindingsError(err):
 		// The command already printed its findings; this is only the exit code.
@@ -267,7 +267,7 @@ func dispatch(ctx context.Context, env *Env, command *Command, args []string, pa
 		return ExitFindings
 	case errors.Is(err, workspace.ErrNoWorkspace), errors.Is(err, manifest.ErrNotFound):
 		env.Printer.Errorf("%v", err)
-		env.Printer.Hint("\nRun `vat init` here, or `cd` into a workspace.")
+		env.Printer.ErrorHint("Run `vat init` here, or `cd` into a workspace.")
 		return ExitUsage
 	default:
 		env.Printer.Errorf("%v", err)

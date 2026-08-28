@@ -940,3 +940,36 @@ func TestADryRunSummarisesThePlanRatherThanAnOutcome(t *testing.T) {
 		t.Errorf("the summary does not say nothing happened:\n%s", output)
 	}
 }
+
+// stdout is the data stream. Under --json a consumer pipes it straight into a
+// parser, and a `usage:` line there makes the parser fail on syntax while the
+// actual reason sits on stderr where nothing is looking. It breaks the plain
+// case too: `vat ... > out.json` wrote the usage line into the file.
+func TestGuidanceOnAFailureGoesToStderrNotIntoTheOutput(t *testing.T) {
+	// Arrange
+	h := newFixture(t)
+	h.mustRun("init", "--name", "acme")
+
+	cases := [][]string{
+		{"changeset", "show"}, // a usage error
+		{"repo", "add", "x"},  // a missing required flag
+	}
+
+	for _, args := range cases {
+		t.Run(strings.Join(args, " "), func(t *testing.T) {
+			// Act
+			code, out, errOut := h.runSplit(args...)
+
+			// Assert
+			if code == ExitOK {
+				t.Fatalf("`vat %s` succeeded", strings.Join(args, " "))
+			}
+			if strings.TrimSpace(out) != "" {
+				t.Errorf("a failing command wrote to stdout:\n%s", out)
+			}
+			if !strings.Contains(errOut, "usage:") {
+				t.Errorf("stderr does not carry the usage line:\n%s", errOut)
+			}
+		})
+	}
+}

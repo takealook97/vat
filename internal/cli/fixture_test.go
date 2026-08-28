@@ -78,6 +78,23 @@ func (h *workspaceFixture) run(args ...string) (int, string) {
 	return code, out.String() + errOut.String()
 }
 
+// runSplit executes one invocation and keeps the two streams apart, which is
+// the only way to assert which of them a message went to.
+func (h *workspaceFixture) runSplit(args ...string) (int, string, string) {
+	h.t.Helper()
+	var out, errOut bytes.Buffer
+	env := &Env{
+		Printer: ui.NewWith(&out, &errOut, false),
+		Now:     testNow,
+		Cwd:     h.root,
+		Root:    h.root,
+		JSON:    true,
+		Yes:     true,
+	}
+	code := dispatch(context.Background(), env, Root(), args, nil)
+	return code, out.String(), errOut.String()
+}
+
 // runJSON executes an invocation with --json and decodes the payload.
 func (h *workspaceFixture) runJSON(target any, args ...string) int {
 	h.t.Helper()
