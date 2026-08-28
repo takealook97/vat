@@ -6,6 +6,16 @@ Notable changes to `vat`. The format follows
 
 ## [Unreleased]
 
+### Fixed
+
+- CI no longer cancels a run on `main`. Superseding is right on a branch, where
+  only the latest commit is under review, and wrong on `main`, where every
+  commit is something somebody may install. Three commits went through
+  unverified on 2026-08-28 — one of them the change a release was tagged on
+  minutes later — and the badge went red each time, because GitHub reports a
+  cancelled run as a failed one. A badge that turns red for pushing twice
+  quickly is a badge people stop reading.
+
 ## [0.2.1] - 2026-08-28
 
 ### Fixed

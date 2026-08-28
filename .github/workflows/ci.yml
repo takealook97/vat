@@ -9,9 +9,15 @@ on:
 permissions:
   contents: read
 
+# Superseding a run is right on a branch, where only the latest commit is under
+# review, and wrong on main, where every commit is a thing somebody may install.
+# Cancelling there let three commits through unverified on 2026-08-28 — one of
+# them the change a release was tagged on minutes later — and painted the badge
+# red each time, because GitHub reports a cancelled run as a failed one. A badge
+# that goes red for pushing twice quickly is a badge people stop reading.
 concurrency:
   group: ci-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 jobs:
   test:
