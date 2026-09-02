@@ -66,7 +66,9 @@ workspace:
 ```
 
 `requires.vat` refuses an older vat rather than letting it act on rules it does
-not implement. `vocabulary` renames the nouns in the generated contracts, so
+not implement. It refuses a newer one just as firmly, which is the point of
+pinning a minor range: widen the range when you upgrade, deliberately, rather
+than discovering on somebody else's machine that the tool moved. `vocabulary` renames the nouns in the generated contracts, so
 your people and your agents read your word rather than the tool's — the
 repository and directory names were always yours, and `vat repo rename` moves
 one later.

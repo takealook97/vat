@@ -288,9 +288,14 @@ func checkRecordSize(store *Store, policy CheckPolicy) []Finding {
 	}
 	var findings []Finding
 	for _, record := range store.Records {
+		// An archived record is out of the working set, and asking somebody to
+		// split a decision that has already been replaced is asking them to
+		// edit history for tidiness.
 		if record.Archived {
 			continue
 		}
+		// The same measure the ranking uses, because the argument for the rule
+		// is that the ranking punishes exactly this.
 		words := len(strings.Fields(record.Body))
 		if words <= limit {
 			continue

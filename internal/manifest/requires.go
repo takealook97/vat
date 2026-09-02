@@ -119,8 +119,52 @@ func (t term) holds(version semver) bool {
 }
 
 // ErrToolTooOld is returned when the running vat does not satisfy the
-// workspace's requirement.
+// workspace's requirement and a newer one could.
 var ErrToolTooOld = errors.New("this workspace requires a different vat")
+
+// ErrToolTooNew is returned when the running vat is past every bound the
+// workspace failed, so no upgrade can satisfy it.
+//
+// The two are separated because the remedy is opposite and one of them was
+// being given for both. Pinning `>=0.4.0 <0.5.0` is how `requires.vat` is meant
+// to be used, so every workspace that pins a minor range meets this on the
+// release that follows — and telling that person to upgrade names the one
+// action that moves them further from the range.
+var ErrToolTooNew = errors.New("this workspace requires a different vat")
+
+// excludesAbove reports whether every term the version fails is an upper bound
+// it has passed.
+//
+// A constraint can fail at both ends at once — `>=9.0.0 <0.1.0` is satisfiable
+// by nothing — and there the lower bound is the reachable one, so it is not
+// reported as too new.
+func (c Constraint) excludesAbove(version semver) bool {
+	failed := 0
+	for _, t := range c.terms {
+		if t.holds(version) {
+			continue
+		}
+		failed++
+		if !t.boundsAbove(version) {
+			return false
+		}
+	}
+	return failed > 0
+}
+
+// boundsAbove reports whether this failing term is one the version is past
+// rather than short of.
+func (t term) boundsAbove(version semver) bool {
+	switch t.operator {
+	case "<", "<=":
+		return true
+	case ">", ">=":
+		return false
+	default:
+		// `=`, which fails in both directions; the comparison says which.
+		return version.compare(t.version) > 0
+	}
+}
 
 // CheckToolVersion reports whether the running vat may operate this workspace.
 //
@@ -142,8 +186,12 @@ func CheckToolVersion(m Manifest, running string) error {
 	if allowed {
 		return nil
 	}
+	sentinel := ErrToolTooOld
+	if parsed, err := parseSemver(running); err == nil && constraint.excludesAbove(parsed) {
+		sentinel = ErrToolTooNew
+	}
 	return fmt.Errorf("%w: %s requires vat %s and this is %s",
-		ErrToolTooOld, FileName, constraint, running)
+		sentinel, FileName, constraint, running)
 }
 
 // describeSuffix matches what `git describe --tags --dirty` appends to the
