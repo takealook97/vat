@@ -94,3 +94,51 @@ func TestAConstraintNobodyCanParseIsReportedAgainstTheFile(t *testing.T) {
 		t.Errorf("output does not name the field at fault:\n%s", output)
 	}
 }
+
+// The counterpart, and the one that had the wrong advice. A workspace pinned to
+// a minor range refuses the next minor, and telling that person to upgrade
+// names the one action that cannot help: they are already past the range, and
+// every upgrade moves them further from it. This is not a corner case — pinning
+// `>=0.4.0 <0.5.0` is how the field is meant to be used, so every such
+// workspace meets this message on the release that follows.
+func TestAWorkspaceOlderThanThisVatIsToldToWidenItRatherThanUpgrade(t *testing.T) {
+	// Arrange
+	h := adoptedFixture(t, "payments")
+	requiring(t, h, ">=0.4.0 <0.5.0")
+
+	// Act
+	code, output := h.runAs("0.5.0", "status")
+
+	// Assert
+	if code != ExitFindings {
+		t.Errorf("exit = %d, want %d for a workspace this build may not operate", code, ExitFindings)
+	}
+	if strings.Contains(output, "Upgrade vat") {
+		t.Errorf("the hint tells a person already past the range to upgrade, which cannot help:\n%s", output)
+	}
+	for _, want := range []string{"<0.5.0", "0.5.0", "requires.vat"} {
+		if !strings.Contains(output, want) {
+			t.Errorf("output is missing %q:\n%s", want, output)
+		}
+	}
+}
+
+// A constraint failing at both ends is unsatisfiable by any version, so the
+// advice must not claim that widening one end fixes it. Upgrading is still the
+// nearer truth — the lower bound is the reachable one — so the old hint stands.
+func TestAConstraintNoVersionCanSatisfyStillAdvisesTheReachableEnd(t *testing.T) {
+	// Arrange
+	h := adoptedFixture(t, "payments")
+	requiring(t, h, ">=9.0.0 <0.1.0")
+
+	// Act
+	code, output := h.runAs("0.5.0", "status")
+
+	// Assert
+	if code != ExitFindings {
+		t.Errorf("exit = %d, want %d", code, ExitFindings)
+	}
+	if !strings.Contains(output, "Upgrade vat") {
+		t.Errorf("a constraint whose lower bound is unmet should still name the upgrade:\n%s", output)
+	}
+}

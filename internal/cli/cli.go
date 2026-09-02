@@ -292,6 +292,14 @@ func dispatch(ctx context.Context, env *Env, command *Command, args []string, pa
 			env.Printer.Hint("\n%s", message)
 		}
 		return ExitFindings
+	case errors.Is(err, manifest.ErrToolTooNew):
+		env.Printer.Errorf("%v", err)
+		// Naming the upgrade here would name the one action that cannot help:
+		// this vat is already past the range, and every newer one is further
+		// from it.
+		env.Printer.ErrorHint(
+			"Widen `requires.vat` in vat.yaml to admit this version, or install the one it names.")
+		return ExitFindings
 	case errors.Is(err, manifest.ErrToolTooOld):
 		env.Printer.Errorf("%v", err)
 		env.Printer.ErrorHint(
