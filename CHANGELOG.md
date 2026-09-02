@@ -6,6 +6,31 @@ Notable changes to `vat`. The format follows
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-09-03
+
+### Added
+
+- `brain/terminal-unarchived` reports a superseded, revoked, or resolved record
+  still sitting in the working directories. `vat brain archive` could always
+  find these, but only for somebody who thought to run it, so they accumulate
+  unseen — the workspace this was measured against held forty-nine terminal
+  records and one archived one. The finding names `vat brain archive --apply`,
+  which resolves it exactly.
+- `brain/record-oversized` reports a record that has outgrown the single
+  judgement it is meant to hold. The cost is not storage: query ranking
+  discounts a document for length, so the record that has swallowed five
+  decisions ranks below any one of them written separately. The record most in
+  need of splitting was the hardest to find, and nothing said so. The limit is
+  1500 words, set from measurement rather than taste — in the largest workspace
+  available the median record was 189 words and the ninety-ninth percentile 938.
+  Splitting is never automatic; which paragraph belongs to which record is a
+  judgement about content.
+
+Both are warnings, and both read what every existing record already carries.
+Nothing on disk changes, the brain schema version is unchanged, and `vat.yaml`
+gains no field — so an existing workspace gets both findings on upgrade with no
+migration, and neither can turn a build red that was green before.
+
 ## [0.4.2] - 2026-08-28
 
 No change to what the program does. `internal/gitx` gained two functions in
