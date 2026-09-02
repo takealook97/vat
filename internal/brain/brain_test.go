@@ -356,8 +356,14 @@ func TestSupersedeUpdatesBothEndsAndPreservesTheOriginalBody(t *testing.T) {
 	if !strings.Contains(after["D-0001"].Body, "The reasoning at the time") {
 		t.Error("the original reasoning was destroyed; supersession must never rewrite it")
 	}
-	if findings := brain.Check(reload(t, root), brain.CheckPolicy{}, reference); len(findings) != 0 {
-		t.Errorf("Supersede left the chain invalid: %v", findingRules(findings))
+	// Superseding is precisely what creates an archive candidate, so the one
+	// finding expected here is that the replaced record has not been moved out
+	// of the working set yet. Anything else means the chain itself is wrong.
+	for _, finding := range brain.Check(reload(t, root), brain.CheckPolicy{}, reference) {
+		if finding.Rule == "brain/terminal-unarchived" && finding.ID == "D-0001" {
+			continue
+		}
+		t.Errorf("Supersede left the chain invalid: %s on %s", finding.Rule, finding.ID)
 	}
 }
 
@@ -737,5 +743,133 @@ func TestALineEndingIsNotProjectionDrift(t *testing.T) {
 	}
 	if len(rebuilt.Changed) != 0 {
 		t.Errorf("projections rewritten for their line endings: %v", rebuilt.Changed)
+	}
+}
+
+// A record that has reached an end state and is still in the working
+// directories is the state `vat brain archive` exists to resolve, and until
+// now nothing reported it. The command found it only when somebody thought to
+// run it, so a workspace could accumulate them for months — the one measured
+// while this rule was written had forty-nine terminal records and one archived
+// one, which is what a finding nobody is shown looks like from the outside.
+func TestCheckReportsATerminalRecordLeftInTheWorkingSet(t *testing.T) {
+	// Arrange
+	root, _ := newStore(t)
+	writeRecord(t, root, "decisions/0001-x.md", `
+id: D-0001
+status: superseded
+superseded_by: D-0002
+`, "# D-0001 — Replaced")
+	writeRecord(t, root, "decisions/0002-y.md", `
+id: D-0002
+status: active
+supersedes: [D-0001]
+`, "# D-0002 — The replacement")
+
+	// Act
+	findings := brain.Check(reload(t, root), brain.CheckPolicy{StaleAfterDays: 90}, reference)
+
+	// Assert
+	rules := findingRules(findings)
+	if _, found := rules["brain/terminal-unarchived"]; !found {
+		t.Errorf("a superseded record outside archive/ was not reported; got %v", rules)
+	}
+	for _, finding := range findings {
+		if finding.Rule != "brain/terminal-unarchived" {
+			continue
+		}
+		if finding.Severity != brain.SeverityWarn {
+			t.Errorf("severity = %q, want warn: an unarchived record makes the layer worse, not wrong, "+
+				"and an error here would break every existing workspace on upgrade", finding.Severity)
+		}
+		if !finding.Fixable {
+			t.Error("the finding should say it is fixable; `vat brain archive --apply` resolves it exactly")
+		}
+	}
+}
+
+// The counterpart: once the record has been moved, the rule must go quiet.
+// Reporting it from archive/ would make the finding permanent and the rule
+// useless.
+func TestCheckDoesNotReportATerminalRecordAlreadyArchived(t *testing.T) {
+	// Arrange
+	root, _ := newStore(t)
+	writeRecord(t, root, "archive/decisions/0001-x.md", `
+id: D-0001
+status: superseded
+superseded_by: D-0002
+`, "# D-0001 — Replaced")
+	writeRecord(t, root, "decisions/0002-y.md", `
+id: D-0002
+status: active
+supersedes: [D-0001]
+`, "# D-0002 — The replacement")
+
+	// Act
+	findings := brain.Check(reload(t, root), brain.CheckPolicy{StaleAfterDays: 90}, reference)
+
+	// Assert
+	if _, found := findingRules(findings)["brain/terminal-unarchived"]; found {
+		t.Error("an archived record was still reported, so the rule can never be satisfied")
+	}
+}
+
+// A record that has grown past a judgement is one nobody has split up yet, and
+// the query ranking already discounts it for length — so the record that most
+// needs reading is the one hardest to find. The threshold is deliberately far
+// above the ordinary record: in the workspace measured here the median was 189
+// words and the ninety-ninth percentile 938, so 1500 reports the outlier and
+// stays silent on the long-but-normal record.
+func TestCheckWarnsAboutARecordTooLargeToHoldOneJudgement(t *testing.T) {
+	// Arrange
+	root, _ := newStore(t)
+	writeRecord(t, root, "decisions/0001-x.md", `
+id: D-0001
+status: active
+`, "# D-0001 — Sprawling\n\n"+strings.Repeat("word ", 2000))
+	writeRecord(t, root, "decisions/0002-y.md", `
+id: D-0002
+status: active
+`, "# D-0002 — Ordinary\n\n"+strings.Repeat("word ", 200))
+
+	// Act
+	findings := brain.Check(reload(t, root), brain.CheckPolicy{StaleAfterDays: 90}, reference)
+
+	// Assert
+	var reported []string
+	for _, finding := range findings {
+		if finding.Rule != "brain/record-oversized" {
+			continue
+		}
+		reported = append(reported, finding.ID)
+		if finding.Severity != brain.SeverityWarn {
+			t.Errorf("severity = %q, want warn: a long record is legible, just badly so", finding.Severity)
+		}
+		if finding.Fixable {
+			t.Error("splitting a record is a judgement about its content, so it is never an automatic repair")
+		}
+	}
+	if len(reported) != 1 || reported[0] != "D-0001" {
+		t.Errorf("oversized records reported = %v, want exactly [D-0001]", reported)
+	}
+}
+
+// The threshold is configurable so a workspace whose records are legitimately
+// longer can raise it, and zero means the built-in default rather than
+// reporting every record as oversized.
+func TestCheckTreatsAZeroSizeLimitAsTheDefaultRatherThanZeroWords(t *testing.T) {
+	// Arrange
+	root, _ := newStore(t)
+	writeRecord(t, root, "decisions/0001-x.md", `
+id: D-0001
+status: active
+`, "# D-0001 — Ordinary\n\n"+strings.Repeat("word ", 200))
+
+	// Act
+	findings := brain.Check(reload(t, root), brain.CheckPolicy{}, reference)
+
+	// Assert
+	if _, found := findingRules(findings)["brain/record-oversized"]; found {
+		t.Error("an ordinary record was reported as oversized, so a zero limit means zero words")
 	}
 }
