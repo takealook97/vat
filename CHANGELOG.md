@@ -6,7 +6,39 @@ Notable changes to `vat`. The format follows
 
 ## [Unreleased]
 
+## [0.5.1] - 2026-09-03
+
+### Fixed
+
+- A workspace pinned below the running vat is told to widen its requirement
+  rather than to upgrade. Both directions of a failed `requires.vat` gave the
+  same hint, and for one of them it named the only action that cannot help:
+  somebody already past the range moves further from it with every upgrade.
+  Pinning a minor range is how the field is meant to be used, so 0.5.0 is
+  exactly the release on which those workspaces meet this message. A constraint
+  that fails at both ends — satisfiable by no version — still names the upgrade,
+  because the lower bound is the reachable one.
+
 ## [0.5.0] - 2026-09-03
+
+### Fixed
+
+- Release tarballs no longer carry the build runner's uid and gid. `tar` had
+  embedded whichever account the GitHub Actions runner happened to be, and a
+  container that maps neither refuses to extract the archive — nobody who
+  downloads a release is that runner. Owner and group are pinned to 0 and the
+  archive is tagged `--numeric-owner`. Archives published up to and including
+  v0.4.2 still carry the old ownership; this is the first release without it.
+  The fix landed on main after v0.4.2 and went unrecorded until now, which is
+  why a correction shipped without anybody being able to read that it had.
+
+### Changed
+
+- `docs/SECURITY_MODEL.md` separates what a command refuses from what a rule
+  reports from what a role's contract merely states. One "control plane" label
+  had covered all three, which reads as a guarantee where two of the tiers are
+  a convention. The README is a landing page now, with the reference material
+  it used to inline moved into `docs/`.
 
 ### Added
 
@@ -28,8 +60,10 @@ Notable changes to `vat`. The format follows
 
 Both are warnings, and both read what every existing record already carries.
 Nothing on disk changes, the brain schema version is unchanged, and `vat.yaml`
-gains no field — so an existing workspace gets both findings on upgrade with no
-migration, and neither can turn a build red that was green before.
+gains no field, so neither can turn a build red that was green before. A
+workspace that pins `requires.vat` to a minor range still has to widen it to
+admit 0.5.x; that is the field working as intended, not a migration this
+release introduced.
 
 ## [0.4.2] - 2026-08-28
 
