@@ -360,6 +360,12 @@ and in one directory an external index can exclude wholesale.
 
 Relative links inside a moved record are repointed so they still resolve.
 
+`vat brain check` reports the same records as `brain/terminal-unarchived`, so a
+working set that is quietly filling with replaced decisions shows up in the
+ordinary check rather than only when somebody remembers to run `archive`. It is
+a warning: an unarchived record makes the entry point larger, not the layer
+wrong.
+
 `history/` is the other half of that separation and vat never writes to it. It
 is where people put long-form past material — the analysis a decision was drawn
 from, a narrative that has been overtaken — so that it stays searchable under
@@ -448,6 +454,7 @@ knows to look for, so this table and `brain.RuleNames()` are compared by a test.
 | `brain/link-broken` | error | a relative link in a record that resolves to nothing |
 | `brain/quarantine-reason` | error | a quarantine with no stated cause, which cannot be reviewed or lifted later |
 | `brain/record-malformed` | error | a file that cannot be read as a record, and is therefore invisible to every rule above |
+| `brain/record-oversized` | warn | a record past the length limit — it holds more than one judgement, and length normalisation ranks it below the records it should have been split into |
 | `brain/record-secret-suspected` | error / warn | a line that carries a credential; error for unmistakable shapes, warning for heuristics |
 | `brain/ref-missing` | error | a reference to a record that does not exist |
 | `brain/ref-withdrawn` | warn | a record citing a revoked or quarantined one as support |
@@ -462,6 +469,7 @@ knows to look for, so this table and `brain.RuleNames()` are compared by a test.
 | `brain/superseded-status` | error | `superseded_by` set while the status says otherwise |
 | `brain/supersedes-asymmetric` | error | the same break, seen from the replacement |
 | `brain/supersedes-missing` | error | `supersedes` naming a record that does not exist |
+| `brain/terminal-unarchived` | warn | a superseded, revoked, or resolved record still in the working set; `vat brain archive --apply` moves it |
 | `brain/title-missing` | warn | a record with no heading; the index can show only its identifier |
 
 ```console
@@ -507,6 +515,13 @@ Ranking discounts length. Counting raw occurrences instead is arithmetic, not
 relevance: a long record repeating one query word beats a short record that
 answers all three, and the long record is usually the sprawling one nobody has
 split up yet. Matching every term is worth more than any amount of repetition.
+
+That discount is why `brain/record-oversized` exists. The record that has grown
+to hold five decisions ranks below any one of them written separately, so the
+record most in need of splitting is also the hardest to find. The check reports
+it rather than leaving the ranking to punish it silently. Splitting stays a
+human judgement — which paragraph belongs to which record is a question about
+content, and this tool does not answer those.
 
 The reading contract:
 

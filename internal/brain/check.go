@@ -42,11 +42,25 @@ type CheckPolicy struct {
 	// ReviewSLADays is how long a record may stay in a non-answerable state
 	// before the queue itself is reported as failing.
 	ReviewSLADays int
+	// MaxRecordWords is the length past which a record is reported as holding
+	// more than one judgement. Zero selects defaultMaxRecordWords.
+	MaxRecordWords int
 	// Only narrows the report to rules whose name contains one of these. It is
 	// for working through one class of problem at a time; an empty list checks
 	// everything.
 	Only []string
 }
+
+// defaultMaxRecordWords is where a record stops being one judgement and starts
+// being a directory nobody has made yet.
+//
+// It is set from measurement rather than taste. In the largest workspace
+// available when this rule was written the median record was 189 words and the
+// ninety-ninth percentile 938, while the longest was 4723 — twenty-five times
+// the median. A limit at the ninety-ninth percentile would report the merely
+// thorough record; this one reports the record that is visibly a different kind
+// of object.
+const defaultMaxRecordWords = 1500
 
 // selected reports whether a rule survives the caller's --only filter.
 func selected(rule string, only []string) bool {
@@ -81,6 +95,7 @@ func RuleNames() []string {
 		"brain/link-broken",
 		"brain/quarantine-reason",
 		"brain/record-malformed",
+		"brain/record-oversized",
 		"brain/record-secret-suspected",
 		"brain/ref-missing",
 		"brain/ref-withdrawn",
@@ -95,6 +110,7 @@ func RuleNames() []string {
 		"brain/superseded-status",
 		"brain/supersedes-asymmetric",
 		"brain/supersedes-missing",
+		"brain/terminal-unarchived",
 		"brain/title-missing",
 	}
 }
@@ -112,6 +128,8 @@ func Check(store *Store, policy CheckPolicy, now time.Time) []Finding {
 	findings = append(findings, checkSecrets(store)...)
 	findings = append(findings, checkIdentity(store)...)
 	findings = append(findings, checkStatuses(store)...)
+	findings = append(findings, checkArchiveHygiene(store)...)
+	findings = append(findings, checkRecordSize(store, policy)...)
 	findings = append(findings, checkProvenance(store, policy, now)...)
 	findings = append(findings, checkSupersession(store, index)...)
 	findings = append(findings, checkReferences(store, index)...)
@@ -222,6 +240,68 @@ func checkStatuses(store *Store) []Finding {
 				Message: "revoked records must state a reason",
 			})
 		}
+	}
+	return findings
+}
+
+// checkArchiveHygiene reports the records that have reached an end state and
+// are still sitting in the working directories.
+//
+// `vat brain archive` has always been able to find these, but only for somebody
+// who thought to run it, so they accumulate unseen: the workspace this rule was
+// written against held forty-nine terminal records and one archived one. The
+// finding is a warning rather than an error because an unarchived record makes
+// the entry point larger, not the layer wrong — and because every workspace
+// that upgrades into this rule would otherwise fail its next build over a
+// condition that was never previously reported.
+func checkArchiveHygiene(store *Store) []Finding {
+	var findings []Finding
+	for _, record := range store.Records {
+		if !record.Status.Terminal() || record.Archived {
+			continue
+		}
+		findings = append(findings, Finding{
+			Rule: "brain/terminal-unarchived", Severity: SeverityWarn,
+			Path: record.Path, ID: record.ID, Fixable: true,
+			Message: fmt.Sprintf(
+				"%s but still in the working set; `vat brain archive --apply` moves it", record.Status),
+		})
+	}
+	return findings
+}
+
+// checkRecordSize reports a record that has outgrown the single judgement it is
+// meant to hold.
+//
+// The cost is not storage. Query ranking discounts a document for length — the
+// length normalisation in this package's own scorer — so the record that has
+// swallowed five decisions ranks below any one of them written separately. The
+// sprawling record is therefore both the one most in need of splitting and the
+// one hardest to find, and nothing said so until now.
+//
+// Splitting is never automatic: which paragraph belongs to which record is a
+// judgement about content, and this tool does not make those.
+func checkRecordSize(store *Store, policy CheckPolicy) []Finding {
+	limit := policy.MaxRecordWords
+	if limit <= 0 {
+		limit = defaultMaxRecordWords
+	}
+	var findings []Finding
+	for _, record := range store.Records {
+		if record.Archived {
+			continue
+		}
+		words := len(strings.Fields(record.Body))
+		if words <= limit {
+			continue
+		}
+		findings = append(findings, Finding{
+			Rule: "brain/record-oversized", Severity: SeverityWarn,
+			Path: record.Path, ID: record.ID,
+			Message: fmt.Sprintf(
+				"%d words against a limit of %d; a record this long holds more than one judgement and ranks below the records it should have been split into",
+				words, limit),
+		})
 	}
 	return findings
 }
