@@ -67,7 +67,8 @@ Commit messages, code, comments, and documentation are all in English.
 - **A test that fails without it.** New behaviour, and every bug fix, needs one.
   A bug fix without a regression test is an invitation for the bug to return.
 - **`make check` passing.** Formatting, vet for this platform and for each of
-  the three CI builds on, the linter, the race-enabled suite, and a build. This
+  the three CI builds on, the linter, the race-enabled suite, the coverage
+  floors below, and a build. This
   is the canonical proof; nothing else counts as one — but it runs the *suite*
   on one operating system only, so it is not evidence that CI will pass. The
   cross-platform vet catches an API that does not exist elsewhere; nothing local
@@ -76,8 +77,11 @@ Commit messages, code, comments, and documentation are all in English.
   CI is what finds those, and a change touching paths, permissions, signals, or
   file locking should say so rather than claim more than was checked.
 - **Coverage holding.** `make cover` enforces 80% overall *and* a 75% floor per
-  package. The second exists because the first was hiding what it was meant to
-  expose: at 80.5% overall, the three packages holding nearly all the logic were
+  package. `make check` runs it, so this is not a separate step to remember —
+  it was one until CI became the only place the floor was enforced, which meant
+  the gate written to stop coverage sliding could only report the slide once it
+  had been pushed. The per-package floor exists because the total was hiding
+  what it was meant to expose: at 80.5% overall, the three packages holding nearly all the logic were
   each under the stated line, floated there by small pure packages in the
   nineties. An average over unequal packages is not a floor.
 - **The spec, when the format changes.** `docs/SPEC.md` is normative and other

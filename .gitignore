@@ -10,6 +10,12 @@
 *.out
 *.test
 coverage.html
+# `make cover` parses the suite's own output from these and deletes them when it
+# finishes. An interrupted run leaves them behind, and a stray build artefact in
+# `git status` is how a real change gets missed while reading it.
+.coverage-packages
+.coverage-shortfall
+.coverage-untested
 
 # Local, derived state
 .vat/
