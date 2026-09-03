@@ -164,13 +164,14 @@ func loadRecord(root string, kind Kind, path string) (Record, error) {
 
 // contentHash identifies a record file by its content.
 //
-// Line endings are normalised first. The hash is written into a generated file
-// that is committed and read on every platform, so hashing the raw bytes would
-// make a Windows checkout disagree with the Linux one that produced it, and
-// every record would look changed to an index — and drifted to `brain check` —
-// for no reason but the checkout.
+// It hashes what the parser reads, not the bytes on disk: a hash that counted a
+// byte order mark or a line ending as content would report an edit for a file
+// the editor merely re-saved, and an index would re-read every record for the
+// checkout it was made on. frontmatter.Normalise is the same function Split
+// calls, so the two definitions of "content" cannot drift apart — which is
+// exactly how the byte order mark got past the line endings the first time.
 func contentHash(data []byte) string {
-	sum := sha256.Sum256([]byte(fsx.NormaliseNewlines(string(data))))
+	sum := sha256.Sum256([]byte(frontmatter.Normalise(string(data))))
 	return "sha256:" + hex.EncodeToString(sum[:])
 }
 

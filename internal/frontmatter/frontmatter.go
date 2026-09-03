@@ -25,9 +25,17 @@ type Document struct {
 	Present bool
 }
 
-// Split separates a Markdown file into header and body. A file without a
-// header yields Present=false and the whole file as Body.
-func Split(content string) Document {
+// Normalise removes the two things an editor adds to a Markdown file that are
+// not its content: a leading byte order mark, and CRLF line endings.
+//
+// Exported because a caller that hashes a file has to define its content the
+// same way the parser does. When those two definitions drifted apart, saving a
+// record in an editor that writes a BOM changed its hash while every field vat
+// reads stayed identical — a file reported as edited that nobody had edited.
+//
+// Nothing else is altered. A lone \r is content: git translates LF and CRLF and
+// nothing else, so a bare \r means the file really holds one.
+func Normalise(content string) string {
 	// An editor that writes a byte order mark puts three bytes in front of the
 	// opening delimiter, and the header stops being a header. Nothing errored:
 	// the whole file became body, every field was lost, and a role that plainly
@@ -36,8 +44,13 @@ func Split(content string) Document {
 	//
 	// Stripped here because roles, skills, and brain records all arrive through
 	// this one function.
-	normalised := strings.TrimPrefix(content, "\ufeff")
-	normalised = strings.ReplaceAll(normalised, "\r\n", "\n")
+	return strings.ReplaceAll(strings.TrimPrefix(content, "\ufeff"), "\r\n", "\n")
+}
+
+// Split separates a Markdown file into header and body. A file without a
+// header yields Present=false and the whole file as Body.
+func Split(content string) Document {
+	normalised := Normalise(content)
 	if !strings.HasPrefix(normalised, delimiter+"\n") {
 		return Document{Body: normalised}
 	}

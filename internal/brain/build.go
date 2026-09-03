@@ -437,10 +437,13 @@ type GraphNode struct {
 	SourceRef string   `json:"source_ref,omitempty"`
 	Observed  string   `json:"observed_at,omitempty"`
 	Refs      []string `json:"refs,omitempty"`
-	// ContentHash is the record file's content, hashed. An index that stored
-	// it alongside the last copy it read can tell which records it has to open
-	// again, instead of reading every file in the repository on every pass.
-	ContentHash string `json:"content_hash,omitempty"`
+	// ContentHash is Record.ContentHash, published.
+	//
+	// Never omitted when empty: an absent field would be indistinguishable from
+	// a hash nobody computed, and an index cannot tell "unchanged" from "not
+	// known" without re-reading the record — which is the work the field exists
+	// to avoid.
+	ContentHash string `json:"content_hash"`
 }
 
 // GraphEdge is a directed relation between two records.
@@ -453,10 +456,12 @@ type GraphEdge struct {
 // Graph is the exported projection of the record relations.
 type Graph struct {
 	Generated string `json:"generated_by"`
-	// SchemaVersion is the record contract this graph was written against, the
-	// same value the marker carries. A reader that does not recognise it knows
-	// the field meanings may have moved under it, which is the one thing a
-	// consumer outside this repository cannot find out any other way.
+	// SchemaVersion is the record contract this build implements, which is not
+	// necessarily the one the marker declares: a brain written by an older vat
+	// keeps its marker until something rewrites it, and the graph is rewritten
+	// on every build. A reader that does not recognise the value knows the
+	// field meanings may have moved under it, which is the one thing a consumer
+	// outside this repository cannot find out any other way.
 	SchemaVersion int         `json:"schema_version"`
 	Nodes         []GraphNode `json:"nodes"`
 	Edges         []GraphEdge `json:"edges"`

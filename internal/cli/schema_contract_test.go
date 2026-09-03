@@ -14,6 +14,7 @@ import (
 
 	"github.com/takealook97/vat/internal/brain"
 	"github.com/takealook97/vat/internal/changeset"
+	"github.com/takealook97/vat/internal/fsx"
 	"github.com/takealook97/vat/internal/manifest"
 )
 
@@ -429,4 +430,45 @@ func scalarsTypedAsSomethingElse(node *yaml.Node, path string) []mistypedScalar 
 		found = append(found, scalarsTypedAsSomethingElse(child, where)...)
 	}
 	return found
+}
+
+// The published example is the only worked workspace a reader can copy, and
+// nothing checked what vat writes into it. A change to `graph.json` left the
+// example behind — it gained two fields and the example kept the old shape — so
+// the first thing a reader who copied it saw was `vat lint` failing on drift in
+// a file they had not touched. The schema tests beside this one check the
+// example's hand-written files; this checks the one vat generates.
+//
+// graph.json and not CURRENT.md, though both are generated and both were stale.
+// CURRENT.md carries the date it was rebuilt and an age in days computed from
+// it, so it is drifted on every day but the one it was written — an invariant
+// no committed file can hold, and a test asserting it would go red overnight on
+// every machine with nothing changed. graph.json carries no clock, which is why
+// it is the one a test can hold to.
+func TestThePublishedExampleCarriesTheGraphThisBuildWrites(t *testing.T) {
+	// Arrange
+	root := "../../examples/workspace/brain"
+	store, err := brain.Load(root)
+	if err != nil {
+		t.Fatalf("load the example brain: %v", err)
+	}
+	if len(store.Records) == 0 {
+		t.Fatal("the example brain lost its records, and this test stopped checking anything")
+	}
+	committed, err := os.ReadFile(filepath.Join(root, brain.GraphFile))
+	if err != nil {
+		t.Fatalf("read the example %s: %v", brain.GraphFile, err)
+	}
+
+	// Act
+	rendered, err := brain.RenderGraph(store)
+	if err != nil {
+		t.Fatalf("RenderGraph: %v", err)
+	}
+
+	// Assert
+	if fsx.NormaliseNewlines(string(committed)) != fsx.NormaliseNewlines(string(rendered)) {
+		t.Errorf("the published example's %s is not what this build writes\n"+
+			"run `vat brain build` in examples/workspace", brain.GraphFile)
+	}
 }

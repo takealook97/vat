@@ -6,7 +6,7 @@ Start every question here. Find the identifiers that matter, then open only
 those records. Reading the whole repository makes answers worse, not better:
 superseded reasoning and current fact become indistinguishable.
 
-Rebuilt 2026-08-25.
+Rebuilt 2026-09-03.
 
 ## Inventory
 
@@ -40,7 +40,7 @@ These are not answers. Re-verify or retire them.
 
 | ID | Status | Age (days) | Record |
 | --- | --- | --- | --- |
-| `G-0001` | stale | 115 | [G-0001-retries-can-double-submit.md](gaps/G-0001-retries-can-double-submit.md) |
+| `G-0001` | stale | 124 | [G-0001-retries-can-double-submit.md](gaps/G-0001-retries-can-double-submit.md) |
 
 ## Reading contract
 

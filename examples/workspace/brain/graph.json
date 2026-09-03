@@ -1,5 +1,6 @@
 {
   "generated_by": "vat brain build",
+  "schema_version": 1,
   "nodes": [
     {
       "id": "D-0001",
@@ -9,7 +10,8 @@
       "path": "decisions/D-0001-orders-own-their-idempotency-keys.md",
       "refs": [
         "O-0001"
-      ]
+      ],
+      "content_hash": "sha256:746d775ecbb714c62a8e8cd927f26e17ac0d2dd8973326b540421a600510468d"
     },
     {
       "id": "G-0001",
@@ -23,14 +25,16 @@
       "refs": [
         "O-0001",
         "D-0001"
-      ]
+      ],
+      "content_hash": "sha256:eba8f84b4008699a1b9f394c57e0c7ad3e46493a2cfcd5250c2a3c0218bea6e8"
     },
     {
       "id": "O-0001",
       "kind": "goal",
       "status": "active",
       "title": "One order never becomes two",
-      "path": "goals/O-0001-one-order-never-becomes-two.md"
+      "path": "goals/O-0001-one-order-never-becomes-two.md",
+      "content_hash": "sha256:c459fe80c230eba9c018193c52e88825d74a1f78c5114ef9cd4db2a0635f981f"
     }
   ],
   "edges": [
