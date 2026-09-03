@@ -506,6 +506,11 @@ carries `schema_version` — the record contract it was written against — and 
 records that changed. Both are projections: a hand edit is drift, and the next
 build overwrites it.
 
+Because the hash covers the record file, `graph.json` moves whenever any byte of
+any record moves — a typo fix included, even though nothing the graph projects
+has changed. A commit that edits a record and does not rebuild leaves
+`vat lint` reporting drift.
+
 `sweep` lists proposed demotions; `--apply` writes them.
 
 `promote` refuses a current-state claim with no `owned_by` and no `source_ref`.

@@ -430,17 +430,32 @@ tell a projection it produced from a file that merely holds the same name:
   the string `vat brain build`.
 
 `graph.json` **MUST** also carry the top-level field `schema_version`, an
-integer holding the same record-contract version as the marker (§5.1). A reader
-that does not recognise the value **MUST NOT** assume the node fields still mean
-what it was written against.
+integer holding the record contract the **writing implementation** implements —
+not the value the marker declares, which may be lower in a brain that has not
+been rebuilt since the writer was upgraded. A reader that does not recognise the
+value **MUST NOT** assume the node fields still mean what it was written
+against.
 
-Each node **SHOULD** carry `content_hash`: the record file's content hashed with
-SHA-256, hex-encoded, prefixed `sha256:`. Line endings **MUST** be normalised to
-`\n` before hashing, so the same record hashes the same on every platform. The
-hash covers the whole file, header included — a status change is the edit an
-index must not miss, and it lives in the header. It exists so that an index over
-a brain can re-read only what changed; it is not an identifier, and §5.3 and
-§5.4 still decide what may be cited.
+Each node **MUST** carry `content_hash`: the record file hashed with SHA-256,
+hex-encoded, prefixed `sha256:`. The hash covers the whole file, header
+included — a status change is the edit an index must not miss, and it lives in
+the header.
+
+Two transformations, and no others, are applied to the bytes before hashing.
+They are named exactly because a second implementation has to reach the same
+digest for a file both tools agree is unchanged:
+
+1. A single leading `U+FEFF` is removed, if present. An editor that writes a
+   byte order mark changes no field of the record, so it **MUST NOT** change
+   the record's hash.
+2. Every `\r\n` sequence is replaced with `\n`.
+
+No other byte is altered. In particular a lone `\r` is **content** and **MUST
+NOT** be folded: version control translates `\n` and `\r\n` and nothing else, so
+a bare `\r` is in the file because somebody put it there.
+
+The hash exists so that an index over a brain can re-read only what changed. It
+is not an identifier, and §5.3 and §5.4 still decide what may be cited.
 
 A tool **MUST NOT** overwrite a file at either name that is non-empty and does
 not carry that provenance. A knowledge repository that predates this
@@ -673,7 +688,7 @@ conforming: it is the one instruction the agent cannot derive for itself.
 | Format | Current | Declared in |
 | --- | --- | --- |
 | manifest | 1 | `version:` in `vat.yaml` |
-| brain | 1 | `schema:` in `.brain` |
+| brain | 1 | `schema:` in `.brain`, and `schema_version` in `graph.json` |
 | changeset | 1 | implied by `id` pattern `CS-NNNN` |
 
 A version is incremented when a change would make an existing conforming reader
@@ -685,6 +700,7 @@ which kind each one is:
 | Format | Unknown keys | Adding an optional field |
 | --- | --- | --- |
 | brain record front matter | a reader **MUST** ignore them | not a version change |
+| brain generated projection | a reader **MUST** ignore them | not a version change |
 | manifest | a reader **MUST** reject the file | a version change |
 | completion record | a reader **MUST** reject the file | a version change |
 
