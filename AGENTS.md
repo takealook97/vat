@@ -109,8 +109,9 @@ make check
 ```
 
 Formatting, `go vet` for this platform and for each of the three CI builds on,
-`golangci-lint` when it is installed, the race-enabled suite, and a build.
-Nothing else counts as proof.
+`golangci-lint` when it is installed, the race-enabled suite, the coverage
+floors — 80% overall and 75% per package — and a build. Nothing else counts as
+proof.
 
 **It runs the suite on one operating system.** CI runs it on Linux, macOS, and
 Windows, so a green `make check` is not evidence that CI will pass. The

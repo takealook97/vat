@@ -46,8 +46,15 @@ PACKAGE_COVERAGE_MIN ?= 75
 .DEFAULT_GOAL := check
 .PHONY: check build install test cover lint fmt vet tidy clean release-snapshot help
 
-## check: format, vet, lint, test, and build — the canonical proof a change is complete
-check: fmt vet lint test build
+# `cover` is part of `check` for the reason the coverage comment above gives.
+# The floor was enforced in CI and nowhere else, so the one gate written to stop
+# coverage sliding could only report the slide after it had been pushed — and
+# CONTRIBUTING.md lists coverage as a completion requirement, which made `check`
+# not the proof it claims to be. It costs one more run of the suite; the race
+# run cannot double as it, because a binary is either instrumented for coverage
+# or for the race detector and `check` needs both answers.
+## check: format, vet, lint, test, cover, and build — the canonical proof a change is complete
+check: fmt vet lint test cover build
 
 ## build: compile the binary into ./bin
 build:
@@ -63,17 +70,24 @@ install:
 test:
 	go test -race ./...
 
+# One run of the suite, not two. `-coverprofile` already prints the per-package
+# percentage that the second `go test -cover` was being run to collect, so that
+# run was forty seconds spent re-deriving what the first one had printed and
+# nobody had read. The output is buffered to a file rather than streamed because
+# it has to be parsed; it is echoed as soon as the run ends, and on failure
+# before anything else.
 ## cover: run tests and fail when total or per-package coverage falls too low
 cover:
-	go test -coverprofile=coverage.out ./...
+	@go test -coverprofile=coverage.out ./... > .coverage-packages 2>&1 || { \
+		cat .coverage-packages; $(RM) .coverage-packages; exit 1; }
+	@cat .coverage-packages
 	@total=$$(go tool cover -func=coverage.out | tail -1 | awk '{print $$NF}' | tr -d '%'); \
 	echo "total coverage: $$total% (minimum $(COVERAGE_MIN)%)"; \
 	awk -v have="$$total" -v want="$(COVERAGE_MIN)" \
 		'BEGIN { exit !(have + 0 >= want + 0) }' || { \
 		echo "coverage $$total% is below the $(COVERAGE_MIN)% minimum required by CONTRIBUTING.md"; \
-		exit 1; }
-	@go test -cover ./... 2>/dev/null > .coverage-packages; \
-	awk -v want="$(PACKAGE_COVERAGE_MIN)" '\
+		$(RM) .coverage-packages; exit 1; }
+	@awk -v want="$(PACKAGE_COVERAGE_MIN)" '\
 		$$1 == "ok" { \
 			for (i = 3; i <= NF; i++) if ($$i == "coverage:") pct = $$(i + 1) + 0; \
 			if (pct < want) printf "  %s %.1f%%\n", $$2, pct; \
@@ -128,6 +142,7 @@ tidy:
 ## clean: discard build and coverage artefacts
 clean:
 	$(RM) -r bin dist coverage.out coverage.html
+	$(RM) .coverage-packages .coverage-shortfall .coverage-untested
 
 ## release-snapshot: build binaries for every supported platform
 release-snapshot:
