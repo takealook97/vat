@@ -6,6 +6,15 @@ Notable changes to `vat`. The format follows
 
 ## [Unreleased]
 
+### Changed
+
+- The word limit behind `brain/record-oversized` is a constant rather than a
+  field on `CheckPolicy`. It was reachable from no `vat.yaml` key, so it looked
+  like a setting while being none; the finding is a warning and does not fail
+  the check, so a workspace that disagrees with the number loses a line of
+  output rather than a build. A real workspace needing a different limit is the
+  evidence for adding the key.
+
 ## [0.5.1] - 2026-09-03
 
 ### Fixed
