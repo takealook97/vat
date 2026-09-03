@@ -547,7 +547,8 @@ integration. **vat will never grow a command named after a search product.** A
 vendor adapter in the core turns the tool into that vendor's document generator
 and ties its release cycle to someone else's.
 
-What vat offers an index is what it already writes:
+What vat offers an index is what it already writes, plus one field added for
+it and read by nothing else:
 
 | Surface | What an index gets from it |
 | --- | --- |
@@ -584,6 +585,12 @@ projection, and the Markdown still wins.
 
 Nothing about this needs vat to know the index exists. If it disappears, every
 `vat` command behaves identically — vat never called it.
+
+`content_hash` is the one concession, and worth naming as one: no vat command
+consults it, so it is written for a reader vat does not have. It stays on the
+harmless side of the boundary because it is a field in a file — not a
+dependency, not a network call, and not a vendor's name in a command. The line
+this section draws is about those three.
 
 ---
 
