@@ -437,6 +437,10 @@ type GraphNode struct {
 	SourceRef string   `json:"source_ref,omitempty"`
 	Observed  string   `json:"observed_at,omitempty"`
 	Refs      []string `json:"refs,omitempty"`
+	// ContentHash is the record file's content, hashed. An index that stored
+	// it alongside the last copy it read can tell which records it has to open
+	// again, instead of reading every file in the repository on every pass.
+	ContentHash string `json:"content_hash,omitempty"`
 }
 
 // GraphEdge is a directed relation between two records.
@@ -448,21 +452,27 @@ type GraphEdge struct {
 
 // Graph is the exported projection of the record relations.
 type Graph struct {
-	Generated string      `json:"generated_by"`
-	Nodes     []GraphNode `json:"nodes"`
-	Edges     []GraphEdge `json:"edges"`
+	Generated string `json:"generated_by"`
+	// SchemaVersion is the record contract this graph was written against, the
+	// same value the marker carries. A reader that does not recognise it knows
+	// the field meanings may have moved under it, which is the one thing a
+	// consumer outside this repository cannot find out any other way.
+	SchemaVersion int         `json:"schema_version"`
+	Nodes         []GraphNode `json:"nodes"`
+	Edges         []GraphEdge `json:"edges"`
 }
 
 // RenderGraph serialises the record relations. The graph is a projection for
 // navigation, never a source of truth: if it disagrees with the Markdown, the
 // Markdown wins and the graph is rebuilt.
 func RenderGraph(store *Store) ([]byte, error) {
-	graph := Graph{Generated: "vat brain build"}
+	graph := Graph{Generated: "vat brain build", SchemaVersion: SchemaVersion}
 	for _, record := range SortRecords(store.Records) {
 		graph.Nodes = append(graph.Nodes, GraphNode{
 			ID: record.ID, Kind: record.Kind, Status: record.Status,
 			Title: record.Title, Path: record.Path, OwnedBy: record.OwnedBy,
 			SourceRef: record.SourceRef, Observed: record.ObservedAt, Refs: record.Refs,
+			ContentHash: record.ContentHash,
 		})
 		for _, ref := range record.Refs {
 			graph.Edges = append(graph.Edges, GraphEdge{From: record.ID, To: ref, Type: "refs"})

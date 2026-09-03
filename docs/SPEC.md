@@ -429,6 +429,19 @@ tell a projection it produced from a file that merely holds the same name:
 - `graph.json` **MUST** carry the top-level field `generated_by`, whose value is
   the string `vat brain build`.
 
+`graph.json` **MUST** also carry the top-level field `schema_version`, an
+integer holding the same record-contract version as the marker (§5.1). A reader
+that does not recognise the value **MUST NOT** assume the node fields still mean
+what it was written against.
+
+Each node **SHOULD** carry `content_hash`: the record file's content hashed with
+SHA-256, hex-encoded, prefixed `sha256:`. Line endings **MUST** be normalised to
+`\n` before hashing, so the same record hashes the same on every platform. The
+hash covers the whole file, header included — a status change is the edit an
+index must not miss, and it lives in the header. It exists so that an index over
+a brain can re-read only what changed; it is not an identifier, and §5.3 and
+§5.4 still decide what may be cited.
+
 A tool **MUST NOT** overwrite a file at either name that is non-empty and does
 not carry that provenance. A knowledge repository that predates this
 specification usually keeps a current-state document of its own, and it is

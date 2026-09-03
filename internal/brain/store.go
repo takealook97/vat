@@ -1,6 +1,8 @@
 package brain
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
 	"io/fs"
 	"os"
@@ -150,13 +152,26 @@ func loadRecord(root string, kind Kind, path string) (Record, error) {
 		title = metadata.ID
 	}
 	return Record{
-		Metadata: metadata,
-		Kind:     kind,
-		Path:     relative,
-		Title:    cleanTitle(title, metadata.ID),
-		Body:     doc.Body,
-		Archived: strings.HasPrefix(relative, archiveDir+"/"),
+		Metadata:    metadata,
+		Kind:        kind,
+		Path:        relative,
+		Title:       cleanTitle(title, metadata.ID),
+		Body:        doc.Body,
+		Archived:    strings.HasPrefix(relative, archiveDir+"/"),
+		ContentHash: contentHash(data),
 	}, nil
+}
+
+// contentHash identifies a record file by its content.
+//
+// Line endings are normalised first. The hash is written into a generated file
+// that is committed and read on every platform, so hashing the raw bytes would
+// make a Windows checkout disagree with the Linux one that produced it, and
+// every record would look changed to an index — and drifted to `brain check` —
+// for no reason but the checkout.
+func contentHash(data []byte) string {
+	sum := sha256.Sum256([]byte(fsx.NormaliseNewlines(string(data))))
+	return "sha256:" + hex.EncodeToString(sum[:])
 }
 
 func relTo(root, path string) string {

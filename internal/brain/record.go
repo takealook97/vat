@@ -241,6 +241,11 @@ type Record struct {
 	// It is still loaded — the supersession chain it belongs to is checked
 	// from both ends — but it is not part of what the layer is working on.
 	Archived bool
+	// ContentHash identifies the file this record was read from, so an index
+	// built over the brain can skip a record it has already read. It covers
+	// the whole file, header included: a status change is exactly what an
+	// index must not miss, and it lives in the header.
+	ContentHash string
 }
 
 // Rel returns the record's path relative to the brain root.

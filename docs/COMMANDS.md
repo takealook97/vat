@@ -500,6 +500,12 @@ but the states these rules report accumulate — a workspace measured while
 should not have to count forty lines to learn that one run of `archive` ends
 them.
 
+`build` renders `CURRENT.md` and `graph.json` from the records. `graph.json`
+carries `schema_version` — the record contract it was written against — and a
+`content_hash` on every node, so an index built over the brain re-reads only the
+records that changed. Both are projections: a hand edit is drift, and the next
+build overwrites it.
+
 `sweep` lists proposed demotions; `--apply` writes them.
 
 `promote` refuses a current-state claim with no `owned_by` and no `source_ref`.
