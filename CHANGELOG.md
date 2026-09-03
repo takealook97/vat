@@ -41,8 +41,12 @@ Notable changes to `vat`. The format follows
 
 - The first `vat lint` after upgrading reports `brain/generated-drift` on
   `graph.json` and fails, because the file predates the two new fields. One run
-  of `vat brain build` ends it. A workspace running `vat lint` in CI will see it
-  there first.
+  of `vat brain build` ends it, and rebuilds `CURRENT.md` at the same time, so a
+  workspace whose index had also gone stale sees both findings clear together. A
+  workspace running `vat lint` in CI will meet this there first.
+- A record's hash covers its file, so `graph.json` moves whenever a record does,
+  including for an edit that changes nothing the graph projects. A commit that
+  touches a record and does not rebuild leaves `vat lint` reporting drift.
 
 ## [0.5.1] - 2026-09-03
 
