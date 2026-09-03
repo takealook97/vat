@@ -98,7 +98,25 @@ func withDefaults(m Manifest) Manifest {
 
 // Validate reports every structural problem in a manifest at once, so a user
 // editing vat.yaml by hand sees the full list rather than one error per run.
+//
+// It is assembled from three collectors rather than written as one pass. Each
+// returns its problems instead of appending to a shared slice, so none of them
+// can end a run early: "report everything at once" is the contract this
+// function exists to keep, and a single `return` added to the middle of a
+// hundred-and-seventy-line body was all it would have taken to break it.
 func Validate(m Manifest) error {
+	problems := validateHeader(m)
+	problems = append(problems, validateRepos(m)...)
+	problems = append(problems, validatePolicy(m)...)
+	if len(problems) == 0 {
+		return nil
+	}
+	return fmt.Errorf("%s is invalid:\n  - %s", FileName, strings.Join(problems, "\n  - "))
+}
+
+// validateHeader checks everything above the repository list: the schema
+// version, and the workspace-wide fields every repository inherits from.
+func validateHeader(m Manifest) []string {
 	var problems []string
 	switch {
 	case m.Version > SchemaVersion:
@@ -146,6 +164,15 @@ func Validate(m Manifest) error {
 				"workspace.remote_template has no {name}; every repository would be given the same origin")
 		}
 	}
+	return problems
+}
+
+// validateRepos checks each entry and, more importantly, what two entries can
+// do to each other. The collisions are the reason this stays one pass over the
+// list rather than a check per repository: none of them is visible from a
+// single entry.
+func validateRepos(m Manifest) []string {
+	var problems []string
 	seenNames := map[string]bool{}
 	seenPaths := map[string]string{}
 	// Two entries may share an upstream when they track different branches --
@@ -168,25 +195,8 @@ func Validate(m Manifest) error {
 		}
 		seenNames[repo.Name] = true
 
-		if strings.TrimSpace(repo.Origin) == "" {
-			problems = append(problems, where+": origin is required")
-		} else if err := ValidateRepoOrigin(repo.Origin); err != nil {
-			problems = append(problems, where+": "+err.Error())
-		} else if HasEmbeddedCredential(repo.Origin) {
-			// vat.yaml is committed. A token pasted into an origin would be
-			// published by the next `git push` of the workspace root, and the
-			// only place vat could report it is a message it must not print.
-			problems = append(problems, where+
-				": origin embeds a credential; store it in your git credential helper and record the plain URL")
-		}
-		if branch := repo.Branch(m.Workspace.DefaultBranch); strings.HasPrefix(branch, "-") {
-			problems = append(problems, fmt.Sprintf(
-				"%s: branch %q begins with '-', which git reads as an option", where, branch))
-		}
-		if !repo.Role.Valid() {
-			problems = append(problems, fmt.Sprintf("%s: unknown role %q (valid: %s)",
-				where, repo.Role, joinRoleNames()))
-		}
+		problems = append(problems, validateRepoFields(m, repo, where)...)
+
 		dir := repo.Dir()
 		// Folded, because two names differing only in case are one directory on
 		// macOS and on Windows. Both entries then govern the same tree: status
@@ -220,14 +230,47 @@ func Validate(m Manifest) error {
 				seenUpstreams[upstream] = repo.Name
 			}
 		}
-		if !containedPath(dir) {
-			problems = append(problems, fmt.Sprintf(
-				"%s: path %q must stay inside the workspace", where, dir))
-		}
-		if repo.Access != "" && repo.Access != "public" && repo.Access != "private" {
-			problems = append(problems, where+`: access must be "public" or "private"`)
-		}
 	}
+	return problems
+}
+
+// validateRepoFields checks what one entry says about itself. Everything here
+// is decidable from the entry alone; anything that needs a second repository
+// stays in the loop above.
+func validateRepoFields(m Manifest, repo Repo, where string) []string {
+	var problems []string
+	if strings.TrimSpace(repo.Origin) == "" {
+		problems = append(problems, where+": origin is required")
+	} else if err := ValidateRepoOrigin(repo.Origin); err != nil {
+		problems = append(problems, where+": "+err.Error())
+	} else if HasEmbeddedCredential(repo.Origin) {
+		// vat.yaml is committed. A token pasted into an origin would be
+		// published by the next `git push` of the workspace root, and the
+		// only place vat could report it is a message it must not print.
+		problems = append(problems, where+
+			": origin embeds a credential; store it in your git credential helper and record the plain URL")
+	}
+	if branch := repo.Branch(m.Workspace.DefaultBranch); strings.HasPrefix(branch, "-") {
+		problems = append(problems, fmt.Sprintf(
+			"%s: branch %q begins with '-', which git reads as an option", where, branch))
+	}
+	if !repo.Role.Valid() {
+		problems = append(problems, fmt.Sprintf("%s: unknown role %q (valid: %s)",
+			where, repo.Role, joinRoleNames()))
+	}
+	if !containedPath(repo.Dir()) {
+		problems = append(problems, fmt.Sprintf(
+			"%s: path %q must stay inside the workspace", where, repo.Dir()))
+	}
+	if repo.Access != "" && repo.Access != "public" && repo.Access != "private" {
+		problems = append(problems, where+`: access must be "public" or "private"`)
+	}
+	return problems
+}
+
+// validatePolicy checks the settings that bound what commands may do.
+func validatePolicy(m Manifest) []string {
+	var problems []string
 	// These three are stated as guarantees in the methodology and the sync
 	// implementation provides them unconditionally: it never merges, never
 	// stashes, and never pushes. Nothing read the fields, so a workspace could
@@ -260,10 +303,7 @@ func Validate(m Manifest) error {
 			problems = append(problems, fmt.Sprintf(`%s must be "manual" or "auto", got %q`, name, value))
 		}
 	}
-	if len(problems) == 0 {
-		return nil
-	}
-	return fmt.Errorf("%s is invalid:\n  - %s", FileName, strings.Join(problems, "\n  - "))
+	return problems
 }
 
 // containedPath reports whether a repository directory stays inside the
