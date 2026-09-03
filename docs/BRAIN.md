@@ -553,7 +553,7 @@ What vat offers an index is what it already writes:
 | --- | --- |
 | `goals/`, `gaps/`, `decisions/`, `memory/` | atomic records, one fact each, with provenance in the header |
 | `CURRENT.md` and the root projections | vat's own summary layer, already written |
-| `graph.json` | every record's id, kind, **status**, path, owner, and `source_ref` |
+| `graph.json` | every record's id, kind, **status**, path, owner, `source_ref`, and a `content_hash` per record, under a `schema_version` for the whole file |
 | `archive/`, `history/` | everything finished with, in directories of their own |
 
 Four rules make that safe to index:
@@ -572,6 +572,15 @@ Four rules make that safe to index:
 4. **Keep the trail.** A result should be traceable to the atomic record and its
    `source_ref`, so a reader can check the claim's status rather than trusting
    the snippet.
+
+Re-indexing is meant to be cheap. Each node in `graph.json` carries a
+`content_hash` over its record file, header included, so an index that kept the
+hashes from its last pass opens only the records whose hash moved — including
+the ones whose only change was a status, which is the change it can least afford
+to miss. The file's `schema_version` says which record contract those fields
+were written against; a value the index does not recognise means re-read rather
+than reuse. Neither field makes the graph authoritative: it is still a
+projection, and the Markdown still wins.
 
 Nothing about this needs vat to know the index exists. If it disappears, every
 `vat` command behaves identically — vat never called it.
