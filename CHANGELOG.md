@@ -6,6 +6,21 @@ Notable changes to `vat`. The format follows
 
 ## [Unreleased]
 
+## [0.5.2] - 2026-09-03
+
+### Added
+
+- `graph.json` carries `schema_version` — the record contract it was written
+  against — and a `content_hash` on every node, covering that record's file with
+  the header included. `docs/BRAIN.md` invites a search index to read this file,
+  and it said neither which contract it was written against nor which records had
+  moved since the last pass, so an index had to open every record on every run.
+  A status change is the edit an index can least afford to miss and it lives in
+  the header, which is why the hash covers it. Line endings are normalised before
+  hashing, so a checkout does not make every record look edited. Neither field
+  makes the graph authoritative: it is still a projection, and the Markdown still
+  wins.
+
 ### Changed
 
 - `vat brain check` ends by naming the commands that clear the findings needing
@@ -21,6 +36,13 @@ Notable changes to `vat`. The format follows
   the check, so a workspace that disagrees with the number loses a line of
   output rather than a build. A real workspace needing a different limit is the
   evidence for adding the key.
+
+### Upgrading
+
+- The first `vat lint` after upgrading reports `brain/generated-drift` on
+  `graph.json` and fails, because the file predates the two new fields. One run
+  of `vat brain build` ends it. A workspace running `vat lint` in CI will see it
+  there first.
 
 ## [0.5.1] - 2026-09-03
 
