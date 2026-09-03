@@ -42,17 +42,14 @@ type CheckPolicy struct {
 	// ReviewSLADays is how long a record may stay in a non-answerable state
 	// before the queue itself is reported as failing.
 	ReviewSLADays int
-	// MaxRecordWords is the length past which a record is reported as holding
-	// more than one judgement. Zero selects defaultMaxRecordWords.
-	MaxRecordWords int
 	// Only narrows the report to rules whose name contains one of these. It is
 	// for working through one class of problem at a time; an empty list checks
 	// everything.
 	Only []string
 }
 
-// defaultMaxRecordWords is where a record stops being one judgement and starts
-// being a directory nobody has made yet.
+// maxRecordWords is where a record stops being one judgement and starts being a
+// directory nobody has made yet.
 //
 // It is set from measurement rather than taste. In the largest workspace
 // available when this rule was written the median record was 189 words and the
@@ -60,7 +57,14 @@ type CheckPolicy struct {
 // the median. A limit at the ninety-ninth percentile would report the merely
 // thorough record; this one reports the record that is visibly a different kind
 // of object.
-const defaultMaxRecordWords = 1500
+//
+// It is a constant and not a policy field. The finding is a warning, which does
+// not fail `vat brain check`, so a workspace that disagrees with the number
+// loses nothing but a line of output — and a knob on `vat.yaml` is a published
+// contract that can never be withdrawn. If a real workspace needs a different
+// limit, that is the evidence for adding one; until then the setting would only
+// be a place to hide from the rule.
+const maxRecordWords = 1500
 
 // selected reports whether a rule survives the caller's --only filter.
 func selected(rule string, only []string) bool {
@@ -129,7 +133,7 @@ func Check(store *Store, policy CheckPolicy, now time.Time) []Finding {
 	findings = append(findings, checkIdentity(store)...)
 	findings = append(findings, checkStatuses(store)...)
 	findings = append(findings, checkArchiveHygiene(store)...)
-	findings = append(findings, checkRecordSize(store, policy)...)
+	findings = append(findings, checkRecordSize(store)...)
 	findings = append(findings, checkProvenance(store, policy, now)...)
 	findings = append(findings, checkSupersession(store, index)...)
 	findings = append(findings, checkReferences(store, index)...)
@@ -281,11 +285,7 @@ func checkArchiveHygiene(store *Store) []Finding {
 //
 // Splitting is never automatic: which paragraph belongs to which record is a
 // judgement about content, and this tool does not make those.
-func checkRecordSize(store *Store, policy CheckPolicy) []Finding {
-	limit := policy.MaxRecordWords
-	if limit <= 0 {
-		limit = defaultMaxRecordWords
-	}
+func checkRecordSize(store *Store) []Finding {
 	var findings []Finding
 	for _, record := range store.Records {
 		// An archived record is out of the working set, and asking somebody to
@@ -297,7 +297,7 @@ func checkRecordSize(store *Store, policy CheckPolicy) []Finding {
 		// The same measure the ranking uses, because the argument for the rule
 		// is that the ranking punishes exactly this.
 		words := len(strings.Fields(record.Body))
-		if words <= limit {
+		if words <= maxRecordWords {
 			continue
 		}
 		findings = append(findings, Finding{
@@ -305,7 +305,7 @@ func checkRecordSize(store *Store, policy CheckPolicy) []Finding {
 			Path: record.Path, ID: record.ID,
 			Message: fmt.Sprintf(
 				"%d words against a limit of %d; a record this long holds more than one judgement and ranks below the records it should have been split into",
-				words, limit),
+				words, maxRecordWords),
 		})
 	}
 	return findings
