@@ -18,6 +18,13 @@ A version is going out. Not for a local multi-platform build — that is
 
 ## Before anything
 
+Run `git fetch --tags`. Every version this binary reports comes from
+`git describe`, so a checkout missing the last tag builds a binary that names an
+older release: on the v0.5.1 commit with only v0.4.2 fetched, `make check` built
+`vat v0.4.2-7-gaae7c2b`. That was cosmetic until `requires.vat` began comparing
+versions, and it is not any more — a workspace pinned `>=0.5.0` refuses that
+binary, built from the exact commit that satisfies it.
+
 Run `make check`. The tag is the trigger and there is no gate after it: a tag
 pushed on a red tree publishes a red release.
 
