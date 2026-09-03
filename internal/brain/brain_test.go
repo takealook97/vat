@@ -873,3 +873,30 @@ status: active
 		t.Error("an ordinary record was reported as oversized, so a zero limit means zero words")
 	}
 }
+
+// A summary that named one command for every fixable finding would send half
+// the readers to the wrong one: a stale claim is swept and a terminal record is
+// archived. Each command is named once, in the order it is first needed.
+func TestFixesNamesEachRepairCommandOnceInTheOrderItIsMet(t *testing.T) {
+	// Arrange
+	findings := []brain.Finding{
+		{Rule: "brain/claim-stale", Fixable: true, Fix: "vat brain sweep --apply"},
+		{Rule: "brain/terminal-unarchived", Fixable: true, Fix: "vat brain archive --apply"},
+		{Rule: "brain/claim-stale", Fixable: true, Fix: "vat brain sweep --apply"},
+		{Rule: "brain/title-missing"},
+	}
+
+	// Act
+	commands := brain.Fixes(findings)
+
+	// Assert
+	want := []string{"vat brain sweep --apply", "vat brain archive --apply"}
+	if len(commands) != len(want) {
+		t.Fatalf("commands = %v, want %v", commands, want)
+	}
+	for i, command := range commands {
+		if command != want[i] {
+			t.Errorf("commands[%d] = %q, want %q", i, command, want[i])
+		}
+	}
+}

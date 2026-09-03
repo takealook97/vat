@@ -493,6 +493,13 @@ than asking what is true now.
 `review` orders by priority: how many records cite the claim, weighted against
 how long it has gone unverified.
 
+`check` ends with the commands that clear the findings needing no judgement,
+and how many of them each clears. The remedy is named on every finding line too,
+but the states these rules report accumulate — a workspace measured while
+`brain/terminal-unarchived` was written held forty-nine of them — and a reader
+should not have to count forty lines to learn that one run of `archive` ends
+them.
+
 `sweep` lists proposed demotions; `--apply` writes them.
 
 `promote` refuses a current-state claim with no `owned_by` and no `source_ref`.

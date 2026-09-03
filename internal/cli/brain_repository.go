@@ -214,6 +214,7 @@ class of problem while you work through it; --list names every rule.`,
 					fmt.Sprintf("%s, %s",
 						pluralise(brain.Errors(findings), "error", "errors"),
 						pluralise(len(findings)-brain.Errors(findings), "warning", "warnings")))
+				reportBrainFixes(env, findings)
 			}
 			if brain.Errors(findings) > 0 {
 				return findingsErrorf("")
@@ -319,6 +320,33 @@ migrate needs and what a list of two hundred findings does not give.`,
 			return renderAfterChange(env, ws.Root)
 		},
 	}
+}
+
+// reportBrainFixes names the commands that clear the findings nobody has to
+// judge.
+//
+// The rules that report a stale claim and a terminal record exist because those
+// states accumulate unseen — the workspace measured for the second held
+// forty-nine terminal records and one archived one. A remedy named only inside
+// each finding's own line accumulates the same way: the reader has to notice
+// for themselves that one command clears thirty of them. `vat lint` has said
+// this since it gained `--fix`, and a reader of this report is owed no less.
+//
+// The commands are listed rather than assumed, because brain has no single
+// `--fix`: a stale claim is swept and a terminal record is archived.
+func reportBrainFixes(env *Env, findings []brain.Finding) {
+	commands := brain.Fixes(findings)
+	if len(commands) == 0 {
+		return
+	}
+	count := 0
+	for _, finding := range findings {
+		if finding.Fixable {
+			count++
+		}
+	}
+	env.Printer.Hint("%s can be repaired without judgement: run %s.",
+		pluralise(count, "finding", "findings"), strings.Join(commands, ", then "))
 }
 
 // reportUnmanagedProjections says which projections were left exactly as they

@@ -8,6 +8,13 @@ Notable changes to `vat`. The format follows
 
 ### Changed
 
+- `vat brain check` ends by naming the commands that clear the findings needing
+  no judgement, and how many each clears. Every finding line already carried its
+  own remedy, but the states these rules report accumulate — the workspace
+  measured while `brain/terminal-unarchived` was written held forty-nine of them
+  — so the reader had to count forty lines to learn that one run of
+  `vat brain archive --apply` ended them. A finding in `--json` now carries the
+  command in a `fix` field, as `vat lint` findings already did.
 - The word limit behind `brain/record-oversized` is a constant rather than a
   field on `CheckPolicy`. It was reachable from no `vat.yaml` key, so it looked
   like a setting while being none; the finding is a warning and does not fail

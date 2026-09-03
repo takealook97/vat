@@ -32,7 +32,14 @@ type Finding struct {
 	Path     string   `json:"path,omitempty"`
 	ID       string   `json:"id,omitempty"`
 	Message  string   `json:"message"`
-	Fixable  bool     `json:"fixable,omitempty"`
+	// Fix is the command that resolves this finding without further judgement.
+	// It is carried per finding rather than assumed, because unlike lint there
+	// is no single `--fix`: a stale claim is resolved by `vat brain sweep` and a
+	// terminal record by `vat brain archive`, and a summary that named one of
+	// them for both would send half the readers to the wrong command.
+	Fix string `json:"fix,omitempty"`
+	// Fixable marks a finding the command in Fix repairs.
+	Fixable bool `json:"fixable,omitempty"`
 }
 
 // CheckPolicy configures the lifecycle rules.
@@ -162,6 +169,27 @@ func Check(store *Store, policy CheckPolicy, now time.Time) []Finding {
 	return findings
 }
 
+// Fixes lists the commands that resolve the fixable findings, in the order they
+// are first met and without repeating one.
+//
+// The rules exist because a workspace accumulates these states unseen — the one
+// measured while `brain/terminal-unarchived` was written held forty-nine
+// terminal records and one archived one — and a report that names the remedy
+// only inside each finding's own line leaves the reader to notice that the same
+// command clears thirty of them.
+func Fixes(findings []Finding) []string {
+	var commands []string
+	seen := map[string]bool{}
+	for _, finding := range findings {
+		if !finding.Fixable || finding.Fix == "" || seen[finding.Fix] {
+			continue
+		}
+		seen[finding.Fix] = true
+		commands = append(commands, finding.Fix)
+	}
+	return commands
+}
+
 // Errors counts the findings that should fail a build.
 func Errors(findings []Finding) int {
 	count := 0
@@ -266,7 +294,8 @@ func checkArchiveHygiene(store *Store) []Finding {
 		}
 		findings = append(findings, Finding{
 			Rule: "brain/terminal-unarchived", Severity: SeverityWarn,
-			Path: record.Path, ID: record.ID, Fixable: true,
+			Path: record.Path, ID: record.ID,
+			Fix: "vat brain archive --apply", Fixable: true,
 			Message: fmt.Sprintf(
 				"%s but still in the working set; `vat brain archive --apply` moves it", record.Status),
 		})
@@ -355,7 +384,7 @@ func checkProvenance(store *Store, policy CheckPolicy, now time.Time) []Finding 
 			if age, ok := record.AgeDays(now); ok && age > policy.StaleAfterDays {
 				findings = append(findings, Finding{
 					Rule: "brain/claim-stale", Severity: SeverityWarn, Path: record.Path, ID: record.ID,
-					Fixable: true,
+					Fix: "vat brain sweep --apply", Fixable: true,
 					Message: fmt.Sprintf("observed %d days ago, past the %d-day window; run `vat brain sweep --apply`",
 						age, policy.StaleAfterDays),
 				})

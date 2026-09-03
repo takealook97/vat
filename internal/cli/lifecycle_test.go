@@ -687,3 +687,29 @@ func TestInitStillWarnsAboutUncommittedContractsWhenItEnrolledSomething(t *testi
 		t.Errorf("init stopped explaining why the first `vat status` shows dirty trees:\n%s", output)
 	}
 }
+
+// The rules that report a stale claim and a terminal record exist because those
+// states accumulate unseen. A report that names the remedy only inside each
+// finding's own line accumulates the same way: forty lines each ending in the
+// same command, and nobody counting. `vat lint` has summarised its repairable
+// findings since it gained `--fix`.
+func TestBrainCheckNamesTheCommandThatClearsItsRepairableFindings(t *testing.T) {
+	// Arrange: superseding is what puts a terminal record in the working set,
+	// which is precisely the state `vat brain archive --apply` resolves.
+	h := brainFixture(t, "payments")
+	h.mustRun("brain", "new", "decision", "--title", "Retry on 429", "--owner", "payments")
+	h.mustRun("brain", "new", "decision", "--title", "Retry on 429 and 503", "--owner", "payments")
+	h.mustRun("brain", "supersede", "D-0001", "D-0002")
+
+	// Act
+	_, output := h.run("brain", "check")
+
+	// Assert: the whole sentence, because every finding line already ends in
+	// the command — what was missing is the count that says how many of them
+	// one run of it clears.
+	want := "1 finding can be repaired without judgement: run vat brain archive --apply."
+	if !strings.Contains(output, want) {
+		t.Errorf("the summary did not name the command that clears the findings, or did not count them.\nwant: %s\ngot:\n%s",
+			want, output)
+	}
+}
