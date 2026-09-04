@@ -53,6 +53,34 @@ on-disk format is a breaking change even when no Go symbol moved.
 6. Verify the release page carries, for every target, an archive and a
    `.cdx.json`, plus one `checksums.txt` and a provenance attestation.
 
+## When main's history has been rewritten
+
+A force-push that rewrites commits leaves every tag on the old history, still
+valid and still pointing at commits nothing reaches. On 2026-09-04 a metadata
+rewrite of everything after v0.2.1 orphaned seven tags, v0.3.0 through v0.5.2.
+The trees were identical, so no release was owed — but two things change and
+neither announces itself.
+
+**`git describe` walks the surviving history, not the tag list.** On the
+rewritten main it answers `v0.2.1-31-g6febbf2`, so `make check` builds a binary
+that names v0.2.1, and a workspace pinned `requires.vat: >=0.5.0` refuses it.
+That is the failure the fetch rule above describes, except no fetch repairs it:
+the tag is present and simply is not an ancestor. Releases are unaffected —
+`release.yml` stamps `github.ref_name`, the tag being pushed — so this is a
+local-build trap, and the tell is a version number far below the last release.
+
+**The forge computes release notes from a commit range.** The next tag cut from
+the rewritten main has v0.2.1 as its most recent reachable predecessor, so the
+generated notes and the `vX.Y.Z-1...vX.Y.Z` comparison span every commit since
+then rather than the release. Write the notes from `CHANGELOG.md` instead of
+accepting the generated ones, and say in the release body that history was
+rewritten, so a reader comparing two tags is not left to conclude the release
+contained work it did not.
+
+Do not repair either by moving the orphaned tags. They are published: the rule
+below holds, and the old commits stay alive precisely because those tags point
+at them.
+
 ## When a published release turns out to be defective
 
 **A published tag is frozen. Never move one, and never delete one.**
