@@ -7,6 +7,7 @@ import (
 
 	"github.com/takealook97/vat/internal/brain"
 	"github.com/takealook97/vat/internal/fsx"
+	"github.com/takealook97/vat/internal/gitx"
 	"github.com/takealook97/vat/internal/manifest"
 	"github.com/takealook97/vat/internal/ui"
 	"github.com/takealook97/vat/internal/workspace"
@@ -20,7 +21,7 @@ func brainNewCommand() *Command {
 	return &Command{
 		Name:    "new",
 		Summary: "Create an atomic record",
-		Usage:   `vat brain new <goal|gap|decision|memory> --title "..." [--claim <kind>] [--owner <repo>] [--axis <a>] [--refs <ids>] [--id <id>]`,
+		Usage:   `vat brain new <goal|gap|decision|memory> --title "..." [--claim <kind>] [--owner <repo>] [--source-path <p>] [--axis <a>] [--refs <ids>] [--id <id>]`,
 		Long: `Create one record holding one fact.
 
 A record enters as provisional, never as truth. Promoting it is a separate,
@@ -34,6 +35,7 @@ changed since.`,
 		Examples: []string{
 			`vat brain new decision --title "Orders own their own idempotency keys"`,
 			`vat brain new gap --title "Retries can double-submit" --claim current-state --owner payments`,
+			`vat brain new gap --title "Retries can double-submit" --claim current-state --owner payments --source-path docs/ORDERING.md`,
 		},
 		Run: runBrainNew,
 	}
@@ -44,6 +46,7 @@ func runBrainNew(ctx context.Context, env *Env, args []string) error {
 	title := set.String("title", "", "the record's heading (required)")
 	claim := set.String("claim", "", "current-state|historical|intent")
 	owner := set.String("owner", "", "repository that is canonical for this fact")
+	sourcePath := set.String("source-path", "", "file in --owner the claim was read from")
 	axis := set.String("axis", "", "grouping axis, for goals")
 	refs := set.String("refs", "", "identifiers of related records")
 	id := set.String("id", "", "explicit identifier (default: the next free one)")
@@ -93,11 +96,15 @@ func runBrainNew(ctx context.Context, env *Env, args []string) error {
 		if *owner == "" {
 			return usageErrorf("a current-state claim needs --owner: which repository is canonical for this fact?")
 		}
-		reference, err := sourceReferenceFor(ctx, ws, *owner)
+		reference, err := sourceReferenceFor(ctx, ws, *owner, *sourcePath)
 		if err != nil {
 			return err
 		}
 		input.SourceRef = reference
+	} else if strings.TrimSpace(*sourcePath) != "" {
+		// Only a claim about the present carries provenance. Dropping the flag
+		// silently would tell the caller they recorded evidence they did not.
+		return usageErrorf("--source-path names the evidence for a claim about the present; pass --claim current-state --owner <repo> as well")
 	}
 
 	path, err := brain.Create(store.Root, input)
@@ -113,10 +120,15 @@ func runBrainNew(ctx context.Context, env *Env, args []string) error {
 	return nil
 }
 
-// sourceReferenceFor pins a claim to the owning repository's exact revision.
-// A branch name would keep moving and silently change what the claim was
-// evidence for.
-func sourceReferenceFor(ctx context.Context, ws *workspace.Workspace, owner string) (string, error) {
+// sourceReferenceFor pins a claim to the owning repository's exact revision,
+// and to the file it was read from when the caller names one. A branch name
+// would keep moving and silently change what the claim was evidence for.
+//
+// The file is the half that makes re-checking cheap. Pinned to a repository
+// alone, the only question a later run can ask is whether the repository moved,
+// which in an active one is always yes; pinned to a file, it can ask whether
+// this claim's evidence moved, which is usually no.
+func sourceReferenceFor(ctx context.Context, ws *workspace.Workspace, owner, sourcePath string) (string, error) {
 	repo, ok := ws.Manifest.Find(owner)
 	if !ok {
 		return "", usageErrorf("%q is not a repository in %s", owner, manifest.FileName)
@@ -129,7 +141,25 @@ func sourceReferenceFor(ctx context.Context, ws *workspace.Workspace, owner stri
 	if err != nil {
 		return "", err
 	}
-	return fmt.Sprintf("%s@%s", owner, revision), nil
+	sourcePath = strings.TrimSpace(sourcePath)
+	if sourcePath == "" {
+		return fmt.Sprintf("%s@%s", owner, revision), nil
+	}
+	// A path that resolves to nothing reads as precision and is worse than no
+	// path at all: every later re-check would ask about a file that was never
+	// there and conclude, correctly and uselessly, that it never changed.
+	if _, err := gitx.FileAtRevision(ctx, dir, revision, sourcePath); err != nil {
+		return "", usageErrorf("%s does not hold %s at %s", owner, sourcePath, shortRevision(revision))
+	}
+	return fmt.Sprintf("%s@%s:%s", owner, revision, sourcePath), nil
+}
+
+// shortRevision abbreviates a revision for a message a human reads.
+func shortRevision(revision string) string {
+	if len(revision) > 8 {
+		return revision[:8]
+	}
+	return revision
 }
 
 // currentRevisionOf reports where the owning repository stands right now, or

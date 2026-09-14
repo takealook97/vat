@@ -468,7 +468,8 @@ region.
 ```
 vat brain init      [directory]
 vat brain new       <goal|gap|decision|memory> --title "..." [--claim <kind>]
-                    [--owner <repo>] [--axis <a>] [--refs <ids>] [--id <id>]
+                    [--owner <repo>] [--source-path <p>] [--axis <a>]
+                    [--refs <ids>] [--id <id>]
 vat brain build
 vat brain check     [--only <rule>] [--list]
 vat brain query     <terms...> [--all] [--limit n]
@@ -485,6 +486,13 @@ vat brain adopt     <repository-name>
 
 `new --claim current-state --owner <repo>` records the owning repository's
 current revision as the claim's evidence. Records enter as `provisional`.
+
+`--source-path` additionally pins the file the claim was read from, and vat
+refuses a path the repository does not hold at that revision. Pinned to a
+repository alone, the only question a later run can ask is whether the
+repository moved — which in an active one is always yes. Pinned to a file, it
+can ask whether *this* claim's evidence moved, and `brain/source-revision-drift`
+stays silent when it did not.
 
 `query` searches a deliberately narrow surface. `--all` widens it to history,
 archives, and terminal records — for auditing why something was decided, rather

@@ -193,9 +193,14 @@ type Metadata struct {
 	ClaimKind ClaimKind `yaml:"claim_kind,omitempty"`
 	// OwnedBy names the repository or system that is canonical for the fact.
 	OwnedBy string `yaml:"owned_by,omitempty"`
-	// SourceRef is "<repo>@<revision>:<path>" — the exact place the claim was
+	// SourceRef is "<repo>@<revision>[:<path>]" — the exact place the claim was
 	// read from. A revision, not a branch: a branch moves and takes the
 	// evidence with it.
+	//
+	// The path is optional, and naming it is what lets a later re-check ask
+	// whether this claim's evidence moved rather than whether the repository
+	// did. Without it the only answerable question is the second one, and in an
+	// active repository its answer is always yes.
 	SourceRef string `yaml:"source_ref,omitempty"`
 	// SourceExternal declares that SourceRef names a system this workspace does
 	// not govern, and deliberately so.
