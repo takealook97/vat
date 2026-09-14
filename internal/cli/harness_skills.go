@@ -78,8 +78,8 @@ type skillSummary struct {
 
 func summariseSkill(skill harness.Skill) skillSummary {
 	// Reported from the adapters that are actually rendered rather than from
-	// the runtimes: field, because those two differ exactly where it matters —
-	// `runtimes: [codex]` names a real runtime and selects no skill adapter.
+	// the runtimes: field, because a name vat does not generate for selects no
+	// adapter and the field would still list it.
 	runtimes := make([]string, 0, len(harness.SkillRuntimeNames()))
 	for _, adapter := range harness.RenderSkillAdapters(skill) {
 		runtimes = append(runtimes, adapter.Runtime)

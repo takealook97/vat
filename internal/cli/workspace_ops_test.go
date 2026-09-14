@@ -6,6 +6,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/takealook97/vat/internal/harness"
 )
 
 // `status` and `sync` are the two commands a workspace runs constantly, so what
@@ -512,10 +514,12 @@ func TestHarnessSkillNewRefusesANameThatWouldEscapeItsDirectory(t *testing.T) {
 	}
 }
 
-func TestHarnessSkillNewGeneratesAClaudeAdapterAndNoOther(t *testing.T) {
-	// Arrange: a skill has an adapter for Claude Code and none for Codex, which
-	// reads the canonical directory itself. Generating a .codex entry would
-	// invent a file that runtime never looks for.
+func TestHarnessSkillNewGeneratesAnAdapterForEveryRuntime(t *testing.T) {
+	// Arrange: a procedure that is discoverable from one runtime and invisible
+	// from the next is not a shared procedure. Two workspaces filled that gap by
+	// hand, each writing the same script to mirror the canonical directory into
+	// .codex/skills, which is what said the assumption behind the omission was
+	// wrong.
 	h := adoptedFixture(t, "payments")
 
 	// Act
@@ -529,27 +533,27 @@ func TestHarnessSkillNewGeneratesAClaudeAdapterAndNoOther(t *testing.T) {
 	if _, err := os.Stat(h.path(".claude", "skills", "release-a-service", "SKILL.md")); err != nil {
 		t.Errorf("no Claude adapter was generated: %v", err)
 	}
-	if _, err := os.Stat(h.path(".codex", "skills")); err == nil {
-		t.Error("a Codex skill directory was generated; Codex reads the canonical directory")
+	if _, err := os.Stat(h.path(".codex", "skills", "release-a-service", "SKILL.md")); err != nil {
+		t.Errorf("no Codex adapter was generated: %v", err)
 	}
 }
 
-func TestHarnessSkillNewSaysWhenTheSkillWillGenerateNothing(t *testing.T) {
-	// Arrange: `--runtimes codex` is spelled correctly, is right on a role, and
-	// selects no skill adapter at all. Left unsaid at creation, the skill sits
-	// on disk generating nothing while every other check reads green.
+func TestHarnessSkillNewHonoursARuntimeItWasGiven(t *testing.T) {
+	// Arrange: `--runtimes codex` used to select no skill adapter at all, and
+	// the command reported the skill as inert. It now means what its author
+	// plainly meant, and the counterpart is that it selects that runtime alone.
 	h := adoptedFixture(t, "payments")
 
 	// Act
-	code, output := h.run("harness", "skill", "new", "codex-only",
+	output := h.mustRun("harness", "skill", "new", "codex-only",
 		"--description", "x", "--runtimes", "codex")
 
 	// Assert
-	if code != ExitOK {
-		t.Errorf("creating an inert skill failed rather than reporting it:\n%s", output)
+	if _, err := os.Stat(h.path(".codex", "skills", "codex-only", "SKILL.md")); err != nil {
+		t.Errorf("the runtime the skill named got no adapter: %v\n%s", err, output)
 	}
-	if !strings.Contains(output, "no adapter") {
-		t.Errorf("`harness skill new --runtimes codex` did not say it generates nothing:\n%s", output)
+	if _, err := os.Stat(h.path(".claude", "skills", "codex-only", "SKILL.md")); err == nil {
+		t.Error("a runtime the skill did not name got an adapter anyway")
 	}
 }
 
@@ -577,8 +581,9 @@ func TestHarnessSkillsReportsWhatEachSkillAdvertises(t *testing.T) {
 		if entry.Description != "Ship one service." {
 			t.Errorf("the listing does not describe the skill that was created: %+v", entry)
 		}
-		if len(entry.Runtimes) != 1 || entry.Runtimes[0] != "claude" {
-			t.Errorf("expected the claude adapter alone, got %v", entry.Runtimes)
+		if len(entry.Runtimes) != len(harness.SkillRuntimeNames()) {
+			t.Errorf("expected an adapter per runtime in %v, got %v",
+				harness.SkillRuntimeNames(), entry.Runtimes)
 		}
 	}
 	if !found {

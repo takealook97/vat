@@ -49,11 +49,17 @@ description: Take one service from a green build to a verified deployment.
 	// Act
 	adapters := harness.RenderSkillAdapters(skills[0])
 
-	// Assert
-	if len(adapters) != 1 {
-		t.Fatalf("rendered %d adapters, want 1", len(adapters))
+	// Assert: every runtime gets a pointer, and none of them gets the procedure.
+	if len(adapters) != len(harness.SkillRuntimeNames()) {
+		t.Fatalf("rendered %d adapters, want one per runtime in %v",
+			len(adapters), harness.SkillRuntimeNames())
 	}
-	adapter := adapters[0]
+	var adapter harness.Adapter
+	for _, candidate := range adapters {
+		if candidate.Runtime == "claude" {
+			adapter = candidate
+		}
+	}
 	if want := filepath.Join(".claude", "skills", "release-a-service", "SKILL.md"); adapter.Path != want {
 		t.Errorf("path = %q, want %q", adapter.Path, want)
 	}
@@ -131,8 +137,9 @@ func TestWritingSkillAdaptersTwiceReportsChangeOnlyOnce(t *testing.T) {
 	}
 
 	// Assert
-	if len(first) != 1 {
-		t.Errorf("first render changed %v, want one adapter", first)
+	if len(first) != len(harness.SkillRuntimeNames()) {
+		t.Errorf("first render changed %v, want one adapter per runtime in %v",
+			first, harness.SkillRuntimeNames())
 	}
 	if len(second) != 0 {
 		t.Errorf("second render rewrote %v; rendering is not idempotent", second)
@@ -203,8 +210,8 @@ func TestOneUnreadableSkillDoesNotWithdrawTheOthers(t *testing.T) {
 	if err != nil {
 		t.Fatalf("WriteSkillAdapters: %v", err)
 	}
-	if len(written) != 1 {
-		t.Errorf("the sound skill's adapter was not written: %v", written)
+	if len(written) != len(harness.SkillRuntimeNames()) {
+		t.Errorf("the sound skill's adapters were not all written: %v", written)
 	}
 }
 
@@ -277,11 +284,12 @@ description: Names no runtimes, so it targets all of them.
 	}
 }
 
-// Codex is a runtime vat knows and generates a role adapter for, so the name is
-// not a typo and nothing about the file looks wrong. It still produces no skill
-// adapter, which is precisely why the case needs holding down: the definition
-// is inert and every other signal reads healthy.
-func TestASkillTargetingOnlyCodexRendersNothing(t *testing.T) {
+// This case used to render nothing, on the assumption that Codex discovers a
+// skill through the canonical directory itself. Two workspaces disproved that
+// by each writing the same script to mirror .agents/skills into .codex/skills,
+// so the assumption is gone and `runtimes: [codex]` now selects the adapter its
+// author plainly meant.
+func TestASkillTargetingOnlyCodexRendersTheCodexAdapter(t *testing.T) {
 	// Arrange
 	root := t.TempDir()
 	writeSkill(t, root, "codex-only", `---
@@ -304,9 +312,12 @@ runtimes: [codex]
 	adapters := harness.RenderSkillAdapters(skills[0])
 
 	// Assert
-	if len(adapters) != 0 {
-		t.Fatalf("rendered %d adapters for a skill no runtime generates one for, want 0: %+v",
+	if len(adapters) != 1 {
+		t.Fatalf("rendered %d adapters for a skill naming one runtime, want 1: %+v",
 			len(adapters), adapters)
+	}
+	if adapters[0].Runtime != "codex" {
+		t.Errorf("runtime = %q; the skill named codex and nothing else", adapters[0].Runtime)
 	}
 }
 

@@ -199,6 +199,8 @@ drift for the same reason and are kept honest the same way.
   scripts/            anything it runs
 .claude/skills/release-a-service/
   SKILL.md            generated: front matter and a pointer, no procedure
+.codex/skills/release-a-service/
+  SKILL.md            generated: the same pointer, for the other runtime
 ```
 
 ```markdown
@@ -221,15 +223,19 @@ rather than reported. A skill with no `description` **is** reported: it is on
 disk, it is generated into every adapter, and it is invisible to the agent that
 needed it.
 
-Only Claude Code is given a skill adapter today. Codex discovers a skill through
-the `agents/` file inside the canonical directory, which is part of the skill
-itself rather than something vat generates.
+Both Claude Code and Codex are given a skill adapter. Codex was left out
+originally, on the assumption that it discovers a skill through the canonical
+directory itself — two workspaces disproved that independently, each writing the
+same script to mirror `.agents/skills/` into `.codex/skills/` and wiring a
+`--check` of it into their own workspace checks. A gap two teams fill by hand,
+the same way, twice, belongs here; and generating the files brings them under
+`harness/adapter-drift`, so the enforcement those scripts provided comes from
+the machine that already does it for every other adapter.
 
-So `runtimes:` on a skill chooses from a shorter list than `runtimes:` on a
-role, and `codex` on a skill selects an adapter that does not exist. The name is
-spelled correctly and is right on a role, so nothing else notices: there is no
-adapter, so there is no drift, and the skill sits on disk generating nothing
-while the report reads green. It is reported for that reason.
+A `runtimes:` name vat does not generate for still selects an adapter that does
+not exist. Nothing else notices — there is no adapter, so there is no drift, and
+the skill sits on disk generating nothing while the report reads green. It is
+reported for that reason.
 
 `vat harness skill new <name> --description "..."` writes the canonical
 procedure and generates the adapter. It reports both of the above at creation —
@@ -249,8 +255,8 @@ commits, record landing with `vat ship`, then close with end-to-end acceptance.
 
 ```console
 $ vat lint
-WARN  harness/runtime-unknown · codex-only  declares runtime "codex", which generates no skill
-                                            adapter; it is one of claude or nothing at all
+WARN  harness/runtime-unknown · gemini-only  declares runtime "gemini", which generates no skill
+                                             adapter; it is one of claude, codex or nothing at all
       → correct the runtimes: list, or drop it to target every runtime
 ```
 

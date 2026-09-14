@@ -482,12 +482,47 @@ func TestAnUnreadableDefinitionDoesNotSilenceTheOtherHarnessRules(t *testing.T) 
 	}
 }
 
-// Codex is spelled correctly, is a runtime vat supports, and generates a role
-// adapter — so checking a skill against the role list finds nothing wrong with
-// it. No skill adapter is written for Codex, though, so the definition selects
-// nothing that exists: the exact state this rule is documented as catching,
-// reached through a value that is not a typo.
+// A skill can name a runtime vat has never heard of. Nothing else notices —
+// there is no adapter, so there is no drift, and the skill sits on disk
+// generating nothing while the report reads green. This rule is the only thing
+// that says so.
 func TestASkillTargetingARuntimeWithNoSkillAdapterIsReported(t *testing.T) {
+	// Arrange
+	ws := fixture(t)
+	dir := filepath.Join(ws.Root, ".agents", "skills", "gemini-only")
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatalf("create: %v", err)
+	}
+	skill := "---\nname: gemini-only\ndescription: A procedure for a runtime vat does not generate for.\nruntimes: [gemini]\n---\n\n# Gemini only\n"
+	if err := os.WriteFile(filepath.Join(dir, "SKILL.md"), []byte(skill), 0o644); err != nil {
+		t.Fatalf("write: %v", err)
+	}
+
+	// Act
+	report := run(t, ws)
+
+	// Assert
+	finding, found := rules(report)["harness/runtime-unknown"]
+	if !found {
+		t.Fatalf("a skill that generates no adapter went unreported: %+v", report.Findings)
+	}
+	if finding.Subject != "gemini-only" {
+		t.Errorf("subject = %q, want the skill's own name", finding.Subject)
+	}
+	if !strings.Contains(finding.Message, "gemini") {
+		t.Errorf("the finding does not name the value that selects nothing: %q", finding.Message)
+	}
+	// Reading "no adapter" when a role adapter for the same name plainly exists
+	// sends the reader to look for a bug that is not there.
+	if !strings.Contains(finding.Message, "skill adapter") {
+		t.Errorf("the finding does not say which kind of adapter is missing: %q", finding.Message)
+	}
+}
+
+// Codex used to belong in the test above, because a skill naming it selected no
+// adapter at all. It now selects one, so reporting it would send a reader to
+// correct a definition that is right.
+func TestASkillTargetingCodexIsNotReported(t *testing.T) {
 	// Arrange
 	ws := fixture(t)
 	dir := filepath.Join(ws.Root, ".agents", "skills", "codex-only")
@@ -503,20 +538,8 @@ func TestASkillTargetingARuntimeWithNoSkillAdapterIsReported(t *testing.T) {
 	report := run(t, ws)
 
 	// Assert
-	finding, found := rules(report)["harness/runtime-unknown"]
-	if !found {
-		t.Fatalf("a skill that generates no adapter went unreported: %+v", report.Findings)
-	}
-	if finding.Subject != "codex-only" {
-		t.Errorf("subject = %q, want the skill's own name", finding.Subject)
-	}
-	if !strings.Contains(finding.Message, "codex") {
-		t.Errorf("the finding does not name the value that selects nothing: %q", finding.Message)
-	}
-	// Reading "no adapter" when a role adapter for codex plainly exists sends
-	// the reader to look for a bug that is not there.
-	if !strings.Contains(finding.Message, "skill adapter") {
-		t.Errorf("the finding does not say which kind of adapter is missing: %q", finding.Message)
+	if finding, found := rules(report)["harness/runtime-unknown"]; found {
+		t.Errorf("a skill targeting codex was reported, and codex now renders one: %q", finding.Message)
 	}
 }
 

@@ -48,12 +48,18 @@ var ErrInvalidSkillName = errors.New("invalid skill name")
 // SkillRuntimeNames lists every runtime a skill adapter is generated for, in
 // the order they are rendered.
 //
-// It is deliberately shorter than RuntimeNames. Codex discovers a skill through
-// the canonical directory itself and is written no adapter, so `runtimes:
-// [codex]` on a skill selects nothing that exists — the definition is inert,
-// and only a rule that knows this list is shorter can say so. Roles and skills
-// are checked against their own list for that reason.
-func SkillRuntimeNames() []string { return []string{runtimeClaude} }
+// Codex was absent from this list on the stated assumption that it discovers a
+// skill through the canonical directory itself. Two workspaces disproved that
+// independently: each wrote the same script to mirror .agents/skills into
+// .codex/skills, and each wired a --check of it into its own workspace checks.
+// A gap two teams fill by hand, the same way, twice, is this tool's to fill —
+// and filling it brings those files under harness/adapter-drift, so the
+// enforcement they wrote scripts for comes from the machine that already does
+// it for every other adapter.
+//
+// It is kept separate from RuntimeNames rather than merged with it, because the
+// two lists answer different questions and have already diverged once.
+func SkillRuntimeNames() []string { return []string{runtimeClaude, runtimeCodex} }
 
 // TargetsRuntime reports whether an adapter should be generated for a runtime.
 func (s Skill) TargetsRuntime(runtime string) bool {
@@ -153,13 +159,24 @@ func RenderSkillAdapters(skill Skill) []Adapter {
 		adapters = append(adapters, Adapter{
 			Runtime: runtimeClaude,
 			Path:    filepath.Join(ClaudeSkillDir, skill.Name, SkillFile),
-			Content: renderClaudeSkill(skill),
+			Content: renderSkillPointer(skill),
+		})
+	}
+	if skill.TargetsRuntime(runtimeCodex) {
+		adapters = append(adapters, Adapter{
+			Runtime: runtimeCodex,
+			Path:    filepath.Join(CodexSkillDir, skill.Name, SkillFile),
+			Content: renderSkillPointer(skill),
 		})
 	}
 	return adapters
 }
 
-func renderClaudeSkill(skill Skill) string {
+// renderSkillPointer makes a skill discoverable in one runtime without carrying
+// any of it. Both runtimes read the same shape, and duplicating the procedure
+// into each would leave two copies to keep in step — two procedures differing
+// by one line are worse than one nobody read.
+func renderSkillPointer(skill Skill) string {
 	var b strings.Builder
 	b.WriteString("---\n")
 	b.WriteString("name: " + skill.Name + "\n")

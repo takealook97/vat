@@ -458,8 +458,9 @@ func TestALineEndingIsNotAdapterDrift(t *testing.T) {
 		toCRLF(t, filepath.Join(root, adapter.Path))
 		converted++
 	}
-	if converted != 3 {
-		t.Fatalf("expected two role adapters and one skill adapter, converted %d", converted)
+	if want := 2 + len(harness.SkillRuntimeNames()); converted != want {
+		t.Fatalf("expected two role adapters and one skill adapter per runtime (%d), converted %d",
+			want, converted)
 	}
 
 	// Assert

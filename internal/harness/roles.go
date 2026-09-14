@@ -21,6 +21,7 @@ const (
 	ClaudeAgentDir = ".claude/agents"
 	ClaudeSkillDir = ".claude/skills"
 	CodexAgentDir  = ".codex/agents"
+	CodexSkillDir  = ".codex/skills"
 )
 
 // Role is one runtime-neutral agent contract. The prose body says what the role
