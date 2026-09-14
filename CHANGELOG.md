@@ -6,6 +6,86 @@ Notable changes to `vat`. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- `vat brain new --source-path <file>` pins the file a claim was read from, so
+  `source_ref` carries the `<repo>@<revision>:<path>` form the specification has
+  always described. The parser returned the path, promotion round-tripped it,
+  and the template vat writes into every new brain advertised it — but no
+  command could produce one, so a claim pinned a repository and nothing finer.
+  vat refuses a path the repository does not hold at that revision: a path that
+  resolves to nothing reads as precision and is worse than none.
+- `vat brain review` lists active claims whose evidence has moved, alongside the
+  records whose status asks for judgement, and `--drifted` narrows to them.
+  Nothing is demoted — a revision moving is not a claim becoming false — and
+  `source` in the `--json` output is `queue` or `drift` so a consumer can route
+  each to the work it needs. The drift rule's remedy line named this command and
+  the command could not show the record: one workspace ran 46 drifted claims
+  against a review queue of eleven, with no overlap.
+- `vat brain promote` takes several identifiers, and `--owner <repo>` selects
+  everything one repository is canonical for. One merge into an active
+  repository is what puts a repository's worth of claims up for re-verification
+  at the same moment. Every record is still judged separately and the gate is
+  unchanged; refusals are reported rather than ending the run.
+- `vat doctor` reports claims pinned to evidence that has moved. The brain
+  section read the review queue and nothing else, so a workspace holding 46 of
+  them — the worst 213 commits behind — was told its knowledge layer was in
+  order, by the command people run first.
+- `vat metrics` measures `drifted evidence`, with `brain_claims` as its
+  denominator. Three drifted claims out of four is a knowledge layer coming
+  apart; three out of three hundred is a Tuesday. Over no claims it prints as no
+  reading, like the other populations.
+- `workspace/layer-unchecked` reports a layer the workspace runs that no
+  workspace check ever judges. One workspace ran the knowledge layer with 53
+  records awaiting promotion and nothing said so, because its checks never ran
+  `vat brain check`.
+- A skill is generated an adapter for Codex as well as Claude. Codex was left
+  out on the assumption that it discovers a procedure through the canonical
+  directory itself; two workspaces disproved it independently, each writing the
+  same script to mirror `.agents/skills/` into `.codex/skills/` and wiring a
+  `--check` of it into their own checks. `runtimes: [codex]` on a skill now
+  means what its author meant.
+
+### Changed
+
+- `brain/source-revision-drift` asks whether a claim's evidence moved rather
+  than whether its repository did. A claim naming the file it was read from is
+  asked about that file and stays silent when it did not change; a claim that
+  pinned only a repository is unchanged, because there is nothing narrower to
+  ask. Counting commits to a repository's HEAD meant one workspace saw 46
+  warnings from this rule alone, and a rule that fires on everything is read as
+  firing on nothing.
+- The drift finding's remedy names `vat brain promote <id> --reverified` with
+  the source to re-read, instead of a command that could not list the record.
+- `vat metrics` runs the rules online, so `lint errors` and `lint warnings` are
+  the numbers `vat lint` prints. Collected offline, they skipped every rule that
+  resolves a git revision: a workspace reporting 47 warnings was measured at
+  nought, and the skipped rules were the ones that show the layer decaying.
+- `vat fit` says `in use` for a layer the workspace already runs, and reads
+  contracts from changesets naming two or more repositories and people from
+  commit authors. Several signals invert on success — a workspace that
+  consolidated its secrets into one credential repository reports secrets living
+  in one place, below the threshold that justified consolidating them — so three
+  adopted workspaces were each told to start with `vat init`.
+- A pinned revision is compared the same way everywhere. `vat lint` compared by
+  prefix and promotion compared exactly, so a claim written with a short hash
+  read as current to one command and as moved to the other.
+
+### Upgrading
+
+- The first `vat lint` after upgrading reports `workspace/layer-unchecked` if
+  the workspace runs the knowledge layer or a harness without checking either.
+  Adding `vat brain check` and `vat harness check` to `workspace.checks` ends
+  it; the rule is a warning and does not fail the run.
+- A workspace that rendered its own Codex skill adapters sees
+  `harness/adapter-drift` on them, because vat now generates those files itself.
+  One `vat harness render` reconciles them, after which the script that was
+  filling the gap can go.
+- Existing claims keep reporting repository movement until they record a path.
+  `vat brain promote <id> --reverified` re-pins what it was given; adding
+  `--source-path` when a claim is next written is what buys the narrower
+  question.
+
 ## [0.5.2] - 2026-09-03
 
 ### Added
