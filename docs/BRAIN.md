@@ -598,13 +598,21 @@ this section draws is about those three.
 
 ```console
 $ vat lint
-WARN  brain/source-revision-drift · G-0014    payments has moved 47 commits since this was observed at 3f9a1c2; re-check, do not assume it broke
+WARN  brain/source-revision-drift · G-0014    payments:docs/ORDERING.md changed since this was observed at 3f9a1c2e; re-check, do not assume it broke
+      → re-read payments:docs/ORDERING.md, then: vat brain promote G-0014 --reverified
 ```
 
 `vat` deliberately refuses to conclude anything. A typo commit does not change
-what is true. Turning drift into a specific, dated item on the review queue is
-the whole point; automatically invalidating claims would make the layer useless
-in a week.
+what is true. Turning drift into a specific, dated item is the whole point;
+automatically invalidating claims would make the layer useless in a week.
+
+**What the claim pinned decides how narrow the question can be.** A claim that
+named the file it was read from is asked whether *that file* changed, and stays
+silent when it did not. A claim that pinned only a repository can be asked
+nothing finer than whether the repository moved — and in an active one the
+answer is always yes, which is how this rule came to be the only thing a busy
+workspace ever saw from `vat lint`. Recording the path with
+`vat brain new --source-path` is what buys the narrower question.
 
 ---
 

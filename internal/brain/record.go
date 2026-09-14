@@ -287,6 +287,33 @@ func (r Record) SourceParts() (repo, revision, filePath string, ok bool) {
 
 var sourceRefPattern = regexp.MustCompile(`^([^@\s]+)@([^:\s]+)(?::(.+))?$`)
 
+// SameRevision reports whether a pinned revision still names the revision a
+// repository is actually at.
+//
+// A record may pin an abbreviated hash, so this is a prefix comparison rather
+// than equality — but only from the pinned side, and only for an abbreviation
+// git would itself accept. Four characters is git's own minimum; below it a
+// prefix match means almost nothing and would report evidence as unchanged
+// because two hashes happen to start alike.
+//
+// It lives here because two commands ask this question and used to disagree:
+// lint compared by prefix and promotion compared exactly, so a claim written
+// with a short hash read as current to one and as moved to the other.
+func SameRevision(pinned, actual string) bool {
+	pinned = strings.TrimSpace(pinned)
+	actual = strings.TrimSpace(actual)
+	if pinned == "" || actual == "" {
+		return false
+	}
+	if pinned == actual {
+		return true
+	}
+	if len(pinned) < 4 || len(pinned) >= len(actual) {
+		return false
+	}
+	return strings.HasPrefix(actual, pinned)
+}
+
 // ParseSourceRef splits "<repo>@<revision>[:<path>]".
 func ParseSourceRef(ref string) (repo, revision, filePath string, ok bool) {
 	match := sourceRefPattern.FindStringSubmatch(strings.TrimSpace(ref))

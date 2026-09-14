@@ -601,7 +601,7 @@ func checkSourceRevisions(ctx context.Context, ws *workspace.Workspace, store *b
 		if record.Status != brain.StatusActive {
 			continue
 		}
-		repoName, revision, _, ok := record.SourceParts()
+		repoName, revision, sourcePath, ok := record.SourceParts()
 		if !ok {
 			continue
 		}
@@ -643,24 +643,53 @@ func checkSourceRevisions(ctx context.Context, ws *workspace.Workspace, store *b
 			continue
 		}
 		head, err := gitx.HeadRevision(ctx, dir)
-		if err != nil || strings.HasPrefix(head, revision) {
+		if err != nil || brain.SameRevision(revision, head) {
 			continue
 		}
-		count, err := gitx.Run(ctx, dir, "rev-list", "--count", revision+"..HEAD")
-		if err != nil {
+		count, err := gitx.CommitsBetween(ctx, dir, revision, head)
+		if err != nil || count == 0 {
 			continue
 		}
-		if count == "0" {
+		// A claim that named the file it was read from can be asked the narrower
+		// question, and the narrow question is the useful one. A repository
+		// takes hundreds of commits that have nothing to do with any given
+		// claim; reporting all of them turned this rule into the only thing a
+		// busy workspace ever saw from `vat lint`, and a rule that fires on
+		// everything is read as firing on nothing.
+		if sourcePath != "" {
+			touched, err := gitx.ChangedPaths(ctx, dir, revision, head, sourcePath)
+			if err != nil {
+				continue
+			}
+			if len(touched) == 0 {
+				continue
+			}
+			findings = append(findings, Finding{
+				Rule: "brain/source-revision-drift", Severity: SeverityWarn, Subject: record.ID,
+				Message: fmt.Sprintf("%s:%s changed since this was observed at %s; re-check, do not assume it broke",
+					repoName, sourcePath, short(revision)),
+				Fix: reverifyHint(record.ID, repoName+":"+sourcePath),
+			})
 			continue
 		}
 		findings = append(findings, Finding{
 			Rule: "brain/source-revision-drift", Severity: SeverityWarn, Subject: record.ID,
-			Message: fmt.Sprintf("%s has moved %s commits since this was observed at %s; re-check, do not assume it broke",
-				repoName, count, short(revision)),
-			Fix: fmt.Sprintf("vat brain review  # then re-verify %s", record.ID),
+			Message: fmt.Sprintf("%s has moved %d %s since this was observed at %s; re-check, do not assume it broke",
+				repoName, count, plural(count, "commit", "commits"), short(revision)),
+			Fix: reverifyHint(record.ID, repoName),
 		})
 	}
 	return findings
+}
+
+// reverifyHint names the command that acts on the record the finding is about.
+//
+// It used to say `vat brain review`, which lists provisional, stale, and
+// quarantined records and therefore could never show an active claim that
+// drifted. Naming a command that cannot show the record it is attached to is
+// worse than naming none: it costs the reader a run to find that out.
+func reverifyHint(id, source string) string {
+	return fmt.Sprintf("re-read %s, then: vat brain promote %s --reverified", source, id)
 }
 
 // checkRollbackPoints reports a recorded return point the repository no longer

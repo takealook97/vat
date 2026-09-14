@@ -258,7 +258,7 @@ The rules, and what each one prevents:
 | `brain/unreferenced` | warn | a scaffolded brain the manifest never adopted, which no `vat brain` command can reach |
 | `brain/generated-drift` | error | a hand-edited projection contradicting the records |
 | `brain/projection-unmanaged` | error | a file holding the name of a generated projection that vat did not write, which no build will overwrite |
-| `brain/source-revision-drift` | warn | a claim whose evidence moved on months ago |
+| `brain/source-revision-drift` | warn | a claim whose evidence moved: the pinned file changed, or — for a claim that pinned no file — the owning repository did |
 | `brain/source-repo-unknown` | warn | a claim pointing at a repository that is not governed, naming the remedy that does not widen the roster |
 | `brain/view-stale` | warn | a maintained view the generated index routes to, left behind by the records for longer than the review window |
 | `brain/source-external-governed` | error | a claim declaring its source external while the workspace governs it, which would exempt a checkable claim from every check |

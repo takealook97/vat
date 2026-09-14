@@ -275,7 +275,11 @@ func confirmEvidence(record Record, request PromoteRequest) (string, error) {
 	if !ok {
 		return "", fmt.Errorf("%s: source_ref %q is not <repo>@<revision>[:<path>]", record.ID, record.SourceRef)
 	}
-	if request.SourceRevision != "" && request.SourceRevision == revision {
+	// Prefix-tolerant, because a record may pin an abbreviated hash and `vat
+	// lint` has always read one as current. Comparing exactly here meant the
+	// same record was current to one command and moved to the other, and the
+	// reviewer paid for the disagreement with a --reverified they did not owe.
+	if SameRevision(revision, request.SourceRevision) {
 		return record.SourceRef, nil
 	}
 	if !request.Reverified {
