@@ -31,12 +31,36 @@ type Signals struct {
 	// decision nobody could find. It is the strongest single signal for the
 	// knowledge layer, because it means the cost is already being paid.
 	DecisionsLost bool
+	// Adopted names the layers the workspace already runs.
+	//
+	// Without it this advisor keeps answering "should you start this" after the
+	// answer is yes, and several of the signals invert once a layer is in use:
+	// a workspace that consolidated its secrets into one credential repository
+	// reports one repository holding secrets, which reads as below the
+	// threshold. Succeeding at adoption should not produce advice to undo it.
+	Adopted []string
+}
+
+// adopted reports whether a layer is already in use.
+func (s Signals) adopted(layer string) bool {
+	for _, name := range s.Adopted {
+		if name == layer {
+			return true
+		}
+	}
+	return false
 }
 
 // Verdict is a recommendation about one layer.
 type Verdict struct {
-	Layer     string `json:"layer"`
-	Adopt     bool   `json:"adopt"`
+	Layer string `json:"layer"`
+	// Adopt is advice to start this layer. It is never true for a layer that is
+	// already in use.
+	Adopt bool `json:"adopt"`
+	// Adopted reports that the workspace already runs this layer, which changes
+	// the question from whether to start it to whether it is still earning its
+	// keep.
+	Adopted   bool   `json:"adopted"`
 	Threshold string `json:"threshold"`
 	Because   string `json:"because"`
 	Command   string `json:"command"`
@@ -131,6 +155,21 @@ func Assess(signals Signals) []Verdict {
 			Command: "vat repo new credential --role credential --private",
 		},
 	}
+	// A layer in use is not a recommendation, and the threshold that justified
+	// starting it is no longer the question. Leaving Adopt set would print
+	// `start with: vat init` at a workspace that has a manifest; leaving it
+	// clear without saying why would print `not yet` at a layer it is running.
+	for index, verdict := range verdicts {
+		if !signals.adopted(verdict.Layer) {
+			continue
+		}
+		verdicts[index] = Verdict{
+			Layer: verdict.Layer, Adopt: false, Adopted: true,
+			Threshold: verdict.Threshold,
+			Because:   "already in use; the threshold below is what justified starting it",
+			Command:   "",
+		}
+	}
 	return verdicts
 }
 
@@ -166,11 +205,24 @@ func because(adopt bool, yes, no string) string {
 
 // Summary renders a one-paragraph conclusion.
 func Summary(verdicts []Verdict) string {
-	var adopt []string
+	var adopt, running []string
 	for _, verdict := range verdicts {
 		if verdict.Adopt {
 			adopt = append(adopt, verdict.Layer)
 		}
+		if verdict.Adopted {
+			running = append(running, verdict.Layer)
+		}
+	}
+	if len(running) == len(verdicts) && len(verdicts) > 0 {
+		return "Every layer is in use. Nothing here is a question of adoption any " +
+			"more; whether each is still earning its keep is what `vat metrics` " +
+			"measures over time."
+	}
+	if len(adopt) == 0 && len(running) > 0 {
+		return fmt.Sprintf("%s in use, and nothing else has reached its threshold yet. "+
+			"Adopting a layer early costs ceremony and buys nothing.",
+			capitalise(strings.Join(running, ", ")))
 	}
 	switch len(adopt) {
 	case 0:
@@ -188,4 +240,13 @@ func Summary(verdicts []Verdict) string {
 			"threshold is met; adopting a layer early costs ceremony and buys nothing.",
 			strings.Join(adopt, ", then "))
 	}
+}
+
+// capitalise upper-cases the first letter of a sentence built from layer names,
+// which are lower case because they are also flag and JSON values.
+func capitalise(text string) string {
+	if text == "" {
+		return text
+	}
+	return strings.ToUpper(text[:1]) + text[1:]
 }

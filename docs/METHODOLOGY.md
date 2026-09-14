@@ -503,9 +503,9 @@ all of it within a month.
 | Layer | Adopt when |
 | --- | --- |
 | workspace | 3+ repositories worked in together |
-| harness | agents work across more than one repository |
+| harness | coding agents work in this code at all |
 | changesets | 2+ interfaces cross a repository boundary |
-| brain | a decision was already lost, or 2+ people across 4+ repositories |
+| brain | a decision was already lost, agents work here weekly, or 2+ people across 4+ repositories |
 | credential | secrets live in 2+ places |
 
 The order matters. Adopting the knowledge layer before the workspace is stable
@@ -513,7 +513,13 @@ produces records about a state nobody can reproduce. Adding semantic search
 before canonical ownership produces fast answers with no way to tell which one
 is true.
 
-`vat fit` gives this verdict for your actual situation.
+`vat fit` gives this verdict for your actual situation, and says `in use` for a
+layer the workspace already runs rather than re-answering a question that has
+been settled. Several of these signals invert once a layer is adopted: a
+workspace that consolidated its secrets into one repository reports secrets
+living in one place, which is below the threshold that justified consolidating
+them. After adoption the question is whether the layer is still earning its
+keep, and §12 is how that is measured.
 
 ---
 

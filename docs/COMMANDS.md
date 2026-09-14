@@ -811,11 +811,19 @@ vat fit [--repos n] [--contracts n] [--people n] [--agent-sessions n]
 ```
 
 Per-layer break-even verdict. Numbers are read from the workspace where they can
-be. `--contracts` is the important one: how many interfaces cross a repository
-boundary is what makes a multi-repo layout expensive, not repository count.
+be: repository count and credential repositories from the manifest, contracts
+from changesets naming two or more repositories, people from commit authors, and
+agent sessions from whether any role is defined. A flag overrides what was read.
+
+A layer the workspace already runs reads as `in use` rather than as advice. This
+matters because several signals invert on success — a workspace that consolidated
+its secrets into one credential repository reports one repository holding
+secrets, which is below the threshold that justified consolidating them. The
+question after adoption is whether a layer is still earning its keep, which
+`vat metrics` measures over time, not whether to start it.
 
 `--json` returns one object per layer with the fields `layer`, `adopt`,
-`threshold`, `because`, and `command`.
+`adopted`, `threshold`, `because`, and `command`.
 
 ---
 

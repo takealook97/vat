@@ -377,9 +377,14 @@ func TestFitRecommendsNothingAtASmallScale(t *testing.T) {
 	// Act
 	output := h.mustRun("fit", "--repos", "2", "--contracts", "0", "--people", "1")
 
-	// Assert
-	if !strings.Contains(output, "None of this pays for itself") {
+	// Assert: the workspace layer reads as in use, because `vat init` ran — the
+	// advisor describing what is actually there is the point. Nothing beyond it
+	// is recommended, which is what this test was written to protect.
+	if strings.Contains(output, "adopt —") {
 		t.Errorf("fit recommended adoption at a scale where it is pure overhead:\n%s", output)
+	}
+	if !strings.Contains(output, "nothing else has reached its threshold") {
+		t.Errorf("fit did not say that the remaining layers are still overhead:\n%s", output)
 	}
 }
 
