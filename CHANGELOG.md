@@ -6,6 +6,25 @@ Notable changes to `vat`. The format follows
 
 ## [Unreleased]
 
+## [0.6.1] - 2026-09-14
+
+### Fixed
+
+- A test compared a generated adapter's path against the forward-slash constant
+  rather than building the expectation with `filepath.Join`, so the suite was
+  red on Windows at v0.6.0 while passing on macOS and Linux.
+
+  **The v0.6.0 binaries are unaffected on every platform.** `RenderSkillAdapters`
+  writes adapter paths with `filepath.Join` as it always has, and the rule that
+  compares them normalises with `filepath.ToSlash`; only the assertion was
+  wrong. This release exists so that the newest tag names a tree whose suite is
+  green on all three operating systems, not because anything installed from
+  v0.6.0 misbehaves. v0.6.0 is not retracted, because nothing about running it
+  is unsafe.
+
+  `make check` runs the suite on one operating system, which CONTRIBUTING says
+  is not evidence that CI will pass. The tag was cut on that evidence alone.
+
 ## [0.6.0] - 2026-09-14
 
 ### Added
