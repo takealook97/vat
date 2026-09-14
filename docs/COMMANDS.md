@@ -789,10 +789,17 @@ vat metrics [--record] [--history]
 A single reading says little.
 
 A measurement with nothing to measure prints `—`, not a number. A median taken
-over no claims and a failure rate over no checks are not zero: printed as `0`
-and `0%` they are the most flattering possible reading of a workspace that has
-verified nothing. Under `--json` the populations are `claims_measured` and
-`checks_recorded`, so a consumer can tell an empty one from a genuine zero.
+over no claims, a failure rate over no checks, and drifted evidence over no
+claims are not zero: printed as `0` and `0%` they are the most flattering
+possible reading of a workspace that has verified nothing. Under `--json` the
+populations are `claims_measured`, `checks_recorded`, and `brain_claims`, so a
+consumer can tell an empty one from a genuine zero.
+
+The rules run online, so `lint errors` and `lint warnings` are the numbers
+`vat lint` prints. They were collected offline once, which skips every rule that
+resolves a git revision — a workspace reporting 47 warnings was measured at
+nought, and the rules being skipped were the ones that show the knowledge layer
+decaying. `drifted evidence` counts those claims directly.
 
 ---
 

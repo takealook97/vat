@@ -75,6 +75,12 @@ func (r Report) Fixable() int {
 	return count
 }
 
+// RuleSourceRevisionDrift names the rule the knowledge layer exists for: a
+// claim whose evidence has moved since it was observed. It is a constant
+// because three other commands select or count it by name, and a string
+// repeated in four packages is a rename waiting to go silently wrong.
+const RuleSourceRevisionDrift = "brain/source-revision-drift"
+
 // Options configure a run.
 type Options struct {
 	// Offline skips rules that need to resolve a git revision.
@@ -196,7 +202,7 @@ func RuleNames() []string {
 		ruleUnreferencedBrain,
 		"brain/generated-drift",
 		"brain/projection-unmanaged",
-		"brain/source-revision-drift",
+		RuleSourceRevisionDrift,
 		"brain/source-repo-unknown",
 		"brain/source-external-governed",
 		ruleViewStale,
@@ -637,7 +643,7 @@ func checkSourceRevisions(ctx context.Context, ws *workspace.Workspace, store *b
 		}
 		if !gitx.RevisionExists(ctx, dir, revision) {
 			findings = append(findings, Finding{
-				Rule: "brain/source-revision-drift", Severity: SeverityWarn, Subject: record.ID,
+				Rule: RuleSourceRevisionDrift, Severity: SeverityWarn, Subject: record.ID,
 				Message: fmt.Sprintf("source revision %s no longer resolves in %s", short(revision), repoName),
 			})
 			continue
@@ -665,7 +671,7 @@ func checkSourceRevisions(ctx context.Context, ws *workspace.Workspace, store *b
 				continue
 			}
 			findings = append(findings, Finding{
-				Rule: "brain/source-revision-drift", Severity: SeverityWarn, Subject: record.ID,
+				Rule: RuleSourceRevisionDrift, Severity: SeverityWarn, Subject: record.ID,
 				Message: fmt.Sprintf("%s:%s changed since this was observed at %s; re-check, do not assume it broke",
 					repoName, sourcePath, short(revision)),
 				Fix: reverifyHint(record.ID, repoName+":"+sourcePath),
@@ -673,7 +679,7 @@ func checkSourceRevisions(ctx context.Context, ws *workspace.Workspace, store *b
 			continue
 		}
 		findings = append(findings, Finding{
-			Rule: "brain/source-revision-drift", Severity: SeverityWarn, Subject: record.ID,
+			Rule: RuleSourceRevisionDrift, Severity: SeverityWarn, Subject: record.ID,
 			Message: fmt.Sprintf("%s has moved %d %s since this was observed at %s; re-check, do not assume it broke",
 				repoName, count, plural(count, "commit", "commits"), short(revision)),
 			Fix: reverifyHint(record.ID, repoName),

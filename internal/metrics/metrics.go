@@ -52,6 +52,18 @@ type Snapshot struct {
 	// most flattering possible reading of a workspace that has verified none.
 	MedianClaimAgeDays int `json:"median_claim_age_days"`
 	ClaimsMeasured     int `json:"claims_measured"`
+	// DriftedClaims is how many active current-state claims are pinned to
+	// evidence that has since moved. It is the other half of the decay story:
+	// the review queue counts what is waiting to be judged, and this counts
+	// what is being cited while nobody has re-read its source.
+	//
+	// BrainClaims is the denominator. Three drifted claims out of four is a
+	// knowledge layer coming apart; three out of three hundred is a Tuesday.
+	// Over no claims at all it prints as no reading rather than as zero, which
+	// would be the most flattering thing that could be said about a workspace
+	// that has recorded no provenance.
+	DriftedClaims int `json:"drifted_claims"`
+	BrainClaims   int `json:"brain_claims"`
 
 	// ChangesetsOpen and ChangesetsStale measure unfinished cross-repository
 	// work — the cost multi-repo layouts pay and usually never count.
@@ -87,11 +99,19 @@ func Collect(ctx context.Context, ws *workspace.Workspace, now time.Time) (Snaps
 		}
 	}
 
-	report, err := lint.Run(ctx, ws, lint.Options{Now: now, Offline: true})
+	// Online, deliberately. Running the rules offline skips every one that
+	// resolves a git revision, which meant the measure named "lint warnings"
+	// was not the number `vat lint` prints — one workspace reported 47 and was
+	// measured at nought — and that the rules being skipped were exactly the
+	// ones that show the knowledge layer decaying.
+	report, err := lint.Run(ctx, ws, lint.Options{Now: now})
 	if err != nil {
 		return snapshot, err
 	}
 	for _, finding := range report.Findings {
+		if finding.Rule == lint.RuleSourceRevisionDrift {
+			snapshot.DriftedClaims++
+		}
 		if finding.Severity == lint.SeverityError {
 			snapshot.LintErrors++
 			continue
@@ -110,6 +130,11 @@ func Collect(ctx context.Context, ws *workspace.Workspace, now time.Time) (Snaps
 		}
 		snapshot.BrainRecords = len(store.WorkingSet())
 		snapshot.BrainCitable = len(store.Answerable())
+		for _, record := range store.CurrentStateClaims() {
+			if record.Status == brain.StatusActive {
+				snapshot.BrainClaims++
+			}
+		}
 		for _, item := range brain.ReviewQueue(store, policy, now) {
 			snapshot.ReviewQueue++
 			if item.Overdue {
@@ -255,6 +280,8 @@ func Compare(current Snapshot, history []Snapshot) []Trend {
 			"cross-repository work with no closing evidence"},
 		{"stale changesets", current.ChangesetsStale, true,
 			"open past the limit, so the revision bundle is drifting from what shipped"},
+		{"drifted evidence", current.DriftedClaims, true,
+			"citable claims whose source moved and nobody has re-read"},
 	}
 
 	trends := make([]Trend, 0, len(measures)+1)
@@ -269,6 +296,11 @@ func Compare(current Snapshot, history []Snapshot) []Trend {
 		// reads as "every claim was verified today", which is the most
 		// flattering thing that could be said about a workspace that has
 		// verified nothing — and a trend against it is arithmetic on nothing.
+		if measure.name == "drifted evidence" && current.BrainClaims == 0 {
+			trend.Current = noReading
+			trends = append(trends, trend)
+			continue
+		}
 		if measure.name == "median claim age" && current.ClaimsMeasured == 0 {
 			trend.Current = noReading
 			trends = append(trends, trend)
@@ -319,6 +351,8 @@ func previousValue(snapshot Snapshot, name string) int {
 		return snapshot.MedianClaimAgeDays
 	case "citable records":
 		return snapshot.BrainCitable
+	case "drifted evidence":
+		return snapshot.DriftedClaims
 	case "open changesets":
 		return snapshot.ChangesetsOpen
 	case "stale changesets":

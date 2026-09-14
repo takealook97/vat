@@ -481,6 +481,9 @@ rituals produced the effect they were for:
 - **review queue length, over time** — the leading indicator. If it only grows,
   knowledge is being written faster than it is verified.
 - **median claim age** — how stale the typical current-state claim's evidence is.
+- **drifted evidence** — how many citable claims are pinned to a source that has
+  moved and nobody has re-read. The queue counts what is waiting to be judged;
+  this counts what is being quoted while unverified.
 - **lint findings** — how far the workspace is from its own declared rules.
 - **open and stale changesets** — cross-repository work with no closing evidence.
 - **rework rate** — how often work reported as done did not survive verification.

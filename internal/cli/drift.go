@@ -22,7 +22,7 @@ import (
 // it pays nothing for it. Resolving a revision lives out here.
 func driftedClaims(ctx context.Context, ws *workspace.Workspace, now time.Time) (map[string]string, error) {
 	report, err := lint.Run(ctx, ws, lint.Options{
-		Now: now, Only: []string{"brain/source-revision-drift"},
+		Now: now, Only: []string{lint.RuleSourceRevisionDrift},
 	})
 	if err != nil {
 		return nil, err
