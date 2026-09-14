@@ -39,6 +39,19 @@ Notable changes to `vat`. The format follows
   workspace check ever judges. One workspace ran the knowledge layer with 53
   records awaiting promotion and nothing said so, because its checks never ran
   `vat brain check`.
+- `vat ship` with no identifier judges the whole workspace: every governed
+  repository committed, on the branch it ships from, and level with that branch
+  on the remote. All three workspaces running vat had written their own
+  `scripts/shipping-gate.sh` to ask this, two of them identical but for a marker
+  string, because `vat ship <id>` needs an identifier and judges one bundle
+  while a round is what anyone actually ships. The brain and the workspace root
+  are judged beside the products: a round where a product went up and the
+  canonical record stayed on one laptop is not closed. Open changesets are
+  reported and do not fail it.
+- `docs/METHODOLOGY.md` §15 names every term against the command that performs
+  it, and against what it is not. Each workspace had invented its own word for
+  the same acts, and a term that names no command is one two people can agree on
+  while meaning different things.
 - A skill is generated an adapter for Codex as well as Claude. Codex was left
   out on the assumption that it discovers a procedure through the canonical
   directory itself; two workspaces disproved it independently, each writing the

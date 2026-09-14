@@ -27,9 +27,15 @@ func shipCommand() *Command {
 	return &Command{
 		Name:    "ship",
 		Summary: "Judge whether a changeset's verified revisions have landed",
-		Usage:   "vat ship <id> [--remote <name>] [--offline]",
+		Usage:   "vat ship [<id>] [--remote <name>] [--offline]",
 		Long: `Report, for every repository in a changeset, whether the revision its checks
 passed on has reached the branch that repository ships from.
+
+With no identifier, the same question is asked of the whole workspace: is every
+governed repository committed, on the branch it ships from, and level with that
+branch on the remote. That is what "this round is closed" means, and a round
+where a product went up while the knowledge repository stayed on one laptop is
+not closed — so the brain is judged beside the products rather than after them.
 
 vat pushes nothing and merges nothing. This judges; landing the work is yours.
 
@@ -42,6 +48,7 @@ landed.
 Every repository is reported in one pass, because this is run in a loop while a
 change is being landed and one finding per run makes that loop unusable.`,
 		Examples: []string{
+			"vat ship                      # is this round closed?",
 			"vat ship CS-0007",
 			"vat ship CS-0007 --offline    # judge against refs already fetched",
 		},
@@ -77,12 +84,15 @@ func runShip(ctx context.Context, env *Env, args []string) error {
 	if err := parseFlags(set, args); err != nil {
 		return err
 	}
-	if set.NArg() != 1 {
-		return usageErrorf("expected exactly one changeset identifier")
+	if set.NArg() > 1 {
+		return usageErrorf("expected one changeset identifier, or none to judge the workspace")
 	}
 	ws, err := env.Workspace()
 	if err != nil {
 		return err
+	}
+	if set.NArg() == 0 {
+		return shipWorkspace(ctx, env, ws, *remote, *offline)
 	}
 	current, err := changeset.Load(ws.Root, set.Arg(0))
 	if err != nil {

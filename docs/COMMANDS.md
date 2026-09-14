@@ -701,12 +701,35 @@ See [CHANGESETS.md](CHANGESETS.md).
 ## vat ship
 
 ```
-vat ship <id> [--remote <name>] [--offline]
+vat ship [<id>] [--remote <name>] [--offline]
 ```
 
 Report, per repository, whether the revision a changeset verified has reached
 the branch that repository ships from. `vat` pushes nothing and merges nothing:
 this judges, the way `doctor` judges.
+
+**With no identifier, the question is asked of the whole workspace**: is every
+governed repository committed, on the branch it ships from, and level with that
+branch on the remote. That is what "this round is closed" means, and a round
+where a product went up while the knowledge repository stayed on one laptop is
+not closed — so the brain and the workspace root are judged beside the products
+rather than after them. Open changesets are reported and do not fail it: a round
+can close with work still running, and failing there would make the gate
+unpassable in any workspace that keeps one open.
+
+```console
+$ vat ship
+OK    .                         level with origin/main at 3f9a1c2e
+OK    payments                  level with origin/main at 8b74612d
+FAIL  console                   2 commits exist only here, so this has not shipped
+INFO  open work                 1 changeset still open: CS-0007
+
+Result
+FAIL  ship                      1 repository of 3 not closed
+```
+
+Under `--json` the workspace form returns `closed`, a `repositories` array, and
+`open_changesets`; the changeset form returns what it always did.
 
 The test is one git question — is the verified revision an ancestor of
 `<remote>/<default-branch>` — so it has the same answer on GitHub, GitLab,

@@ -559,7 +559,37 @@ payment, purchasing, and production writes are each separately approved.
 
 ---
 
-## 15. Twelve sentences
+## 15. The words, and which command is each one
+
+Every workspace running this model invented its own name for the same acts, and
+two of them wrote the same script under different words. A term that names no
+command is a term two people can agree on and mean different things by, so each
+one below is pinned to the command that performs it and to what it is not.
+
+| Term | Command | What it is | What it is not |
+| --- | --- | --- | --- |
+| **sync** | `vat sync` | fetch every repository and fast-forward only what is safe | not `pull`: nothing merges, nothing rebases, and local work is never discarded |
+| **status** | `vat status` | what every repository is, right now: branch, cleanliness, revision | not a judgement — `doctor` judges |
+| **diagnose** | `vat doctor` | judge the workspace and the machine | never repairs; §4.3 |
+| **lint** | `vat lint` | check the workspace against its own declared rules | `--fix` regenerates only what is generated |
+| **verify** | `vat changeset verify` | run a repository's canonical checks and record the revision they passed on | not a claim that anything shipped |
+| **land** | — | the verified revision is an ancestor of the branch a repository ships from | not a merged pull request: a forge's model of one is its own, and an open one is the state of not having landed |
+| **ship** | `vat ship <id>` | judge whether a changeset's verified revisions have landed | pushes nothing, merges nothing |
+| **close a round** | `vat ship` | judge whether every governed repository is committed, on its branch, and level with the remote | a round where a product went up and the canonical record stayed on one laptop is not closed |
+| **close a changeset** | `vat changeset close` | record what was accepted, once the evidence exists | not the same act as landing; §7 |
+| **promote** | `vat brain promote` | a human states that a record was checked | not a status field somebody edited; §6.6 |
+| **drift** | `vat lint` | a claim's evidence moved since it was observed | not the claim becoming false; §6.2 |
+| **render** | `vat harness render` | generate each runtime's adapter from the canonical definition | an adapter carries no procedure, only a pointer |
+| **measure** | `vat metrics` | whether the discipline is producing its effect, over time | a single reading says almost nothing; §12 |
+| **fit** | `vat fit` | whether a layer is worth adopting yet, or already in use | §13 |
+
+The English is the contract. A workspace may say these in any language it likes
+among its own people, and `vat.yaml` and the records stay in English so that the
+next reader — or the next runtime — is reading the same words as the tool.
+
+---
+
+## 16. Twelve sentences
 
 1. A workspace is a control plane, not a code repository.
 2. Repositories in one folder are still independent. `git -C` is the boundary.
