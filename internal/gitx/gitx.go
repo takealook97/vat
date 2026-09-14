@@ -368,6 +368,52 @@ func UnpushedCommits(ctx context.Context, dir string) (int, error) {
 	return count, nil
 }
 
+// CommitsBetween counts the commits reachable from `to` but not from `from`.
+//
+// The range is deliberately one-way. AheadBehind answers the symmetrical
+// question about two branches; this answers "how far has this repository
+// travelled since the revision a claim was read from", which is a different
+// question and has a different wrong answer.
+//
+// A missing revision is an error rather than a count of zero. A rewritten or
+// dropped commit is exactly the case a caller must hear about, and reporting it
+// as zero would let a claim whose evidence no longer exists read as current.
+func CommitsBetween(ctx context.Context, dir, from, to string) (int, error) {
+	out, err := Run(ctx, dir, "rev-list", "--count", fmt.Sprintf("%s..%s", from, to))
+	if err != nil {
+		return 0, err
+	}
+	count, err := strconv.Atoi(strings.TrimSpace(out))
+	if err != nil {
+		return 0, fmt.Errorf("parse commit count %q: %w", out, err)
+	}
+	return count, nil
+}
+
+// ChangedPaths lists the files a revision range touched, optionally narrowed to
+// a pathspec.
+//
+// This is what separates "the repository moved" from "the evidence moved". A
+// claim pinned to a file in a repository that has since taken two hundred
+// unrelated commits has not lost its evidence, and a rule that cannot tell the
+// two apart reports every claim in a busy workspace.
+//
+// The pathspec goes after `--`. Without it git reads a value beginning with a
+// dash as one of its own options, and a path arriving here comes out of a
+// record that an agent may have written.
+func ChangedPaths(ctx context.Context, dir, from, to string, pathspec ...string) ([]string, error) {
+	args := []string{"diff", "--name-only", fmt.Sprintf("%s..%s", from, to), "--"}
+	args = append(args, pathspec...)
+	out, err := Run(ctx, dir, args...)
+	if err != nil {
+		return nil, err
+	}
+	if strings.TrimSpace(out) == "" {
+		return nil, nil
+	}
+	return strings.Split(out, "\n"), nil
+}
+
 // StashCount returns how many stash entries the repository holds. Stashes are
 // invisible to `git status`, so removing a repository without checking them
 // loses work silently.
