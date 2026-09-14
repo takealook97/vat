@@ -59,17 +59,78 @@ func Sweep(store *Store, policy CheckPolicy, now time.Time, apply bool) ([]Trans
 	return transitions, nil
 }
 
+// ReviewSource says why an item is in the re-check queue, because the two
+// reasons need different work done to them: a record awaiting its first review
+// needs a judgement, and an active claim whose evidence moved needs the source
+// re-read. A consumer that cannot tell them apart cannot route either.
+type ReviewSource string
+
+const (
+	// ReviewFromQueue is a record whose own status asks for judgement.
+	ReviewFromQueue ReviewSource = "queue"
+	// ReviewFromDrift is an active claim whose evidence moved. It is still
+	// citable — a moved revision is not a claim becoming false — and appears
+	// here so that the work it implies is visible rather than invisible.
+	ReviewFromDrift ReviewSource = "drift"
+)
+
 // ReviewItem is one entry in the prioritised re-check queue.
 type ReviewItem struct {
-	ID         string `json:"id"`
-	Path       string `json:"path"`
-	Status     Status `json:"status"`
-	Title      string `json:"title"`
-	AgeDays    int    `json:"age_days"`
-	References int    `json:"references"`
-	Priority   int    `json:"priority"`
-	Overdue    bool   `json:"overdue"`
-	Why        string `json:"why"`
+	Source     ReviewSource `json:"source"`
+	ID         string       `json:"id"`
+	Path       string       `json:"path"`
+	Status     Status       `json:"status"`
+	Title      string       `json:"title"`
+	AgeDays    int          `json:"age_days"`
+	References int          `json:"references"`
+	Priority   int          `json:"priority"`
+	Overdue    bool         `json:"overdue"`
+	Why        string       `json:"why"`
+}
+
+// DriftItems builds queue entries for active claims whose evidence has moved,
+// given the reason for each by record ID.
+//
+// The caller supplies the reasons because answering "has this evidence moved"
+// needs git, and this package deliberately cannot see it. What belongs here is
+// the ordering: a drifted claim competes for attention with everything else
+// awaiting judgement, and ranking it by a different rule would put it in a
+// second list nobody reads.
+//
+// The record's status is not touched. A revision moving is not a claim becoming
+// false, and demoting on drift would remove an answer because somebody fixed a
+// typo in the owning repository.
+func DriftItems(store *Store, reasons map[string]string, now time.Time) []ReviewItem {
+	references := store.ReferenceCounts()
+	items := make([]ReviewItem, 0, len(reasons))
+	for _, record := range store.CurrentStateClaims() {
+		why, drifted := reasons[record.ID]
+		if !drifted || record.Status != StatusActive {
+			continue
+		}
+		age, _ := record.AgeDays(now)
+		count := references[record.ID]
+		items = append(items, ReviewItem{
+			Source: ReviewFromDrift,
+			ID:     record.ID, Path: record.Path, Status: record.Status, Title: record.Title,
+			AgeDays: age, References: count,
+			Priority: priorityOf(record.Status, age, count),
+			Why:      why,
+		})
+	}
+	return items
+}
+
+// SortReviewItems orders a queue by what it costs to leave unresolved. It is
+// exported so a caller that merged two sources can restore the one ordering
+// rather than inventing a second.
+func SortReviewItems(items []ReviewItem) {
+	sort.SliceStable(items, func(i, j int) bool {
+		if items[i].Priority != items[j].Priority {
+			return items[i].Priority > items[j].Priority
+		}
+		return items[i].ID < items[j].ID
+	})
 }
 
 // ReviewQueue returns everything awaiting human judgement, ordered by how much
@@ -97,7 +158,8 @@ func ReviewQueue(store *Store, policy CheckPolicy, now time.Time) []ReviewItem {
 		age, _ := record.AgeDays(now)
 		count := references[record.ID]
 		items = append(items, ReviewItem{
-			ID: record.ID, Path: record.Path, Status: record.Status, Title: record.Title,
+			Source: ReviewFromQueue,
+			ID:     record.ID, Path: record.Path, Status: record.Status, Title: record.Title,
 			AgeDays: age, References: count,
 			Priority: priorityOf(record.Status, age, count),
 			Overdue:  policy.ReviewSLADays > 0 && age > policy.ReviewSLADays,

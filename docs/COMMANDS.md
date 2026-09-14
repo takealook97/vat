@@ -473,7 +473,7 @@ vat brain new       <goal|gap|decision|memory> --title "..." [--claim <kind>]
 vat brain build
 vat brain check     [--only <rule>] [--list]
 vat brain query     <terms...> [--all] [--limit n]
-vat brain review    [--overdue] [--limit n]
+vat brain review    [--overdue] [--drifted] [--limit n]
 vat brain sweep     [--apply]
 vat brain promote   <id> [--reviewer <name>] [--reverified]
 vat brain supersede <old-id> <new-id>
@@ -498,8 +498,15 @@ stays silent when it did not.
 archives, and terminal records — for auditing why something was decided, rather
 than asking what is true now.
 
-`review` orders by priority: how many records cite the claim, weighted against
-how long it has gone unverified.
+`review` lists two things that need different work: a record whose status asks
+for judgement, and an active claim whose evidence moved. It orders both by
+priority — how many records cite the claim, weighted against how long it has
+gone unverified — and `--drifted` narrows to the second.
+
+A drifted claim stays `active` and stays citable. A revision moving is not a
+claim becoming false, so listing it here is not demoting it; `source` in the
+`--json` output is `queue` or `drift` so a consumer can route each to the work
+it actually needs.
 
 `check` ends with the commands that clear the findings needing no judgement,
 and how many of them each clears. The remedy is named on every finding line too,

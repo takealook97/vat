@@ -228,8 +228,19 @@ $ vat brain review
 ID      STATUS       AGE  CITED  TITLE                          WHY
 G-0014  stale        115  7      Retries are not idempotent     observation aged out; re-verify against the owning repository
 D-0031  quarantined  62   3      Pricing is per seat            suspected wrong; confirm or revoke
+G-0009  active       12   4      Refunds settle next day        payments:docs/REFUNDS.md changed since this was observed at 3f9a1c2e
 G-0022  stale        94   0      Log rotation is weekly         observation aged out; re-verify against the owning repository
 ```
+
+Two things are waiting here, and they need different work. A record whose status
+asks for judgement needs a decision. An active claim whose evidence moved needs
+its source re-read — `G-0009` above is still `active` and still citable, because
+a revision moving is not a claim becoming false. `--drifted` narrows to those,
+and under `--json` the `source` field is `queue` or `drift`.
+
+Drift used to be reported only by `vat lint`, whose remedy line named this
+command — which could not show it. A workspace measured while that was true ran
+46 drifted claims against a review queue of eleven, with no overlap.
 
 Priority weighs how many records cite the claim against how long it has gone
 unverified, with quarantined items lifted above unreviewed ones because they may

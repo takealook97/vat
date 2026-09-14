@@ -81,8 +81,17 @@ func brainReviewCommand() *Command {
 	return &Command{
 		Name:    "review",
 		Summary: "The re-check queue, ordered by what it costs to leave unresolved",
-		Usage:   "vat brain review [--overdue] [--limit n]",
+		Usage:   "vat brain review [--overdue] [--drifted] [--limit n]",
 		Long: `List everything awaiting human judgement.
+
+Two things are waiting, and they need different work. A record whose status asks
+for judgement needs a decision. An active claim whose evidence moved needs its
+source re-read — it stays citable, because a revision moving is not a claim
+becoming false, but nobody has confirmed it since.
+
+Drift used to be reported only by vat lint, whose remedy line named this command
+— which could not show it. One workspace ran with 46 drifted claims and a review
+queue of eleven, and no overlap at all.
 
 Priority weights how many other records depend on a claim against how long it
 has gone unverified. A stale claim nothing cites can wait; a stale claim the
@@ -92,6 +101,7 @@ to prevent.`,
 		Run: func(ctx context.Context, env *Env, args []string) error {
 			set := newFlagSet("brain review")
 			overdueOnly := set.Bool("overdue", false, "only items past the review window")
+			driftedOnly := set.Bool("drifted", false, "only claims whose evidence moved")
 			limit := set.Int("limit", 20, "maximum items")
 			if err := parseFlags(set, args); err != nil {
 				return err
@@ -100,7 +110,16 @@ to prevent.`,
 			if err != nil {
 				return err
 			}
-			items := brain.ReviewQueue(store, brainPolicy(ws), env.Now)
+			var items []brain.ReviewItem
+			if !*driftedOnly {
+				items = brain.ReviewQueue(store, brainPolicy(ws), env.Now)
+			}
+			drifted, err := driftedClaims(ctx, ws, env.Now)
+			if err != nil {
+				return err
+			}
+			items = append(items, brain.DriftItems(store, drifted, env.Now)...)
+			brain.SortReviewItems(items)
 			if *overdueOnly {
 				filtered := items[:0]
 				for _, item := range items {
@@ -133,14 +152,20 @@ to prevent.`,
 				})
 			}
 			env.Printer.Table([]string{"ID", "STATUS", "AGE", "CITED", "TITLE", "WHY"}, rows)
-			overdue := 0
+			overdue, moved := 0, 0
 			for _, item := range items {
 				if item.Overdue {
 					overdue++
 				}
+				if item.Source == brain.ReviewFromDrift {
+					moved++
+				}
 			}
 			env.Printer.Hint("\n%d awaiting review, %d past the %d-day window.",
 				len(items), overdue, ws.Manifest.Policy.Brain.ReviewSLADays)
+			if moved > 0 {
+				env.Printer.Hint("%d of them stayed citable: the evidence moved, which is not the claim becoming false.", moved)
+			}
 			env.Printer.Hint("Re-verify against the owning repository, then: vat brain promote <id>")
 			return nil
 		},
