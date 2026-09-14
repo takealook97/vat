@@ -127,6 +127,7 @@ func Run(ctx context.Context, ws *workspace.Workspace, opts Options) (Report, er
 	}
 	add(harnessFindings...)
 	add(checkTrustPolicy(ws)...)
+	add(checkLayersAreChecked(ws)...)
 
 	brainFindings, err := checkBrain(ctx, ws, opts, now)
 	if err != nil {
@@ -197,6 +198,7 @@ func RuleNames() []string {
 		"harness/definition-malformed",
 		"harness/adapter-orphaned",
 		"policy/trust-undeclared",
+		"workspace/layer-unchecked",
 		"brain/not-initialised",
 		"brain/schema-newer",
 		ruleUnreferencedBrain,

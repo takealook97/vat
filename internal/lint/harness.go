@@ -5,8 +5,10 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/takealook97/vat/internal/brain"
 	"github.com/takealook97/vat/internal/fsx"
 	"github.com/takealook97/vat/internal/harness"
+	"github.com/takealook97/vat/internal/manifest"
 	"github.com/takealook97/vat/internal/workspace"
 )
 
@@ -237,4 +239,79 @@ func unknownRuntimes(subject, kind string, declared, supported []string) []Findi
 		})
 	}
 	return findings
+}
+
+// layerCheck pairs an adopted layer with the command that judges it.
+type layerCheck struct {
+	layer   string
+	command string
+	why     string
+}
+
+// checkLayersAreChecked reports a layer the workspace runs but never checks.
+//
+// The failure is quiet by construction. One workspace ran the knowledge layer
+// with 53 records awaiting promotion — a third of everything it held — and
+// nothing said so, because its `workspace.checks` never ran `vat brain check`.
+// A second workspace had wired exactly that and stayed clean. The difference
+// was not discipline: nobody had told the first one, and until this rule
+// existed nothing could.
+//
+// Only layers the workspace demonstrably runs are asked about. A layer nobody
+// adopted costs nothing and is owed nothing, and a rule that fires on a
+// workspace for not doing something it never chose to do is how a rule set gets
+// ignored wholesale.
+func checkLayersAreChecked(ws *workspace.Workspace) []Finding {
+	var wanted []layerCheck
+	if root, ok := ws.BrainPath(); ok && brain.IsBrain(root) {
+		wanted = append(wanted, layerCheck{
+			layer:   "brain",
+			command: "vat brain check",
+			why:     "records accumulate unpromoted and unverified with nothing reporting it",
+		})
+	}
+	if definesAnyRole(ws) {
+		wanted = append(wanted, layerCheck{
+			layer:   "harness",
+			command: "vat harness check",
+			why:     "a generated contract drifts from the manifest with nothing reporting it",
+		})
+	}
+
+	var findings []Finding
+	for _, want := range wanted {
+		if declaresCheck(ws.Manifest.Workspace.Checks, want.command) {
+			continue
+		}
+		findings = append(findings, Finding{
+			Rule: "workspace/layer-unchecked", Severity: SeverityWarn, Subject: want.layer,
+			Message: fmt.Sprintf("the %s layer is in use but no workspace check runs %q; %s",
+				want.layer, want.command, want.why),
+			// Not fixable: workspace.checks is a list somebody wrote, and
+			// editing it is a change to what this workspace promises rather
+			// than regeneration of something generated.
+			Fix: fmt.Sprintf("add %q to workspace.checks in %s", want.command, manifest.FileName),
+		})
+	}
+	return findings
+}
+
+// definesAnyRole reports whether a role was written by hand. `vat init` seeds
+// procedures into every workspace it creates, so their presence proves that vat
+// ran and nothing else; a role is written deliberately.
+func definesAnyRole(ws *workspace.Workspace) bool {
+	roles, malformed, err := harness.LoadRoles(ws.Root)
+	return err == nil && len(roles)+len(malformed) > 0
+}
+
+// declaresCheck reports whether any declared check invokes the command. The
+// comparison is by substring because a workspace legitimately wraps the command
+// — `vat brain check --quiet`, or a script whose line names it.
+func declaresCheck(checks []string, command string) bool {
+	for _, check := range checks {
+		if strings.Contains(check, command) {
+			return true
+		}
+	}
+	return false
 }
