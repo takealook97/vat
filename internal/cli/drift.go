@@ -2,6 +2,7 @@ package cli
 
 import (
 	"context"
+	"sort"
 	"time"
 
 	"github.com/takealook97/vat/internal/lint"
@@ -34,4 +35,15 @@ func driftedClaims(ctx context.Context, ws *workspace.Workspace, now time.Time) 
 		reasons[finding.Subject] = finding.Message
 	}
 	return reasons, nil
+}
+
+// sortedKeys returns the identifiers in a stable order, so two runs over an
+// unchanged workspace report the same thing in the same sequence.
+func sortedKeys(reasons map[string]string) []string {
+	ids := make([]string, 0, len(reasons))
+	for id := range reasons {
+		ids = append(ids, id)
+	}
+	sort.Strings(ids)
+	return ids
 }

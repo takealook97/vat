@@ -53,8 +53,16 @@ func runDoctor(ctx context.Context, env *Env, args []string) error {
 	if err != nil {
 		return err
 	}
+	// Asked here rather than inside doctor: resolving a revision is git's job,
+	// and the diagnosis package is assembled by this layer rather than reaching
+	// sideways for a second opinion that could differ from `vat lint`'s.
+	drifted, err := driftedClaims(ctx, ws, env.Now)
+	if err != nil {
+		return err
+	}
 	report := doctor.Run(ctx, ws, doctor.Options{
 		Network: *network, Now: env.Now, SecretMaxAgeDays: *secretAge,
+		DriftedClaims: sortedKeys(drifted),
 	})
 
 	if env.JSON {

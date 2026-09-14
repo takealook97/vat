@@ -192,7 +192,7 @@ secret value.
 | workspace | manifest validity, root versioning, `.gitignore` coverage |
 | repositories | presence, origin, branch, cleanliness |
 | credentials | files that look like plaintext secrets, encrypted count, age since last change, key material readable by other users |
-| brain | record counts, review queue, generated-file freshness |
+| brain | record counts, review queue, claims whose evidence has moved, generated-file freshness |
 | changesets | open and overdue work |
 | recovery | commits and stashes that exist only on this machine |
 | network | `--network` only: whether the GitHub CLI is authenticated, and the platform vat is running on |

@@ -78,6 +78,19 @@ type Options struct {
 	// long-lived secrets that are never rotated stop being an asset and become
 	// a liability, and nothing else in a workspace tracks their age.
 	SecretMaxAgeDays int
+	// DriftedClaims names the active current-state claims whose evidence has
+	// moved since it was observed.
+	//
+	// It is supplied rather than computed because answering it needs to resolve
+	// a git revision, and this package is one the command layer assembles
+	// rather than one that reaches sideways into `lint` for a second opinion.
+	// Two commands deriving the same answer separately is how they come to
+	// disagree about the same record.
+	//
+	// Left empty, the brain section says nothing about drift — which is what a
+	// caller that did not ask the question should get, rather than a cheerful
+	// report that nothing moved.
+	DriftedClaims []string
 }
 
 // Run diagnoses the workspace and the machine it sits on.
@@ -93,7 +106,7 @@ func Run(ctx context.Context, ws *workspace.Workspace, opts Options) Report {
 	add(checkWorkspace(ws)...)
 	add(checkRepos(ctx, ws)...)
 	add(checkSecrets(ws, now, opts.SecretMaxAgeDays)...)
-	add(checkBrain(ws, now)...)
+	add(checkBrain(ws, now, opts.DriftedClaims)...)
 	add(checkChangesets(ws, now)...)
 	add(checkRecoverability(ctx, ws)...)
 	if opts.Network {
@@ -478,7 +491,7 @@ func scanCredentialRepo(dir string) (plaintext []string, encrypted int, oldest t
 	return plaintext, encrypted, oldest
 }
 
-func checkBrain(ws *workspace.Workspace, now time.Time) []Finding {
+func checkBrain(ws *workspace.Workspace, now time.Time, driftedClaims []string) []Finding {
 	root, ok := ws.BrainPath()
 	if !ok || !fsx.IsDir(root) {
 		return nil
@@ -547,6 +560,19 @@ func checkBrain(ws *workspace.Workspace, now time.Time) []Finding {
 	default:
 		findings = append(findings, Finding{
 			Section: sectionBrain, Subject: "review queue", Status: StatusOK, Detail: "empty",
+		})
+	}
+
+	// A claim whose evidence moved is still citable — a revision moving is not a
+	// claim becoming false — so this is a warning about work outstanding, not a
+	// verdict on the record. Saying nothing was the defect: one workspace held
+	// 46 of these, the worst 213 commits behind, and read as healthy.
+	if len(driftedClaims) > 0 {
+		findings = append(findings, Finding{
+			Section: sectionBrain, Subject: "evidence", Status: StatusWarn,
+			Detail: fmt.Sprintf("%s pinned to evidence that has moved since it was observed",
+				plural(len(driftedClaims), "claim", "claims")),
+			Fix: "vat brain review --drifted",
 		})
 	}
 
