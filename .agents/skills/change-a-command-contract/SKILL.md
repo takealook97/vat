@@ -8,8 +8,15 @@ description: Change a vat command's output, exit code, or flags without breaking
 ## When to use this
 
 A change touches what a command prints, what it exits with, which flags it
-accepts, or what it writes to disk. All four are contracts somebody else may
-already depend on, including scripts nobody in this repository can see.
+accepts, what its `--json` emits, or what it writes to disk. All five are
+contracts somebody else may already depend on, including scripts nobody in this
+repository can see.
+
+The `--json` shape is the easiest to change by accident, because it is usually a
+struct in another package with no test naming the command it serves. Adding a
+field is safe. Renaming or removing one is not, and neither is adding rows to a
+list a consumer filters — if the new rows need different handling, give them a
+field that says so rather than leaving a consumer to guess from the others.
 
 ## The rule this implements
 

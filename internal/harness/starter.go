@@ -124,11 +124,12 @@ the file in front of you.
    decided rather than what is true, since that widens the search to history,
    archives, and terminal records.
 3. Read the record's status before citing it. A ` + "`provisional`" + ` record has not
-   crossed the promotion gate, and a claim pinned to a revision its repository
-   has since moved past is evidence about a tree that no longer exists.
-4. ` + "`vat brain review`" + ` to see which claims are most worth re-checking: it
-   orders by how many records cite a claim against how long it has gone
-   unverified.
+   crossed the promotion gate. A claim whose evidence has moved is still
+   citable — a revision moving is not a claim becoming false — but nobody has
+   confirmed it since, so say that rather than quoting it flat.
+4. ` + "`vat brain review`" + ` to see what is worth re-checking. It lists two things:
+   records awaiting judgement, and active claims whose evidence moved.
+   ` + "`--drifted`" + ` narrows to the second.
 5. ` + "`vat brain check`" + ` before trusting the layer as a whole.
 
 ## When it must stop
@@ -140,5 +141,16 @@ harder to correct than they were when nobody had written them down.
 Do not promote a record to make a citation look stronger. Promotion is a claim
 that the evidence was re-read, and ` + "`vat brain promote`" + ` refuses to move the
 observation date forward unless the evidence is demonstrably unchanged or you
-state with ` + "`--reverified`" + ` that you read the source yourself.
+state with ` + "`--reverified`" + ` that you read the source yourself. It takes
+several identifiers, and ` + "`--owner <repo>`" + ` takes everything one repository is
+canonical for — one merge is what puts a repository's worth of claims up for
+re-verification at once.
+
+## When you write one
+
+Pass ` + "`--source-path`" + ` to ` + "`vat brain new`" + ` and name the file you actually read.
+Pinned to a repository alone, the only question a later run can ask is whether
+the repository moved, and in an active one the answer is always yes; pinned to a
+file, it can ask whether this claim's evidence moved, and usually the answer is
+no.
 `
