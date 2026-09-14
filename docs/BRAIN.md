@@ -286,6 +286,12 @@ error: G-0014: payments has moved since this was observed (pinned 3f9a1c2e8b74,
 ```
 
 Passing `--reverified` re-pins `source_ref` to the revision you actually read.
+
+Several records can be promoted at once, and `--owner <repo>` selects everything
+one repository is canonical for, because one merge is what puts twenty claims up
+for re-verification at the same moment. Each is still judged separately: every
+refusal is reported rather than stopping the run, and the command exits non-zero
+if any refused.
 Leaving the old one would date the record today against something nobody opened.
 
 **It will not revive an end state.** A superseded, revoked, or resolved record

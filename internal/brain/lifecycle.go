@@ -166,12 +166,7 @@ func ReviewQueue(store *Store, policy CheckPolicy, now time.Time) []ReviewItem {
 			Why:      why,
 		})
 	}
-	sort.SliceStable(items, func(i, j int) bool {
-		if items[i].Priority != items[j].Priority {
-			return items[i].Priority > items[j].Priority
-		}
-		return items[i].ID < items[j].ID
-	})
+	SortReviewItems(items)
 	return items
 }
 

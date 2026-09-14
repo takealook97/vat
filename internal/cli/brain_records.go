@@ -188,8 +188,8 @@ func brainPromoteCommand() *Command {
 	return &Command{
 		Name:    "promote",
 		Summary: "Mark a reviewed record as citable",
-		Usage:   "vat brain promote <id> [--reviewer <name>] [--reverified]",
-		Long: `Move a record to active after a human has checked it.
+		Usage:   "vat brain promote <id...> | --owner <repo> [--reviewer <name>] [--reverified]",
+		Long: `Move records to active after a human has checked them.
 
 A current-state claim with no owner and no source revision cannot be promoted at
 all. That refusal is what makes the promotion gate real rather than an honour
@@ -200,39 +200,96 @@ revision the claim was read from. When it is, the observation date moves freely.
 When it has moved — or vat cannot see the repository — the date only moves if
 you pass --reverified, which is you stating that you re-read the source
 yourself. Otherwise one keystroke would re-date a year-old claim as verified
-today.`,
+today.
+
+Several records can be named at once, and --owner selects everything one
+repository is canonical for, because one merge into an active repository is what
+puts twenty claims up for re-verification at the same moment. Every record is
+still judged separately and the gate is unchanged: a batch is many claims that a
+human checked, not a way around having to.`,
+		Examples: []string{
+			`vat brain promote G-0014 --reviewer alex`,
+			`vat brain promote --owner payments --reviewer alex --reverified`,
+		},
 		Run: func(ctx context.Context, env *Env, args []string) error {
 			set := newFlagSet("brain promote")
 			reviewer := set.String("reviewer", "", "who reviewed it")
 			reverified := set.Bool("reverified", false, "you re-read the source yourself")
+			owner := set.String("owner", "", "promote every record this repository owns")
 			if err := parseFlags(set, args); err != nil {
 				return err
 			}
-			if set.NArg() != 1 {
-				return usageErrorf("expected exactly one record identifier")
+			named := set.Args()
+			if len(named) > 0 && strings.TrimSpace(*owner) != "" {
+				// Two different selections. Preferring one silently would
+				// promote a set the caller did not ask for, and promotion is
+				// the one step in this layer that cannot be taken back quietly.
+				return usageErrorf("name records or pass --owner, not both")
+			}
+			if len(named) == 0 && strings.TrimSpace(*owner) == "" {
+				return usageErrorf("expected at least one record identifier, or --owner <repo>")
 			}
 			ws, store, err := openBrain(env)
 			if err != nil {
 				return err
 			}
-			record, ok := store.ByID()[set.Arg(0)]
-			if !ok {
-				return usageErrorf("no record with id %q", set.Arg(0))
-			}
-			request := brain.PromoteRequest{
-				Reviewer: *reviewer, Now: env.Now, Reverified: *reverified,
-				RequireReviewer: ws.Manifest.Policy.Gates.BrainPromote == manifest.GateManual,
-				SourceRevision:  currentRevisionOf(ctx, ws, record.OwnedBy),
-			}
-			if err := brain.Promote(store.Root, record, request); err != nil {
+			records, err := recordsToPromote(store, named, *owner)
+			if err != nil {
 				return err
 			}
-			env.Printer.Status(ui.LevelOK, record.ID,
-				fmt.Sprintf("active, observed %s", env.Now.Format("2006-01-02")))
+			refused := 0
+			for _, record := range records {
+				request := brain.PromoteRequest{
+					Reviewer: *reviewer, Now: env.Now, Reverified: *reverified,
+					RequireReviewer: ws.Manifest.Policy.Gates.BrainPromote == manifest.GateManual,
+					SourceRevision:  currentRevisionOf(ctx, ws, record.OwnedBy),
+				}
+				// Every record is reported, refusals included. These commands
+				// run in a loop while somebody clears a queue, and stopping at
+				// the first refusal hides both the rest of the refusals and the
+				// records that would have gone through.
+				if err := brain.Promote(store.Root, record, request); err != nil {
+					env.Printer.Status(ui.LevelFail, record.ID, firstLine(err.Error()))
+					refused++
+					continue
+				}
+				env.Printer.Status(ui.LevelOK, record.ID,
+					fmt.Sprintf("active, observed %s", env.Now.Format("2006-01-02")))
+			}
 			env.Printer.Hint("Run `vat brain build` to refresh the index.")
+			if refused > 0 {
+				return findingsErrorf("%d of %d refused", refused, len(records))
+			}
 			return nil
 		},
 	}
+}
+
+// recordsToPromote resolves the selection, in a stable order so that a batch
+// reads the same way twice.
+func recordsToPromote(store *brain.Store, named []string, owner string) ([]brain.Record, error) {
+	byID := store.ByID()
+	if owner != "" {
+		var records []brain.Record
+		for _, record := range store.WorkingSet() {
+			if record.OwnedBy == owner && !record.Status.Terminal() && record.Status != brain.StatusActive {
+				records = append(records, record)
+			}
+		}
+		if len(records) == 0 {
+			return nil, usageErrorf("no record awaiting promotion is owned by %q", owner)
+		}
+		return records, nil
+	}
+	records := make([]brain.Record, 0, len(named))
+	for _, id := range named {
+		record, ok := byID[id]
+		if !ok {
+			return nil, usageErrorf("no record with id %q", id)
+		}
+		records = append(records, record)
+	}
+	return records, nil
 }
 
 func brainSupersedeCommand() *Command {

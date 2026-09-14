@@ -475,7 +475,7 @@ vat brain check     [--only <rule>] [--list]
 vat brain query     <terms...> [--all] [--limit n]
 vat brain review    [--overdue] [--drifted] [--limit n]
 vat brain sweep     [--apply]
-vat brain promote   <id> [--reviewer <name>] [--reverified]
+vat brain promote   <id...> | --owner <repo> [--reviewer <name>] [--reverified]
 vat brain supersede <old-id> <new-id>
 vat brain quarantine <id> --reason "..."
 vat brain revoke    <id> --reason "..."
@@ -527,6 +527,13 @@ has changed. A commit that edits a record and does not rebuild leaves
 `vat lint` reporting drift.
 
 `sweep` lists proposed demotions; `--apply` writes them.
+
+`promote` takes several identifiers, and `--owner <repo>` selects everything one
+repository is canonical for — one merge into an active repository is what puts
+twenty claims up for re-verification at the same moment. Every record is judged
+separately, every refusal is reported rather than stopping the run, and the exit
+code is non-zero if any refused. The gate is unchanged: a batch is many claims
+that a human checked, not a way around having to.
 
 `promote` refuses a current-state claim with no `owned_by` and no `source_ref`.
 It also refuses to move the observation date forward unless the evidence is
