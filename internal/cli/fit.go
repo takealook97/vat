@@ -165,7 +165,7 @@ func adoptedLayers(ws *workspace.Workspace) []string {
 	if definesRoles(ws) {
 		layers = append(layers, fit.LayerHarness)
 	}
-	if sets, err := changeset.LoadAll(ws.ChangesetsDir()); err == nil && len(sets) > 0 {
+	if sets, err := changeset.LoadAll(ws.Root); err == nil && len(sets) > 0 {
 		layers = append(layers, fit.LayerChangesets)
 	}
 	// Declared is not adopted: a repository named as the brain but never
@@ -184,7 +184,7 @@ func adoptedLayers(ws *workspace.Workspace) []string {
 // repositories. Each is evidence that an interface crossed a boundary, which is
 // the thing --contracts asks the caller to count by hand.
 func countCrossRepositoryChangesets(ws *workspace.Workspace) int {
-	sets, err := changeset.LoadAll(ws.ChangesetsDir())
+	sets, err := changeset.LoadAll(ws.Root)
 	if err != nil {
 		return 0
 	}

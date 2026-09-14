@@ -402,7 +402,8 @@ func CommitsBetween(ctx context.Context, dir, from, to string) (int, error) {
 // dash as one of its own options, and a path arriving here comes out of a
 // record that an agent may have written.
 func ChangedPaths(ctx context.Context, dir, from, to string, pathspec ...string) ([]string, error) {
-	args := []string{"diff", "--name-only", fmt.Sprintf("%s..%s", from, to), "--"}
+	args := make([]string, 0, 4+len(pathspec))
+	args = append(args, "diff", "--name-only", fmt.Sprintf("%s..%s", from, to), "--")
 	args = append(args, pathspec...)
 	out, err := Run(ctx, dir, args...)
 	if err != nil {
