@@ -6,6 +6,8 @@ Notable changes to `vat`. The format follows
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-09-14
+
 ### Added
 
 - `vat brain new --source-path <file>` pins the file a claim was read from, so
