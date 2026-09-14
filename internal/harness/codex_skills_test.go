@@ -1,6 +1,7 @@
 package harness_test
 
 import (
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -47,8 +48,12 @@ description: Check the knowledge layer before stating something as true.
 	if !ok {
 		t.Fatalf("a skill targeting every runtime renders no Codex adapter: %+v", adapters)
 	}
-	if !strings.HasPrefix(codex.Path, harness.CodexSkillDir) {
-		t.Errorf("path = %q; want it under %s", codex.Path, harness.CodexSkillDir)
+	// Built with filepath.Join, like the assertion on the Claude adapter beside
+	// it: an adapter path is written to disk, so it carries the platform's own
+	// separator. Comparing against the forward-slash constant passed on macOS
+	// and Linux and failed on Windows, which is the whole reason CI runs three.
+	if want := filepath.Join(harness.CodexSkillDir, "consult-the-brain-first", harness.SkillFile); codex.Path != want {
+		t.Errorf("path = %q, want %q", codex.Path, want)
 	}
 	if _, ok := byRuntime["claude"]; !ok {
 		t.Error("the Claude adapter was lost while adding the Codex one")
