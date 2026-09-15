@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"path/filepath"
+	"regexp"
 	"slices"
 	"sort"
 	"strings"
@@ -84,13 +85,10 @@ func Build(store *Store, now time.Time) (BuildResult, error) {
 // Drift returns the generated files whose on-disk content no longer matches
 // what the atomic records would produce.
 func Drift(store *Store, now time.Time) ([]string, error) {
-	var drifted []string
-	expected := map[string][]byte{CurrentFile: []byte(RenderCurrent(store, now))}
 	graph, err := RenderGraph(store)
 	if err != nil {
 		return nil, err
 	}
-	expected[GraphFile] = graph
 
 	// A file vat never wrote is not out of date with respect to the records;
 	// it is not a projection at all. Calling it drift would offer `vat brain
@@ -100,6 +98,7 @@ func Drift(store *Store, now time.Time) ([]string, error) {
 		return nil, err
 	}
 
+	var drifted []string
 	for _, name := range Generated() {
 		if slices.Contains(foreign, name) {
 			continue
@@ -109,15 +108,50 @@ func Drift(store *Store, now time.Time) ([]string, error) {
 		if err != nil {
 			return nil, err
 		}
+		if !exists {
+			drifted = append(drifted, name)
+			continue
+		}
+		expected := graph
+		if name == CurrentFile {
+			// Rendered as of the day the file on disk says it was built, not
+			// today. CURRENT.md carries that date and an age in days per
+			// record, both from the clock, so comparing against a re-render
+			// made now reported drift on the first run of every new day for a
+			// repository nobody had touched — and `vat brain build` cleared it
+			// by rewriting the date, so it returned every night and was read as
+			// the projection being stale rather than as the check being wrong.
+			// Asking the question as of the file's own stamp leaves exactly one
+			// thing that can differ: the records.
+			expected = []byte(RenderCurrent(store, renderedAt(string(current), now)))
+		}
 		// The same question the harness asks of its own generated files: a line
 		// ending is not drift, and reporting it as one gave a Windows checkout
 		// a permanently red `vat brain check` on files nobody had touched.
-		if !exists || fsx.NormaliseNewlines(string(current)) != fsx.NormaliseNewlines(string(expected[name])) {
+		if fsx.NormaliseNewlines(string(current)) != fsx.NormaliseNewlines(string(expected)) {
 			drifted = append(drifted, name)
 		}
 	}
 	sort.Strings(drifted)
 	return drifted, nil
+}
+
+// rebuiltStamp matches the line RenderCurrent writes to date the projection.
+var rebuiltStamp = regexp.MustCompile(`(?m)^Rebuilt (\d{4}-\d{2}-\d{2})\.$`)
+
+// renderedAt reads the day a projection says it was built, falling back to the
+// given time when the line is missing or unreadable — an older projection, or
+// one edited by hand, is then compared as it always was rather than trusted.
+func renderedAt(content string, fallback time.Time) time.Time {
+	match := rebuiltStamp.FindStringSubmatch(content)
+	if match == nil {
+		return fallback
+	}
+	stamped, err := time.Parse("2006-01-02", match[1])
+	if err != nil {
+		return fallback
+	}
+	return stamped
 }
 
 // RenderCurrent produces the bounded entry point: enough to find the right
