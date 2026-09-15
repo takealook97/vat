@@ -253,6 +253,18 @@ func TestTheManifestReferenceNamesEveryFieldTheSchemaAccepts(t *testing.T) {
 			t.Errorf("docs/MANIFEST.md never names the workspace field %q", field)
 		}
 	}
+	// The policy block was documented here and nowhere in the specification,
+	// and neither document was held to it. This half holds the reference.
+	for _, group := range []any{
+		manifest.SyncPolicy{}, manifest.TrustPolicy{}, manifest.BrainPolicy{},
+		manifest.ChangesetPolicy{}, manifest.GatePolicy{},
+	} {
+		for _, field := range yamlFieldNames(group) {
+			if !strings.Contains(reference, "`"+field+"`") {
+				t.Errorf("docs/MANIFEST.md never names the policy field %q", field)
+			}
+		}
+	}
 }
 
 // yamlFieldNames returns the on-disk names of a struct's serialised fields.
@@ -879,4 +891,53 @@ func TestNoCommandWritesToStdoutWhenItRefusesTheInvocation(t *testing.T) {
 				strings.Join(path, " "), out)
 		}
 	})
+}
+
+// SPEC.md is the normative half: it says prose is the specification and a
+// schema disagreeing with it has a bug. So a field the manifest always writes
+// and the specification never names leaves the schema ahead of the document it
+// is supposed to project.
+//
+// The whole `policy` block was in that state from the manifest's first commit —
+// five groups, sixteen fields, present in the schema and in MANIFEST.md and
+// absent from §4.1 — because the test that holds MANIFEST.md to the code
+// checked only the workspace and repository structs, and nothing held SPEC.md
+// to anything but its enumerations.
+func TestTheSpecificationNamesEveryManifestFieldWrittenToDisk(t *testing.T) {
+	// Arrange
+	for _, path := range []string{"../../docs/SPEC.md"} {
+		content, err := os.ReadFile(path)
+		if err != nil {
+			t.Fatalf("read %s: %v", path, err)
+		}
+		reference := string(content)
+
+		// Act & Assert
+		for _, group := range []struct {
+			prefix string
+			value  any
+			// A group of groups is named by its own prefix appearing on the
+			// fields beneath it, which is how adding a sixth policy group with
+			// no documentation fails here rather than silently.
+			namesGroups bool
+		}{
+			{prefix: "workspace.", value: manifest.Workspace{}},
+			{prefix: "policy.", value: manifest.Policy{}, namesGroups: true},
+			{prefix: "policy.sync.", value: manifest.SyncPolicy{}},
+			{prefix: "policy.trust.", value: manifest.TrustPolicy{}},
+			{prefix: "policy.brain.", value: manifest.BrainPolicy{}},
+			{prefix: "policy.changeset.", value: manifest.ChangesetPolicy{}},
+			{prefix: "policy.gates.", value: manifest.GatePolicy{}},
+		} {
+			for _, field := range yamlFieldNames(group.value) {
+				qualified := group.prefix + field
+				if group.namesGroups {
+					qualified += "."
+				}
+				if !strings.Contains(reference, "`"+qualified) {
+					t.Errorf("%s never names %q", path, qualified)
+				}
+			}
+		}
+	}
 }

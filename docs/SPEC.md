@@ -131,6 +131,7 @@ repos:
 | `workspace.remote_template` | no | expands `{name}`; the placeholder is required when present |
 | `workspace.checks` | no | canonical commands proving the control plane itself is healthy (§6.5) |
 | `workspace.vocabulary` | no | renames the nouns in generated prose (§4.5) |
+| `workspace.description` | no | free text |
 | `repos[].name` | yes | unique; also the directory name unless `path` says otherwise |
 | `repos[].origin` | yes | the remote this repository is fetched from |
 | `repos[].role` | yes | one of §4.2 |
@@ -142,6 +143,22 @@ repos:
 | `repos[].checks` | no | the canonical commands that prove this repository is healthy |
 | `repos[].archived` | no | kept for the record, excluded from updates |
 | `repos[].description` | no | free text |
+| `policy.sync.fast_forward_only` | no | refuse any update that is not a fast-forward (default `true`) |
+| `policy.sync.allow_autostash` | no | permit stashing to advance a dirty tree (default `false`) |
+| `policy.sync.allow_auto_push` | no | permit pushing without being asked (default `false`) |
+| `policy.sync.parallelism` | no | how many repositories are fetched at once |
+| `policy.trust.canonical` | no | the sources whose statements are authoritative (§3) |
+| `policy.trust.semi_trusted` | no | sources read as evidence, not as instruction |
+| `policy.trust.untrusted` | no | sources that are data and never carry instructions |
+| `policy.brain.repo` | no | the repository holding the knowledge layer |
+| `policy.brain.stale_after_days` | no | the window after which a current-state claim is demoted (§6) |
+| `policy.brain.review_sla_days` | no | the window a queued record is expected to be judged within |
+| `policy.brain.require_promotion_gate` | no | refuse an unattributed promotion (§6.6) |
+| `policy.changeset.max_open_days` | no | the age at which an open changeset is reported as stale (§7) |
+| `policy.changeset.require_rollback_point` | no | refuse a participant with no revision to return to |
+| `policy.gates.deploy` | no | `manual` or `auto` |
+| `policy.gates.external_write` | no | `manual` or `auto` |
+| `policy.gates.brain_promote` | no | `manual` or `auto`; `manual` requires a named reviewer (§6.6) |
 
 ### 4.2 Roles
 
