@@ -6,6 +6,30 @@ Notable changes to `vat`. The format follows
 
 ## [Unreleased]
 
+## [0.6.4] - 2026-09-15
+
+### Fixed
+
+- `brain/generated-drift` no longer reports a projection nobody has touched.
+  `CURRENT.md` carries the day it was rendered and an age in days for every
+  record, both from the clock, and the check compared it against a re-render
+  made with today's clock — so it failed on the first run of every new calendar
+  day. Two of the three workspaces running vat were in that state: clean trees,
+  `CURRENT.md` committed beside the records it was built from, no commits since,
+  red the next morning. The remedy works, which is why it went unexamined:
+  `vat brain build` rewrites the date, so the error cleared every day and
+  returned every night. The question is now asked as of the day the file itself
+  says it was built, which leaves the records as the only thing that can differ.
+- `docs/SPEC.md` §4.1 names the `policy` block. Five groups and sixteen fields
+  were in the schema and in `docs/MANIFEST.md` and named nowhere in the
+  normative field table, from the manifest's first commit; `workspace.description`
+  was missing from it too while appearing in the same file's own example. Both
+  documents are now held to the code by a test, each by the convention it uses.
+- The `runner` suite runs on Windows. Seven of its eight tests skipped there
+  because their fixtures were POSIX shell, so `cmd /C` — the branch
+  `docs/FAQ.md` says `vat.yaml` commands run through — had no coverage on any
+  platform, and CI on three operating systems was running the skip.
+
 ## [0.6.3] - 2026-09-15
 
 ### Added
