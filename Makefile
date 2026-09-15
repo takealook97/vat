@@ -44,7 +44,7 @@ COVERAGE_MIN ?= 80
 PACKAGE_COVERAGE_MIN ?= 75
 
 .DEFAULT_GOAL := check
-.PHONY: check build install test cover lint fmt vet tidy clean release-snapshot help
+.PHONY: check build install test cover lint fmt vet hooks tidy clean release-snapshot help
 
 # `cover` is part of `check` for the reason the coverage comment above gives.
 # The floor was enforced in CI and nowhere else, so the one gate written to stop
@@ -133,6 +133,11 @@ lint:
 		echo "golangci-lint is not installed; skipping"; \
 		echo "install: https://golangci-lint.run/welcome/install/"; \
 	fi
+
+## hooks: point this clone's git hooks at .githooks, so the commit contract is checked locally
+hooks:
+	git config core.hooksPath .githooks
+	@echo "core.hooksPath = .githooks"
 
 ## tidy: prune and verify module dependencies
 tidy:

@@ -16,6 +16,7 @@ The strongest proposals name a failure that already happened to you.
 ```bash
 git clone https://github.com/takealook97/vat.git
 cd vat
+make hooks
 make check
 ```
 
@@ -31,6 +32,11 @@ make lint      # golangci-lint alone; `make check` already runs it
 ```
 
 ## Commit convention
+
+`make hooks` points this clone at `.githooks`, so the rule below is checked as
+you commit rather than after the history is written. The same script runs in CI
+over a pull request's range, which is the copy that decides — a clone without
+the hook is not rejected, and `--no-verify` buys nothing.
 
 ```
 {category}: {description}

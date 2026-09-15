@@ -171,3 +171,28 @@ jobs:
         with:
           name: coverage
           path: coverage.out
+
+  # The hook in .githooks only runs in a clone that installed it, and
+  # `--no-verify` is one flag away. This is the copy that decides, and it reads
+  # the same script so the two cannot drift into two different rules.
+  commits:
+    name: commit contract
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Check every subject in the range
+        env:
+          BASE: ${{ github.event.pull_request.base.sha }}
+          HEAD: ${{ github.event.pull_request.head.sha }}
+        run: |
+          failed=0
+          while IFS= read -r subject; do
+            [ -n "$subject" ] || continue
+            .githooks/commit-msg --subject "$subject" || failed=1
+          done <<< "$(git log --format=%s "$BASE..$HEAD")"
+          exit "$failed"
