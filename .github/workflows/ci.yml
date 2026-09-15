@@ -5,6 +5,13 @@ on:
     branches: [main]
   pull_request:
   workflow_dispatch:
+  # Nothing here pins a toolchain: `go-version: stable` follows whatever Go has
+  # released, and the published binaries are built the same way. So a tree that
+  # passed can stop passing with no commit behind it, and without this the first
+  # person to find out is whoever pushes next — or whoever installs. A weekly
+  # run asks the question while nobody is waiting on the answer.
+  schedule:
+    - cron: "0 3 * * 1"
 
 permissions:
   contents: read
