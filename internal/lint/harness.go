@@ -213,9 +213,13 @@ func malformedDefinitions(malformed []harness.Malformed) []Finding {
 // inert, while every diagnostic reports the harness healthy.
 //
 // The supported list is a parameter because roles and skills are separate
-// adapter contracts even when they currently target the same runtimes. Keeping
-// the lists separate prevents a future runtime added to one kind from making a
-// correctly spelled but inert declaration on the other look supported.
+// adapter contracts, even now that both target the same runtimes. They did not
+// always: before v0.6.0 vat rendered a role adapter for Codex and no skill
+// adapter at all, and checking skills against the role list is how that case
+// went unreported — the rule documented as catching a value that generates no
+// adapter was reading the wrong list to decide. Keeping the lists separate is
+// what stops the next runtime added to one kind from making a correctly spelled
+// but inert declaration on the other look supported.
 func unknownRuntimes(subject, kind string, declared, supported []string) []Finding {
 	var findings []Finding
 	for _, name := range declared {
@@ -296,12 +300,68 @@ func checkLayersAreChecked(ws *workspace.Workspace) []Finding {
 
 // definesAnyHarnessDefinition reports whether the workspace has adopted the
 // harness layer. A skill is as observable as a role: both render runtime
-// adapters that can drift, including the procedures vat seeds at init.
+// adapters that can drift, so a workspace that defines skills and no roles is
+// running the layer and is asked about it.
+//
+// What does not count is the procedures `vat init` seeds. Their presence proves
+// that vat ran and nothing else, and counting them put this warning on every
+// workspace vat creates, for content vat wrote itself, on the first command a
+// new user runs. The repair is not vat's to apply either: `workspace.checks` is
+// the evidence `vat changeset verify` consumes, so seeding a value there would
+// record the control plane as proven by a check nobody chose.
 func definesAnyHarnessDefinition(ws *workspace.Workspace) bool {
-	roles, malformedRoles, roleErr := harness.LoadRoles(ws.Root)
-	skills, malformedSkills, skillErr := harness.LoadSkills(ws.Root)
-	return roleErr == nil && skillErr == nil &&
-		len(roles)+len(malformedRoles)+len(skills)+len(malformedSkills) > 0
+	roles, malformedRoles, err := harness.LoadRoles(ws.Root)
+	if err != nil {
+		return false
+	}
+	if len(roles)+len(malformedRoles) > 0 {
+		return true
+	}
+	skills, malformedSkills, err := harness.LoadSkills(ws.Root)
+	if err != nil {
+		return false
+	}
+	return len(malformedSkills) > 0 || definesAnAuthoredSkill(skills)
+}
+
+// definesAnAuthoredSkill reports whether any skill is one somebody wrote rather
+// than one vat seeded. A seeded procedure becomes the user's file the moment it
+// lands, so a starter edited in place still reads as seeded here; whether its
+// adapter still matches it is `harness/adapter-drift`'s question, asked
+// directly and on the file itself.
+//
+// Seeded is decided by name and deliberately not by content. Comparing against
+// what this build would write makes the answer depend on the build: change a
+// starter's wording in any later version and every workspace holding the older
+// text — untouched, by anybody — flips to authored and is warned on upgrade for
+// a file nobody edited. The cost of deciding by name is the opposite miss: a
+// skill somebody writes under a starter's own name stays invisible to this
+// rule. That is one narrow case against one that would fire everywhere at once,
+// and this rule is worth less the more often it is wrong.
+//
+// Deciding by name has a residual of the same shape, and it is smaller rather
+// than absent: renaming or dropping a starter in a later version leaves the old
+// seed under a name this list no longer holds, and it reads as authored on
+// upgrade. Renaming one is already a deliberate break — the name is the
+// directory under `.claude/skills/` and `.codex/skills/` and is written into
+// the adoption guide — so it is a thing somebody decides, not a thing prose
+// drifts into.
+//
+// A malformed skill counts as authored, and that is an inference rather than a
+// default: `WriteStarterSkills` writes valid front matter every time, so a
+// skill vat cannot parse is one somebody has edited. The name is unreadable in
+// that state, which is why it is not consulted.
+func definesAnAuthoredSkill(skills []harness.Skill) bool {
+	seeded := make(map[string]bool)
+	for _, starter := range harness.StarterSkills() {
+		seeded[starter.Name] = true
+	}
+	for _, skill := range skills {
+		if !seeded[skill.Name] {
+			return true
+		}
+	}
+	return false
 }
 
 // declaresCheck reports whether any declared check invokes the command. The

@@ -12,9 +12,29 @@ Notable changes to `vat`. The format follows
   and no roles as using the harness layer. Those skills render runtime adapters
   that can drift, but the rule only looked under `.agents/roles/`, so a
   skill-only workspace received no prompt to add `vat harness check`.
+
+  The procedures `vat init` seeds are not adoption on their own. Counting them
+  put the warning on every workspace vat had just created, for files vat wrote
+  itself, on the first command a new user runs — and the obvious repair was not
+  vat's to apply, because `workspace.checks` is the evidence
+  `vat changeset verify` consumes and a value seeded there would record the
+  control plane as proven by a check nobody chose. A skill somebody wrote is
+  adoption; a starter left where `vat init` put it is not. Whether a seeded
+  procedure still matches its adapter is `harness/adapter-drift`'s question,
+  asked directly and on the file itself.
 - The normative harness format now lists the Codex skill adapter added in
   v0.6.0. The implementation and harness guide already described both runtime
   adapters, while `docs/SPEC.md` still stated the pre-v0.6.0 contract.
+
+### Upgrading
+
+- The first `vat lint` after upgrading reports `workspace/layer-unchecked` on a
+  workspace that defines skills of its own, no roles, and no `vat harness check`
+  in `workspace.checks`. That combination was invisible to the rule before.
+  Adding the check ends it, and nothing that passed before fails now: the
+  finding is a warning and `vat lint` leaves the exit code alone for warnings.
+- A workspace holding only the two procedures `vat init` seeds is not asked, so
+  a newly created workspace is silent on its first run.
 
 ## [0.6.1] - 2026-09-14
 

@@ -252,7 +252,7 @@ The rules, and what each one prevents:
 | `harness/definition-malformed` | error | a role or skill file that cannot be read, reported instead of withdrawing every other definition beside it |
 | `harness/adapter-orphaned` | warn | a generated adapter left behind by a deleted definition, still loaded by the runtime and pointing at a file that is gone |
 | `harness/runtime-unknown` | warn | a `runtimes:` value that generates no adapter, leaving the definition inert while every other rule passes |
-| `workspace/layer-unchecked` | warn | a layer the workspace runs that no workspace check ever judges, so its findings accumulate unseen |
+| `workspace/layer-unchecked` | warn | a layer the workspace adopted that no workspace check ever judges, so its findings accumulate unseen |
 | `policy/trust-undeclared` | warn | a harness that cannot say which content is data |
 | `brain/not-initialised` | warn | a declared knowledge repository with no records |
 | `brain/schema-newer` | error | a knowledge layer written against a schema this build cannot read, which these checks would otherwise certify |

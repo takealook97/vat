@@ -599,10 +599,10 @@ func TestFitStartsRecommendingTheHarnessOnceAgentsAreInTheLoop(t *testing.T) {
 // The advice was wrong before it was checked. It said to run `vat lint` and
 // `vat doctor`, and both fail there — every repository reported missing, which
 // is true and tells the reader nothing about what they changed. What makes the
-// corrected advice safe is that findings caused by absent working trees are
-// confined to `repo/`. Independent workspace findings may still appear: init
-// seeds skills, so a workspace that has not added `vat harness check` is
-// correctly warned even when every governed tree is absent.
+// corrected advice safe is that the failures are confined to `repo/`: if a rule
+// outside that prefix ever starts needing a working tree, the documented
+// selectors quietly begin failing builds for a reason the documentation does
+// not mention.
 func TestOnlyRepositoryRulesNeedTheWorkingTreesToBePresent(t *testing.T) {
 	// Arrange
 	h := newFixture(t)
@@ -625,9 +625,6 @@ func TestOnlyRepositoryRulesNeedTheWorkingTreesToBePresent(t *testing.T) {
 		}
 		if strings.Contains(line, "lint ") || strings.Contains(line, "errors") {
 			continue // the summary line, not a finding
-		}
-		if strings.Contains(line, "workspace/layer-unchecked") {
-			continue // independent of whether governed working trees are present
 		}
 		if !strings.Contains(line, "repo/") {
 			t.Errorf("a rule outside repo/ needs the working trees, which docs/ADOPTION.md does not account for:\n%s", line)

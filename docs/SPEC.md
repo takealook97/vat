@@ -596,7 +596,7 @@ verified, exactly as for any other participant.
 .claude/agents/<name>.md             generated adapter
 .claude/skills/<name>/SKILL.md       generated adapter
 .codex/agents/<name>.toml            generated adapter; `-` in the name becomes `_`
-.codex/skills/<name>/SKILL.md         generated adapter
+.codex/skills/<name>/SKILL.md        generated adapter
 ```
 
 Whether generated content has drifted **MUST** be decided on content and not on

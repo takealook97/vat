@@ -88,14 +88,7 @@ func TestASkillOnlyHarnessNobodyChecksIsReported(t *testing.T) {
 		Name: "payments", Origin: "https://example.invalid/acme/payments.git",
 		Role: manifest.RoleProduct, Checks: []string{"make check"},
 	})
-	skillDir := filepath.Join(ws.Root, harness.SkillsDir, "release-a-service")
-	if err := os.MkdirAll(skillDir, 0o755); err != nil {
-		t.Fatalf("create skill directory: %v", err)
-	}
-	content := []byte("---\nname: release-a-service\ndescription: Release a service.\n---\n\n# Release a service\n")
-	if err := os.WriteFile(filepath.Join(skillDir, harness.SkillFile), content, 0o644); err != nil {
-		t.Fatalf("write skill: %v", err)
-	}
+	writeSkill(t, ws.Root, "release-a-service")
 	ws.Manifest.Workspace.Checks = []string{"vat lint"}
 
 	// Act
@@ -110,5 +103,83 @@ func TestASkillOnlyHarnessNobodyChecksIsReported(t *testing.T) {
 	}
 	if !strings.Contains(finding.Fix, "vat harness check") {
 		t.Errorf("fix = %q; it does not name the check that is missing", finding.Fix)
+	}
+}
+
+func TestAHarnessThatIsCheckedIsNotReported(t *testing.T) {
+	// Arrange: the other side, which the harness layer did not have until a
+	// workspace was warned for doing the right thing.
+	ws := fixture(t, manifest.Repo{
+		Name: "payments", Origin: "https://example.invalid/acme/payments.git",
+		Role: manifest.RoleProduct, Checks: []string{"make check"},
+	})
+	writeSkill(t, ws.Root, "release-a-service")
+	ws.Manifest.Workspace.Checks = []string{"vat lint", "vat harness check"}
+
+	// Act
+	_, found := rules(run(t, ws))["workspace/layer-unchecked"]
+
+	// Assert
+	if found {
+		t.Error("a workspace that checks its harness was reported for not checking it")
+	}
+}
+
+func TestAWorkspaceWithNoHarnessDefinitionIsNotAskedToCheckOne(t *testing.T) {
+	// Arrange: no role and no skill is no layer, and a layer nobody adopted is
+	// owed nothing.
+	ws := fixture(t, manifest.Repo{
+		Name: "payments", Origin: "https://example.invalid/acme/payments.git",
+		Role: manifest.RoleProduct, Checks: []string{"make check"},
+	})
+	ws.Manifest.Workspace.Checks = []string{"vat lint"}
+
+	// Act
+	_, found := rules(run(t, ws))["workspace/layer-unchecked"]
+
+	// Assert
+	if found {
+		t.Error("a workspace that never adopted the harness was told to check it")
+	}
+}
+
+// The case that cost a release: counting seeded procedures as adoption made
+// this rule fire on every workspace `vat init` had just written, for files vat
+// put there itself. Seeding a value into `workspace.checks` to quiet it is not
+// the way out either — that field is the evidence `vat changeset verify`
+// consumes, and filling it in on somebody's behalf records the control plane as
+// proven by a check nobody chose.
+func TestTheProceduresInitSeedsAreNotAdoptionOnTheirOwn(t *testing.T) {
+	// Arrange
+	ws := fixture(t, manifest.Repo{
+		Name: "payments", Origin: "https://example.invalid/acme/payments.git",
+		Role: manifest.RoleProduct, Checks: []string{"make check"},
+	})
+	if _, err := harness.WriteStarterSkills(ws.Root); err != nil {
+		t.Fatalf("seed starter skills: %v", err)
+	}
+	ws.Manifest.Workspace.Checks = []string{"vat lint"}
+
+	// Act
+	_, found := rules(run(t, ws))["workspace/layer-unchecked"]
+
+	// Assert
+	if found {
+		t.Error("a workspace holding only the procedures vat seeded was told it had adopted the harness")
+	}
+}
+
+// writeSkill puts one authored procedure on disk: a skill nobody seeded, which
+// is what separates a workspace that adopted the harness from one vat merely
+// ran in.
+func writeSkill(t *testing.T, root, name string) {
+	t.Helper()
+	dir := filepath.Join(root, harness.SkillsDir, name)
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatalf("create skill directory: %v", err)
+	}
+	content := []byte("---\nname: " + name + "\ndescription: Release a service.\n---\n\n# " + name + "\n")
+	if err := os.WriteFile(filepath.Join(dir, harness.SkillFile), content, 0o644); err != nil {
+		t.Fatalf("write skill: %v", err)
 	}
 }
