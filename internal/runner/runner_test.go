@@ -4,7 +4,6 @@ import (
 	"context"
 	"os"
 	"path/filepath"
-	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -13,9 +12,6 @@ import (
 )
 
 func TestASucceedingCommandReportsItsOutput(t *testing.T) {
-	if runtime.GOOS == "windows" {
-		t.Skip("the fixture command is POSIX shell")
-	}
 	// Arrange
 	job := runner.Job{Repo: "a", Dir: t.TempDir(), Command: "echo hello"}
 
@@ -32,11 +28,8 @@ func TestASucceedingCommandReportsItsOutput(t *testing.T) {
 }
 
 func TestAFailingCommandCarriesItsExitCodeAndMessage(t *testing.T) {
-	if runtime.GOOS == "windows" {
-		t.Skip("the fixture command is POSIX shell")
-	}
 	// Arrange
-	job := runner.Job{Repo: "a", Dir: t.TempDir(), Command: "echo trouble >&2; exit 3"}
+	job := runner.Job{Repo: "a", Dir: t.TempDir(), Command: complainAndFail("trouble", 3)}
 
 	// Act
 	result := runner.RunOne(context.Background(), job, 10*time.Second)
@@ -54,13 +47,10 @@ func TestAFailingCommandCarriesItsExitCodeAndMessage(t *testing.T) {
 }
 
 func TestRunPreservesJobOrderDespiteConcurrency(t *testing.T) {
-	if runtime.GOOS == "windows" {
-		t.Skip("the fixture command is POSIX shell")
-	}
 	// Arrange: the slowest job is first, so unordered results would be visible.
 	dir := t.TempDir()
 	jobs := []runner.Job{
-		{Repo: "slow", Dir: dir, Command: "sleep 0.2; echo slow"},
+		{Repo: "slow", Dir: dir, Command: sequence(pause(1), "echo slow")},
 		{Repo: "fast", Dir: dir, Command: "echo fast"},
 	}
 
@@ -77,11 +67,8 @@ func TestRunPreservesJobOrderDespiteConcurrency(t *testing.T) {
 }
 
 func TestATimeoutIsReportedAsSuch(t *testing.T) {
-	if runtime.GOOS == "windows" {
-		t.Skip("the fixture command is POSIX shell")
-	}
 	// Arrange
-	job := runner.Job{Repo: "a", Dir: t.TempDir(), Command: "sleep 5"}
+	job := runner.Job{Repo: "a", Dir: t.TempDir(), Command: pause(5)}
 
 	// Act
 	result := runner.RunOne(context.Background(), job, 100*time.Millisecond)
@@ -96,17 +83,14 @@ func TestATimeoutIsReportedAsSuch(t *testing.T) {
 }
 
 func TestStopOnFailureAbandonsTheRemainingJobs(t *testing.T) {
-	if runtime.GOOS == "windows" {
-		t.Skip("the fixture command is POSIX shell")
-	}
 	// Arrange: lowering concurrency alone would still run every job, just one
 	// at a time. Stopping has to mean the rest do not run.
 	dir := t.TempDir()
 	marker := filepath.Join(dir, "ran-third")
 	jobs := []runner.Job{
-		{Repo: "first", Dir: dir, Command: "true"},
+		{Repo: "first", Dir: dir, Command: succeed()},
 		{Repo: "second", Dir: dir, Command: "exit 1"},
-		{Repo: "third", Dir: dir, Command: "touch " + marker},
+		{Repo: "third", Dir: dir, Command: writeMarker(marker)},
 	}
 
 	// Act
@@ -140,14 +124,11 @@ func TestASkippedJobIsNeitherAPassNorAFailure(t *testing.T) {
 }
 
 func TestKeepGoingRunsEveryJobDespiteAFailure(t *testing.T) {
-	if runtime.GOOS == "windows" {
-		t.Skip("the fixture command is POSIX shell")
-	}
 	// Arrange
 	dir := t.TempDir()
 	jobs := []runner.Job{
 		{Repo: "first", Dir: dir, Command: "exit 1"},
-		{Repo: "second", Dir: dir, Command: "true"},
+		{Repo: "second", Dir: dir, Command: succeed()},
 	}
 
 	// Act
@@ -165,9 +146,6 @@ func TestKeepGoingRunsEveryJobDespiteAFailure(t *testing.T) {
 }
 
 func TestAnInterruptedJobIsNamedRatherThanNumbered(t *testing.T) {
-	if runtime.GOOS == "windows" {
-		t.Skip("the fixture command is POSIX shell")
-	}
 	// Arrange: a job killed by Ctrl-C reports the signal that killed it, which
 	// renders as "exit status -1" — a number that tells the reader nothing.
 	// Pressing Ctrl-C is something the user did, and the report should say so.
@@ -179,7 +157,7 @@ func TestAnInterruptedJobIsNamedRatherThanNumbered(t *testing.T) {
 		cancel()
 	}()
 	result := runner.RunOne(ctx, runner.Job{
-		Repo: "payments", Dir: t.TempDir(), Command: "sleep 30",
+		Repo: "payments", Dir: t.TempDir(), Command: pause(30),
 	}, 0)
 
 	// Assert
