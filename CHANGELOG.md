@@ -6,6 +6,8 @@ Notable changes to `vat`. The format follows
 
 ## [Unreleased]
 
+## [0.6.2] - 2026-09-15
+
 ### Fixed
 
 - `workspace/layer-unchecked` now recognises a workspace with canonical skills
