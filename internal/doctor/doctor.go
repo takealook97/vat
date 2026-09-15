@@ -74,6 +74,12 @@ type Options struct {
 	Network bool
 	// Now is the reference time, injected for deterministic tests.
 	Now time.Time
+	// ToolVersion is the release this binary reports itself as, and
+	// LatestVersion the newest one published. Both are supplied: the first so a
+	// test can state it, the second because finding it needs the network. With
+	// either missing the currency check says nothing.
+	ToolVersion   string
+	LatestVersion string
 	// SecretMaxAgeDays reports credential material older than this. Static
 	// long-lived secrets that are never rotated stop being an asset and become
 	// a liability, and nothing else in a workspace tracks their age.
@@ -103,6 +109,7 @@ func Run(ctx context.Context, ws *workspace.Workspace, opts Options) Report {
 	add := func(findings ...Finding) { report.Findings = append(report.Findings, findings...) }
 
 	add(checkTools(ctx)...)
+	add(checkToolCurrency(opts.ToolVersion, opts.LatestVersion)...)
 	add(checkWorkspace(ws)...)
 	add(checkRepos(ctx, ws)...)
 	add(checkSecrets(ws, now, opts.SecretMaxAgeDays)...)

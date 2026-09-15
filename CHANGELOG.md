@@ -6,6 +6,24 @@ Notable changes to `vat`. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- `vat upgrade` installs the newest published release the way this binary was
+  installed, and `vat doctor --network` reports when one exists.
+
+  `requires.vat` could not answer this. It asks whether a binary is acceptable
+  to the workspace, and a range stays satisfied by the version it was written
+  against for as long as it stands — so every release inside `>=0.6.1 <0.7.0`
+  arrived unannounced to the two workspaces that pinned it, and both were still
+  on the version they pinned at with nothing anywhere saying otherwise.
+
+  vat replaces nothing itself. Homebrew keeps a manifest of the files in its
+  Cellar and `go install` records the module version, so a binary that
+  overwrote itself would leave both describing a file they did not write. The
+  installer is asked to do its own job, and an install vat cannot account for
+  is reported with the release to fetch rather than guessed at. Diagnosis stays
+  in `doctor` and the repair is its own command, as everywhere else here.
+
 ## [0.6.2] - 2026-09-15
 
 ### Fixed

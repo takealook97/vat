@@ -864,6 +864,53 @@ toolchain records.
 
 ---
 
+## vat upgrade
+
+```
+vat upgrade [--check]
+```
+
+Compare this binary against the newest published release and, when it is
+behind, run the upgrade for however it was installed.
+
+`requires.vat` cannot answer this question. It asks whether the binary is
+acceptable to the workspace, and a range like `>=0.6.1 <0.7.0` stays satisfied
+by 0.6.1 for as long as it stands — so every release inside the range arrives
+unannounced to the people who wrote it. `vat doctor --network` reports that a
+newer one exists; this is the command that acts on it, because diagnosis and
+repair are separate here.
+
+**vat replaces nothing itself.** Homebrew keeps a manifest of the files in its
+Cellar and `go install` records the module version, so a binary that overwrote
+itself would leave both describing a file they did not write. The installer is
+asked to do its own job instead:
+
+| Where the binary lives | What runs |
+| --- | --- |
+| under a Homebrew `Cellar` | `brew upgrade takealook97/tap/vat` |
+| under a `go/bin` | `go install github.com/takealook97/vat/cmd/vat@latest` |
+| anywhere else | nothing; the release to fetch is named |
+
+The installer's output is captured and printed through vat rather than streamed
+to the terminal, so a control character in somebody else's bytes is rendered
+rather than executed.
+
+```console
+$ vat upgrade
+WARN  vat                       running v0.6.1; v0.6.2 is published
+INFO  running                   brew upgrade takealook97/tap/vat
+```
+
+Under `--json` the command reports `running`, `latest`, and `current`, and runs
+nothing.
+
+| Exit | Meaning |
+| --- | --- |
+| 0 | already the newest release, or the upgrade ran |
+| 1 | the lookup failed, the upgrade failed, or vat cannot tell how it was installed |
+
+---
+
 ## vat completion
 
 ```

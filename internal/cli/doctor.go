@@ -7,6 +7,7 @@ import (
 
 	"github.com/takealook97/vat/internal/doctor"
 	"github.com/takealook97/vat/internal/ui"
+	"github.com/takealook97/vat/internal/version"
 )
 
 func doctorCommand() *Command {
@@ -60,9 +61,24 @@ func runDoctor(ctx context.Context, env *Env, args []string) error {
 	if err != nil {
 		return err
 	}
+	// Only with --network, and never fatal. `requires.vat` cannot tell anyone a
+	// newer release exists — a range is satisfied by the version it was written
+	// against for as long as it stands — so this is the only place that asks.
+	// A lookup that fails leaves both fields empty and the check silent, which
+	// is the honest answer to a question the network refused.
+	running, latest := "", ""
+	if *network {
+		if tag, lookupErr := latestRelease(ctx); lookupErr == nil {
+			running, latest = env.ToolVersion, tag
+			if running == "" {
+				running = version.Short()
+			}
+		}
+	}
 	report := doctor.Run(ctx, ws, doctor.Options{
 		Network: *network, Now: env.Now, SecretMaxAgeDays: *secretAge,
 		DriftedClaims: sortedKeys(drifted),
+		ToolVersion:   running, LatestVersion: latest,
 	})
 
 	if env.JSON {
