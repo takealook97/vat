@@ -86,13 +86,14 @@ repos:
 
 ```bash
 vat lint --fix
-git add vat.yaml AGENTS.md CLAUDE.md .gitignore .agents .claude
+git add vat.yaml AGENTS.md CLAUDE.md .gitignore .agents .claude .codex
 git commit -m "chore: adopt vat"
 ```
 
 `init` also seeded two procedures under `.agents/skills/` and generated their
-adapters under `.claude/skills/`. They describe vat's own command sequences and
-nothing else; they are yours from the moment they land, so edit or delete them.
+adapters under `.claude/skills/` and `.codex/skills/`. They describe vat's own
+command sequences and nothing else; they are yours from the moment they land,
+so edit or delete them.
 Deleting one is without consequence and nothing puts it back — re-seeding on a
 later run would undo a removal somebody meant.
 
@@ -157,9 +158,9 @@ vat harness skills
 A workspace that adopted vat before skills existed gains none by upgrading;
 `vat init` seeds only at creation. Create them with the command above.
 
-Add `vat lint --only harness` to CI. Without it the contracts drift within a
-month and the layer is decorative; see **In CI** below for why the selector is
-there.
+Add `vat harness check` to the workspace checks and CI. Without it the contracts
+drift within a month and the layer is decorative; see **In CI** below for why
+the remaining lint selectors are there.
 
 ---
 
@@ -303,7 +304,7 @@ a root commit cannot swallow a nested clone. So a CI checkout has the manifest
 and none of the repositories it names. Ask it only what it can see:
 
 ```yaml
-- run: vat lint --only harness    # contracts and adapters, rendered from the manifest
+- run: vat harness check          # contracts and adapters, rendered from the manifest
 - run: vat lint --only workspace
 - run: vat lint --only brain
 - run: vat lint --only changeset

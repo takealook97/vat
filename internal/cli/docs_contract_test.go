@@ -565,7 +565,7 @@ func TestTheDemoShowsTheFilesInitAlwaysWrites(t *testing.T) {
 	if err != nil {
 		t.Fatalf("glob docs: %v", err)
 	}
-	candidates = append(candidates, "../../README.md", demoPath)
+	candidates = append(candidates, "../../README.md", "../../examples/README.md", demoPath)
 	transcripts := map[string]string{}
 	for _, path := range candidates {
 		content, err := os.ReadFile(path)
@@ -584,12 +584,13 @@ func TestTheDemoShowsTheFilesInitAlwaysWrites(t *testing.T) {
 
 	unconditional := []string{"vat.yaml", ".gitignore", "AGENTS.md", "CLAUDE.md"}
 	starters := harness.StarterSkills()
-	written := make([]string, 0, len(unconditional)+2*len(starters))
+	written := make([]string, 0, len(unconditional)+3*len(starters))
 	written = append(written, unconditional...)
 	for _, skill := range starters {
 		written = append(written,
 			harness.SkillsDir+"/"+skill.Name+"/"+harness.SkillFile,
-			harness.ClaudeSkillDir+"/"+skill.Name+"/"+harness.SkillFile)
+			harness.ClaudeSkillDir+"/"+skill.Name+"/"+harness.SkillFile,
+			harness.CodexSkillDir+"/"+skill.Name+"/"+harness.SkillFile)
 	}
 
 	// Act & Assert

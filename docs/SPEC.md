@@ -596,6 +596,7 @@ verified, exactly as for any other participant.
 .claude/agents/<name>.md             generated adapter
 .claude/skills/<name>/SKILL.md       generated adapter
 .codex/agents/<name>.toml            generated adapter; `-` in the name becomes `_`
+.codex/skills/<name>/SKILL.md         generated adapter
 ```
 
 Whether generated content has drifted **MUST** be decided on content and not on
@@ -650,9 +651,10 @@ without consequence. Anything seeded is therefore ordinary content under
 `.agents/skills/`, distinguished by nothing on disk.
 
 A definition **MAY** name the runtimes it targets; naming none targets every
-runtime that has an adapter of that kind. The two kinds do not share one set: a
-role has an adapter for Claude Code and for Codex, a skill for Claude Code only,
-because Codex discovers a skill through the canonical directory itself.
+runtime that has an adapter of that kind. Roles and skills both have adapters
+for Claude Code and Codex. Their supported-runtime sets remain distinct
+contracts so that adding a runtime to one kind does not silently select a
+nonexistent adapter on the other.
 
 An implementation **MUST** report a `runtimes:` value that selects no adapter of
 the kind it appears on — including a runtime the implementation otherwise

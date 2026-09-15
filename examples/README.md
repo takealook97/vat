@@ -40,12 +40,12 @@ pretending otherwise.
 | `brain/CURRENT.md` | the generated index, including the "needs attention" section |
 | `changesets/CS-0001.yaml` | a closed cross-repository change with its return points |
 | `.agents/skills/*/SKILL.md` | the two procedures `vat init` seeds — canonical, yours to edit |
-| `.claude/skills/*/SKILL.md` | what a generated skill adapter is: front matter and a pointer, never a copy |
+| `.claude/skills/*/SKILL.md`, `.codex/skills/*/SKILL.md` | generated skill adapters: front matter and a pointer, never a copy |
 
 The stale gap is the most instructive file. It is not marked wrong — it is
 marked *unverified*, with the exact revision and date it was last true.
 
-The pair of skill files is the second. Open both: the canonical one holds the
-procedure, and the generated one holds ten lines that only make it discoverable.
-Editing the generated copy is the mistake `harness/adapter-drift` exists to
+The skill files are the second. The canonical one holds the procedure, and each
+generated adapter holds ten lines that only make it discoverable in one
+runtime. Editing an adapter is the mistake `harness/adapter-drift` exists to
 report.

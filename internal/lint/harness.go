@@ -212,12 +212,10 @@ func malformedDefinitions(malformed []harness.Malformed) []Finding {
 // binds to nothing, so model-ambiguous passes too. The definition sits on disk,
 // inert, while every diagnostic reports the harness healthy.
 //
-// The supported list is a parameter because it is not the same for both kinds.
-// Codex is a runtime vat generates a role adapter for and no skill adapter at
-// all, so `runtimes: [codex]` is a correctly spelled name on a role and an
-// inert definition on a skill. Checking skills against the role list is how
-// that case went unreported: the rule documented as catching a value that
-// generates no adapter was reading the wrong list to decide.
+// The supported list is a parameter because roles and skills are separate
+// adapter contracts even when they currently target the same runtimes. Keeping
+// the lists separate prevents a future runtime added to one kind from making a
+// correctly spelled but inert declaration on the other look supported.
 func unknownRuntimes(subject, kind string, declared, supported []string) []Finding {
 	var findings []Finding
 	for _, name := range declared {
@@ -270,7 +268,7 @@ func checkLayersAreChecked(ws *workspace.Workspace) []Finding {
 			why:     "records accumulate unpromoted and unverified with nothing reporting it",
 		})
 	}
-	if definesAnyRole(ws) {
+	if definesAnyHarnessDefinition(ws) {
 		wanted = append(wanted, layerCheck{
 			layer:   "harness",
 			command: "vat harness check",
@@ -296,12 +294,14 @@ func checkLayersAreChecked(ws *workspace.Workspace) []Finding {
 	return findings
 }
 
-// definesAnyRole reports whether a role was written by hand. `vat init` seeds
-// procedures into every workspace it creates, so their presence proves that vat
-// ran and nothing else; a role is written deliberately.
-func definesAnyRole(ws *workspace.Workspace) bool {
-	roles, malformed, err := harness.LoadRoles(ws.Root)
-	return err == nil && len(roles)+len(malformed) > 0
+// definesAnyHarnessDefinition reports whether the workspace has adopted the
+// harness layer. A skill is as observable as a role: both render runtime
+// adapters that can drift, including the procedures vat seeds at init.
+func definesAnyHarnessDefinition(ws *workspace.Workspace) bool {
+	roles, malformedRoles, roleErr := harness.LoadRoles(ws.Root)
+	skills, malformedSkills, skillErr := harness.LoadSkills(ws.Root)
+	return roleErr == nil && skillErr == nil &&
+		len(roles)+len(malformedRoles)+len(skills)+len(malformedSkills) > 0
 }
 
 // declaresCheck reports whether any declared check invokes the command. The

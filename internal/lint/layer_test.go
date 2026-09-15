@@ -1,10 +1,13 @@
 package lint_test
 
 import (
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
 	"github.com/takealook97/vat/internal/brain"
+	"github.com/takealook97/vat/internal/harness"
 	"github.com/takealook97/vat/internal/manifest"
 )
 
@@ -75,5 +78,37 @@ func TestAWorkspaceWithNoBrainIsNotAskedToCheckOne(t *testing.T) {
 	// Assert
 	if found {
 		t.Error("a workspace that never adopted the knowledge layer was told to check it")
+	}
+}
+
+func TestASkillOnlyHarnessNobodyChecksIsReported(t *testing.T) {
+	// Arrange: skills are harness definitions too. A workspace that defines no
+	// roles still renders runtime adapters whose drift must be checked.
+	ws := fixture(t, manifest.Repo{
+		Name: "payments", Origin: "https://example.invalid/acme/payments.git",
+		Role: manifest.RoleProduct, Checks: []string{"make check"},
+	})
+	skillDir := filepath.Join(ws.Root, harness.SkillsDir, "release-a-service")
+	if err := os.MkdirAll(skillDir, 0o755); err != nil {
+		t.Fatalf("create skill directory: %v", err)
+	}
+	content := []byte("---\nname: release-a-service\ndescription: Release a service.\n---\n\n# Release a service\n")
+	if err := os.WriteFile(filepath.Join(skillDir, harness.SkillFile), content, 0o644); err != nil {
+		t.Fatalf("write skill: %v", err)
+	}
+	ws.Manifest.Workspace.Checks = []string{"vat lint"}
+
+	// Act
+	finding, found := rules(run(t, ws))["workspace/layer-unchecked"]
+
+	// Assert
+	if !found {
+		t.Fatal("a workspace running a skill-only harness with nothing checking it was reported as clean")
+	}
+	if finding.Subject != "harness" {
+		t.Errorf("subject = %q, want harness", finding.Subject)
+	}
+	if !strings.Contains(finding.Fix, "vat harness check") {
+		t.Errorf("fix = %q; it does not name the check that is missing", finding.Fix)
 	}
 }

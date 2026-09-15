@@ -207,6 +207,8 @@ OK    .agents/skills/before-cross-repo-work/SKILL.md  seeded
 OK    .agents/skills/consult-the-brain-first/SKILL.md  seeded
 OK    .claude/skills/before-cross-repo-work/SKILL.md  generated
 OK    .claude/skills/consult-the-brain-first/SKILL.md  generated
+OK    .codex/skills/before-cross-repo-work/SKILL.md  generated
+OK    .codex/skills/consult-the-brain-first/SKILL.md  generated
 OK    AGENTS.md                 generated
 OK    CLAUDE.md                 generated
 OK    brain/AGENTS.md           generated

@@ -424,12 +424,12 @@ cannot be reviewed.
 is who is running; a skill is a procedure loaded on demand. The body stays
 canonical and each adapter carries a pointer to it, never a copy.
 
-A skill renders an adapter for Claude Code and for no other runtime, so
-`--runtimes codex` produces a definition that generates nothing. The command
-says so at creation rather than leaving it for the next `vat lint`. It also says
-when a skill has no `--description`, because the description is the whole of
-what a runtime advertises, and one invented here would satisfy
-`harness/skill-metadata` while telling the runtime nothing.
+A skill renders adapters for Claude Code and Codex. `--runtimes` may select one
+or both; a name that selects no supported skill adapter is reported at creation
+rather than left for the next `vat lint`. The command also says when a skill has
+no `--description`, because the description is the whole of what a runtime
+advertises, and one invented here would satisfy `harness/skill-metadata` while
+telling the runtime nothing.
 
 `skills` lists what is defined, reporting the runtimes that actually render an
 adapter rather than the `runtimes:` field, because those differ exactly where it

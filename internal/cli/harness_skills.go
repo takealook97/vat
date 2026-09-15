@@ -12,10 +12,10 @@ import (
 )
 
 // Skills are a separate file from roles for the reason the two are separate
-// kinds: a role says who is running and renders an adapter per runtime, while a
-// skill is a procedure loaded on demand and renders one for Claude Code alone.
-// Folding them into one command would have to keep explaining which half of the
-// behaviour it means.
+// kinds: a role says who is running, while a skill is a procedure loaded on
+// demand. Folding them into one command would have to keep explaining which
+// half of the behaviour it means even though both currently target the same
+// runtimes.
 
 func harnessSkillsCommand() *Command {
 	return &Command{

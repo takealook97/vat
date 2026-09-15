@@ -6,6 +6,16 @@ Notable changes to `vat`. The format follows
 
 ## [Unreleased]
 
+### Fixed
+
+- `workspace/layer-unchecked` now recognises a workspace with canonical skills
+  and no roles as using the harness layer. Those skills render runtime adapters
+  that can drift, but the rule only looked under `.agents/roles/`, so a
+  skill-only workspace received no prompt to add `vat harness check`.
+- The normative harness format now lists the Codex skill adapter added in
+  v0.6.0. The implementation and harness guide already described both runtime
+  adapters, while `docs/SPEC.md` still stated the pre-v0.6.0 contract.
+
 ## [0.6.1] - 2026-09-14
 
 ### Fixed

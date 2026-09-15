@@ -77,8 +77,8 @@ const (
 )
 
 // RuntimeNames lists every runtime vat generates a role adapter for, in the
-// order the adapters are rendered. SkillRuntimeNames is the shorter list that
-// applies to skills.
+// order the adapters are rendered. SkillRuntimeNames is a separate contract
+// for skills even while the two lists contain the same runtimes.
 func RuntimeNames() []string { return []string{runtimeClaude, runtimeCodex} }
 
 // TargetedRuntimes returns the runtimes this role generates an adapter for.
