@@ -6,6 +6,8 @@ Notable changes to `vat`. The format follows
 
 ## [Unreleased]
 
+## [0.6.5] - 2026-09-26
+
 ### Changed
 
 - `vat brain query` says when `--limit` cut the results: `15 of 42 results; 27
