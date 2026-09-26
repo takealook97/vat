@@ -877,3 +877,28 @@ func TestARecordWithAReadableDateIsNotReported(t *testing.T) {
 		}
 	}
 }
+
+// A memory record is read back by an agent in a later session. Written as an
+// order, it arrives there as one, and can outrank what the person in that
+// session is asking for now; the template is the one place vat shapes how the
+// lesson is phrased, so it asks for what was observed rather than what to do.
+func TestTheMemoryTemplateAsksForAnObservationNotAnInstruction(t *testing.T) {
+	// Act
+	body := defaultBody(KindMemory, "M-0001", "Retries double-submit")
+
+	// Assert
+	start := strings.Index(body, "## Lesson")
+	if start < 0 {
+		t.Fatalf("the memory template lost its Lesson section:\n%s", body)
+	}
+	lesson := body[start:]
+	if end := strings.Index(lesson[len("## Lesson"):], "\n## "); end >= 0 {
+		lesson = lesson[:len("## Lesson")+end]
+	}
+	if strings.Contains(lesson, "What to do") {
+		t.Errorf("the Lesson guidance still asks for an instruction:\n%s", lesson)
+	}
+	if !strings.Contains(lesson, "not an instruction") {
+		t.Errorf("the Lesson guidance does not say why it wants an observation:\n%s", lesson)
+	}
+}

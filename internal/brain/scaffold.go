@@ -383,13 +383,19 @@ this file is not edited — a new decision supersedes it.
 		// lesson nobody can retrieve at the right moment is a lesson nobody
 		// applies; scope is here rather than in the front matter because the
 		// convention has to prove itself before it becomes a checked field.
+		// The lesson is asked for as an observation because an agent reads it
+		// back in a later session, where an order is taken as one and can
+		// outrank what the person in that session is asking for now.
 		return heading + `## Trigger
 
 What situation should bring this back? Write the circumstance, not the date.
 
 ## Lesson
 
-What to do differently next time, in one sentence.
+What holds, in one sentence, stated as an observation and not an instruction:
+"retries within the window create a second order", not "never retry". An
+imperative is read back later as an order, and can override what someone is
+asking for at the time.
 
 ## Evidence
 

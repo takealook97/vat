@@ -48,11 +48,18 @@ That is why `vat brain new memory` opens with these headings:
 
 ```markdown
 ## Trigger          what situation should bring this back
-## Lesson           what to do differently, in one sentence
+## Lesson           what holds, in one sentence — an observation, not an order
 ## Evidence         the run that failed, the file, the exact revision
 ## Scope            `workspace`, or the one repository it applies to
 ## Reuse condition  what has to stay true for it to still apply
 ```
+
+The lesson is written as an observation — "retries within the window create a
+second order", not "never retry". A memory record is read back by an agent in
+some later session, and an imperative arrives there as an instruction: it can
+outrank what the person in that session is actually asking for, which is also
+the shape a poisoned record takes. Stating what was seen leaves the decision to
+whoever is reading it now.
 
 They are a convention, not a schema. Nothing checks them yet, deliberately: a
 field becomes part of the record schema here only once there is a rule worth

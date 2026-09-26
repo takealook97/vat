@@ -13,6 +13,11 @@ Notable changes to `vat`. The format follows
   four hundred, the one place in the layer that truncated without saying so —
   `CURRENT.md` names how many records each section left out and `vat brain
   review` reports its full count. `--json` is unchanged.
+- `vat brain new memory` asks for the lesson as an observation rather than an
+  instruction. A memory record is read back by an agent in a later session,
+  where "never retry" arrives as an order and can outrank what the person there
+  is asking for; "retries within the window create a second order" leaves that
+  decision to them.
 
 ### Fixed
 
