@@ -6,6 +6,22 @@ Notable changes to `vat`. The format follows
 
 ## [Unreleased]
 
+### Changed
+
+- `vat brain query` says when `--limit` cut the results: `15 of 42 results; 27
+  more past the limit`. It used to print "15 results" whether fifteen matched or
+  four hundred, the one place in the layer that truncated without saying so —
+  `CURRENT.md` names how many records each section left out and `vat brain
+  review` reports its full count. `--json` is unchanged.
+
+### Fixed
+
+- Query ranking is held to what each of its mechanisms is for. The suite passed
+  with term saturation, length normalisation, and the coverage weight each
+  switched off, so any of them could have been deleted with every test green.
+  Each mechanism, and the preference for a reviewed record over a draft, now has
+  a test that fails when that one mechanism is removed.
+
 ## [0.6.4] - 2026-09-15
 
 ### Fixed

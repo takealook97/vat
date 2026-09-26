@@ -499,6 +499,11 @@ stays silent when it did not.
 archives, and terminal records — for auditing why something was decided, rather
 than asking what is true now.
 
+When `--limit` cuts the results, the closing line says so — `15 of 42 results;
+27 more past the limit` — because a cut nobody can see reads as the whole
+answer. `--json` is the array of the hits shown, unchanged in shape; a consumer
+that needs to know whether it was cut asks for a larger `--limit`.
+
 `review` lists two things that need different work: a record whose status asks
 for judgement, and an active claim whose evidence moved. It orders both by
 priority — how many records cite the claim, weighted against how long it has

@@ -42,7 +42,7 @@ are auditing why something was decided rather than asking what is true now.`,
 			if err != nil {
 				return err
 			}
-			hits := brain.Query(store, set.Args(), brain.QueryOptions{
+			hits, matched := brain.Query(store, set.Args(), brain.QueryOptions{
 				IncludeHistory: *all, IncludeTerminal: *all, Limit: *limit,
 			})
 			if env.JSON {
@@ -70,8 +70,12 @@ are auditing why something was decided rather than asking what is true now.`,
 					env.Printer.Hint("      │ %s", truncate(line, 96))
 				}
 			}
-			env.Printer.Hint("\n%s. Open the records themselves; this is an index, not an answer.",
-				pluralise(len(hits), "result", "results"))
+			summary := pluralise(len(hits), "result", "results")
+			if matched > len(hits) {
+				summary = fmt.Sprintf("%d of %d results; %d more past the limit, raise --limit to see them",
+					len(hits), matched, matched-len(hits))
+			}
+			env.Printer.Hint("\n%s. Open the records themselves; this is an index, not an answer.", summary)
 			return nil
 		},
 	}

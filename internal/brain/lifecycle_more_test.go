@@ -424,8 +424,8 @@ func TestQueryLeavesSupersededReasoningOutOfTheDefaultSurface(t *testing.T) {
 	store := mustLoad(t, root)
 
 	// Act
-	narrow := Query(store, []string{"pricing"}, QueryOptions{Limit: 10})
-	wide := Query(store, []string{"pricing"}, QueryOptions{Limit: 10, IncludeTerminal: true})
+	narrow, _ := Query(store, []string{"pricing"}, QueryOptions{Limit: 10})
+	wide, _ := Query(store, []string{"pricing"}, QueryOptions{Limit: 10, IncludeTerminal: true})
 
 	// Assert
 	for _, hit := range narrow {

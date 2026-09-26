@@ -31,10 +31,16 @@ type QueryOptions struct {
 }
 
 // Query searches the bounded surface for every term, ranking records that match
-// more terms higher and preferring answerable records.
-func Query(store *Store, terms []string, opts QueryOptions) []Hit {
+// more terms higher and preferring answerable records. It returns at most
+// opts.Limit hits — twenty when the limit is not positive — and, separately,
+// how many matched before that cut.
+//
+// The count is returned because a cut nobody can see reads as "this is
+// everything": a reader cannot tell a short answer from a truncated one, and
+// the index and the review queue already say what they left out.
+func Query(store *Store, terms []string, opts QueryOptions) ([]Hit, int) {
 	if len(terms) == 0 {
-		return nil
+		return nil, 0
 	}
 	needles := make([]string, 0, len(terms))
 	for _, term := range terms {
@@ -43,7 +49,7 @@ func Query(store *Store, terms []string, opts QueryOptions) []Hit {
 		}
 	}
 	if len(needles) == 0 {
-		return nil
+		return nil, 0
 	}
 	limit := opts.Limit
 	if limit <= 0 {
@@ -112,15 +118,22 @@ func Query(store *Store, terms []string, opts QueryOptions) []Hit {
 		}
 		return hits[i].Path < hits[j].Path
 	})
-	if len(hits) > limit {
+	matched := len(hits)
+	if matched > limit {
 		hits = hits[:limit]
 	}
-	return hits
+	return hits, matched
 }
 
 // Term-frequency saturation and length normalisation, the two constants of the
 // BM25 family. k1 decides how quickly repeating a word stops helping; b decides
 // how much a long document is discounted for being long.
+//
+// None of these values was fitted to data, and there is no corpus here to fit
+// them to. What is pinned instead is the ordering each one exists to produce:
+// every mechanism, and the reviewed-record preference in Query, has a test in
+// query_surface_test.go that fails when that one mechanism is switched off.
+// Retuning is done against those orderings — see CONTRIBUTING.md.
 const (
 	termSaturation   = 1.2
 	lengthNormalised = 0.75

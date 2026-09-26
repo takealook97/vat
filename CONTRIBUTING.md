@@ -94,6 +94,15 @@ Commit messages, code, comments, and documentation are all in English.
   tools may already read what it describes. A change to a file vat writes
   belongs there in the same commit; a test compares its enumerations against the
   code, so an omission fails the suite rather than shipping quietly.
+- **A stated ordering before a retuned constant.** Ranking in
+  `internal/brain/query.go` rests on constants nobody fitted to data. Changing
+  one starts by writing down which result should come first and why, as a test,
+  before looking at what the new value produces — decided afterwards, the
+  expectation is whatever the new number happened to do. Each mechanism is
+  pinned by a test that fails when that mechanism alone is switched off; check
+  that it still does, because a suite that passes with a mechanism removed says
+  nothing about it. The suite once passed with three of the five zeroed. Say in
+  the pull request what the change was not measured against.
 - **Doc comments on exported names.** Every package has a package comment
   saying what it owns.
 - **Comments that explain why.** The code already says what it does. A comment

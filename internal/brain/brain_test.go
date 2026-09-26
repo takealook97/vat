@@ -470,7 +470,7 @@ func TestQueryPrefersARecordMatchingEveryTerm(t *testing.T) {
 		"# D-0002 — Retries retries retries retries")
 
 	// Act
-	hits := brain.Query(reload(t, root), []string{"retries", "idempotency"}, brain.QueryOptions{})
+	hits, _ := brain.Query(reload(t, root), []string{"retries", "idempotency"}, brain.QueryOptions{})
 
 	// Assert
 	if len(hits) == 0 {
@@ -497,8 +497,8 @@ supersedes: [D-0001]
 `, "# D-0002 — Something else entirely")
 
 	// Act
-	narrow := brain.Query(reload(t, root), []string{"pricing"}, brain.QueryOptions{})
-	wide := brain.Query(reload(t, root), []string{"pricing"}, brain.QueryOptions{IncludeTerminal: true})
+	narrow, _ := brain.Query(reload(t, root), []string{"pricing"}, brain.QueryOptions{})
+	wide, _ := brain.Query(reload(t, root), []string{"pricing"}, brain.QueryOptions{IncludeTerminal: true})
 
 	// Assert
 	if len(narrow) != 0 {

@@ -115,6 +115,29 @@ func TestABrainRecordIsNotCitableUntilAHumanPromotesIt(t *testing.T) {
 	}
 }
 
+func TestBrainQuerySaysHowManyMatchesTheLimitLeftOut(t *testing.T) {
+	// Arrange: a cut nobody can see reads as "this is everything". The index
+	// and the review queue both state what they left out; a search that did not
+	// would be the one place a reader could not tell a short answer from a
+	// truncated one.
+	h := brainFixture(t, "payments")
+	for _, title := range []string{"Retries double-submit", "Retries skip refunds", "Retries hide errors"} {
+		h.mustRun("brain", "new", "decision", "--title", title, "--owner", "payments")
+	}
+
+	// Act
+	_, cut := h.run("brain", "query", "retries", "--limit", "1")
+	_, whole := h.run("brain", "query", "retries")
+
+	// Assert
+	if !strings.Contains(cut, "1 of 3 results") || !strings.Contains(cut, "2 more") {
+		t.Errorf("a truncated search does not say what it left out:\n%s", cut)
+	}
+	if strings.Contains(whole, "more") {
+		t.Errorf("a complete search claims something was left out:\n%s", whole)
+	}
+}
+
 func TestBrainBuildAndCheckAgreeOnAWellFormedRepository(t *testing.T) {
 	// Arrange: summaries are projections. Building them must not be able to
 	// invalidate the records they were built from.
