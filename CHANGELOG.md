@@ -48,12 +48,13 @@ Notable changes to `vat`. The format follows
   installs no runtime hooks.
 
 - `policy.gates.brain_promote: agent` requires pinned source paths for every
-  non-goal record and readable source HEAD for re-verification. Goals retain
+  non-goal record and readable source HEAD for current-state re-verification. Goals retain
   manual conditions; git attribution does not identify humans versus agents.
 - Optional `recorded_by` stores the git author on `vat brain new`.
 - `brain/reviewer-unattributed` warns about active records without a reviewer
   under manual or agent promotion gates.
-- `vat brain review --json` drift rows carry structured `evidence`: the
+- `vat brain review --json` queue and drift rows include `kind`; drift rows carry
+  structured `evidence`: the
   repository, pinned revision, optional source path, and observed HEAD revision.
   Unresolvable pins are marked with `pin_unresolvable: true`. Queue rows omit
   evidence; explanations, human output, and record statuses are unchanged.
@@ -69,6 +70,10 @@ Notable changes to `vat`. The format follows
 
 ### Fixed
 
+- Non-current-state records retain their evidence pins when promoted after the
+  source repository moves, including under the agent gate with `--reverified`.
+- Empty `vat brain review --json` and `vat brain query --json` results emit `[]`
+  consistently instead of `null`.
 - Brain query applies the observation window when deciding whether active
   current-state claims are citable. Expired hits warn as `expired` and lose the
   citable ranking bonus; query JSON adds `citable`. Claims at the window

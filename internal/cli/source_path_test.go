@@ -158,3 +158,37 @@ func TestAgentGatePromotesPinnedHistoricalDecisionsAndMemory(t *testing.T) {
 		}
 	}
 }
+
+func TestHistoricalPromotionKeepsItsEvidencePinAfterTheSourceMoves(t *testing.T) {
+	for _, gate := range []string{"manual", "agent", "auto"} {
+		for _, reverified := range []bool{false, true} {
+			t.Run(gate+"/"+map[bool]string{false: "plain", true: "reverified"}[reverified], func(t *testing.T) {
+				h := brainFixture(t, "payments")
+				manifest := readFile(t, h.path("vat.yaml"))
+				writeFile(t, h.path("vat.yaml"), strings.Replace(manifest, "brain_promote: manual", "brain_promote: "+gate, 1))
+				h.mustRun("brain", "new", "decision", "--title", "Historical evidence", "--claim", "historical", "--owner", "payments", "--source-path", "README.md")
+				store, err := brain.Load(h.path("brain"))
+				if err != nil {
+					t.Fatal(err)
+				}
+				pin := store.ByID()["D-0001"].SourceRef
+				// The cited file survives only in history; promotion must not replace its provenance with HEAD.
+				git(t, h.path("payments"), "rm", "README.md")
+				git(t, h.path("payments"), "commit", "--quiet", "-m", "Remove old evidence")
+				args := []string{"brain", "promote", "D-0001"}
+				if reverified {
+					args = append(args, "--reverified")
+				}
+				h.mustRun(args...)
+				store, err = brain.Load(h.path("brain"))
+				if err != nil {
+					t.Fatal(err)
+				}
+				record := store.ByID()["D-0001"]
+				if record.Status != brain.StatusActive || record.SourceRef != pin {
+					t.Fatalf("historical provenance changed: %+v; original pin %s", record.Metadata, pin)
+				}
+			})
+		}
+	}
+}

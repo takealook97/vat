@@ -46,6 +46,9 @@ are auditing why something was decided rather than asking what is true now.`,
 				IncludeHistory: *all, IncludeTerminal: *all, Limit: *limit,
 			}, brainPolicy(ws), env.Now)
 			if env.JSON {
+				if hits == nil {
+					hits = []brain.Hit{}
+				}
 				return emitJSON(env, hits)
 			}
 			if len(hits) == 0 {
@@ -118,7 +121,7 @@ to prevent.`,
 			if err != nil {
 				return err
 			}
-			var items []brain.ReviewItem
+			items := []brain.ReviewItem{}
 			if !*driftedOnly {
 				items = brain.ReviewQueue(store, brainPolicy(ws), env.Now)
 			}

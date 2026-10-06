@@ -411,11 +411,12 @@ promote under mechanically checkable evidence conditions. Agent output still
 enters as `provisional`; writing it is never promotion. Under
 `policy.gates.brain_promote: agent`, every non-goal record **MUST** have a
 `source_ref` pinned with a path (`<repo>@<revision>:<path>`), and that file
-**MUST** exist at the revision being recorded. The source repository HEAD **MUST** be
-readable, including when `--reverified` is used. Non-goal records with
-`source_external: true` or sources outside `vat.yaml` cannot be agent-promoted:
-their source HEAD is unreadable. Goals follow the `manual` gate; keeping goals out of agent upkeep is a procedural boundary,
-not a human-versus-agent distinction vat can detect.
+**MUST** exist at the revision being recorded. For current-state claims, the
+source repository HEAD **MUST** be readable, including when `--reverified` is
+used. Non-goal records with `source_external: true` or sources outside
+`vat.yaml` cannot be agent-promoted: their pinned source cannot be checked.
+Goals follow the `manual` gate; keeping goals out of agent upkeep is a
+procedural boundary, not a human-versus-agent distinction vat can detect.
 
 Promotion under `manual` or `agent` **MUST** record `reviewed_by` from git
 `user.name` and `user.email` effective in the brain repository, as
@@ -428,12 +429,15 @@ identity as optional `recorded_by`, omitting it when unset. Identity **MUST
 NOT** be supplied as free text at the command line. A git author attributes the
 action; it does not prove whether a human or an agent performed it.
 
-Re-dating a record's `observed_at` is an assertion that somebody re-read the
-source. An implementation **MUST NOT** move `observed_at` forward solely because
-the source revision has changed. Renewed source review, asserted with
-`--reverified`, is required to advance it against changed evidence. Under the
-agent gate, the readable HEAD becomes the new pin; neither a moving branch nor
-an unreadable source can stand in for this evidence.
+Re-dating a current-state claim's `observed_at` is an assertion that somebody
+re-read the source. An implementation **MUST NOT** move `observed_at` forward
+solely because the source revision has changed. Renewed source review, asserted
+with `--reverified`, is required to advance it against changed evidence. Under
+the agent gate, the readable HEAD becomes the new pin; neither a moving branch
+nor an unreadable source can stand in for this evidence. For non-current-state
+records under every gate, promotion **MUST** preserve the original pin without
+comparing it with HEAD, even with `--reverified`; the agent gate checks the
+path only at that pinned revision.
 
 ### 5.5.1 Claims about systems the workspace does not govern
 

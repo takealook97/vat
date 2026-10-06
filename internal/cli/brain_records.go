@@ -199,7 +199,8 @@ func brainPromoteCommand() *Command {
 		Long: `Move records to active after review. Identity comes from git user.name and
 user.email in the brain repository. Manual and agent gates require both.
 The agent gate additionally requires pinned source paths for non-goal records,
-whose files exist at the pinned revisions, and a readable source HEAD.
+whose files exist at the pinned revisions. Current-state claims also require
+a readable source HEAD.
 External sources and repositories outside vat.yaml cannot satisfy this gate.
 Goals follow manual conditions; git identity cannot distinguish a human from
 an agent.
@@ -208,12 +209,14 @@ A current-state claim with no owner and no source revision cannot be promoted at
 all. That refusal is what makes the promotion gate real rather than an honour
 system: analysis does not become organisational truth because it was useful.
 
-vat reads the owning repository to see whether the evidence is still the
-revision the claim was read from. When it is, the observation date moves freely.
+For current-state claims, vat reads the owning repository to see whether the
+evidence is still the revision the claim was read from. When it is, the
+observation date moves freely.
 When it has moved — or vat cannot see the repository — the date only moves if
 you pass --reverified, which is you stating that you re-read the source
 yourself. Otherwise one keystroke would re-date a year-old claim as verified
-today.
+today. Non-current-state records retain their original evidence pin even with
+--reverified; the agent gate checks the path at that pin without comparing HEAD.
 
 Several records can be named at once, and --owner selects everything one
 repository is canonical for, because one merge into an active repository is what
@@ -300,7 +303,8 @@ reviewer checked; every record must satisfy the gate.`,
 // if the named file never existed there.
 func checkAgentSourcePath(ctx context.Context, ws *workspace.Workspace, record brain.Record, request brain.PromoteRequest) error {
 	if !request.AgentGate || record.Kind == brain.KindGoal || record.Status.Terminal() ||
-		strings.TrimSpace(request.Reviewer) == "" || request.SourceRevision == "" {
+		strings.TrimSpace(request.Reviewer) == "" ||
+		(record.IsCurrentStateClaim() && request.SourceRevision == "") {
 		return nil
 	}
 	owner, revision, path, ok := record.SourceParts()
@@ -308,13 +312,13 @@ func checkAgentSourcePath(ctx context.Context, ws *workspace.Workspace, record b
 		return nil
 	}
 	repo, ok := ws.Manifest.Find(owner)
-	if !ok {
-		return nil
+	if !ok || record.SourceExternal {
+		return fmt.Errorf("%s: agent promotion requires evidence in a governed source repository", record.ID)
 	}
 	if _, err := gitx.FileAtRevision(ctx, ws.RepoPath(repo), revision, path); err != nil {
 		return fmt.Errorf("%s: %s does not hold %s at %s", record.ID, owner, path, shortRevision(revision))
 	}
-	if request.Reverified && request.SourceRevision != revision {
+	if record.IsCurrentStateClaim() && request.Reverified && request.SourceRevision != "" && request.SourceRevision != revision {
 		if _, err := gitx.FileAtRevision(ctx, ws.RepoPath(repo), request.SourceRevision, path); err != nil {
 			return fmt.Errorf("%s: %s does not hold %s at %s", record.ID, owner, path, shortRevision(request.SourceRevision))
 		}

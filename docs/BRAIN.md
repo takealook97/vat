@@ -308,7 +308,8 @@ error: G-0014: payments has moved since this was observed (pinned 3f9a1c2e8b74,
   Re-read the source at the new revision, then: vat brain promote G-0014 --reverified
 ```
 
-Passing `--reverified` re-pins `source_ref` to the revision you actually read.
+For current-state claims, passing `--reverified` re-pins `source_ref` to the
+revision you actually read.
 
 Several records can be promoted at once, and `--owner <repo>` selects everything
 one repository is canonical for, because one merge is what puts twenty claims up
@@ -329,18 +330,22 @@ unset identity is omitted. `brain new` records optional `recorded_by` from the
 same git configuration, and permits creation without it.
 
 Version 0.7.0 deliberately revises the model to allow agent promotion after
-separate review. Set `policy.gates.brain_promote: agent` to require every
-non-goal record, including decisions and historical memories, to have
-`source_ref: <repo>@<revision>:<path>` whose file exists at the pinned revision.
-A repo-only pin is insufficient. A readable source repository HEAD is required,
-including with `--reverified`. Non-goal `source_external` records and sources
-outside `vat.yaml` cannot be agent-promoted because their HEAD is unreadable. Unchanged
-pinned evidence allows promotion without that flag; moved evidence requires
-re-reading and re-verification. Goals behave as under `manual`; the
-[`keep-the-brain-current` procedure](../examples/workspace/.agents/skills/keep-the-brain-current/SKILL.md)
-excludes them, since git identity cannot distinguish people from
-agents. Agent output still enters `provisional`, and a different model family
-must judge the evidence before the agent acts.
+separate review. Set `policy.gates.brain_promote: agent` to require every non-
+goal record, including decisions and historical memories, to have `source_ref:
+<repo>@<revision>:<path>` whose file exists at the pinned revision. A repo-only
+pin is insufficient. Current-state claims require a readable source repository
+HEAD, including with `--reverified`. Non-goal `source_external` records and
+sources outside `vat.yaml` cannot be agent-promoted because their pinned
+evidence cannot be checked. For current-state claims, unchanged pinned evidence
+allows promotion without that flag; moved evidence requires re-reading and re-
+verification. Under every gate, non-current-state records keep their original
+evidence pin even with `--reverified`; the agent gate checks the path at that
+revision without comparing the pin with HEAD. Goals behave as under `manual`;
+the [`keep-the-brain-current`
+procedure](../examples/workspace/.agents/skills/keep-the-brain-
+current/SKILL.md) excludes them, since git identity cannot distinguish people
+from agents. Agent output still enters `provisional`, and a different model
+family must judge the evidence before the agent acts.
 
 The same gate closes the path around it: with
 `policy.brain.require_promotion_gate` set, `vat brain supersede` leaves the

@@ -510,9 +510,9 @@ than asking what is true now.
 
 When `--limit` cuts the results, the closing line says so — `15 of 42 results;
 27 more past the limit` — because a cut nobody can see reads as the whole
-answer. `--json` remains the array of hits shown; each hit gains a `citable`
-boolean, with all existing fields preserved. A consumer that needs to know
-whether it was cut asks for a larger `--limit`.
+answer. `--json` remains the array of hits shown (`[]` when empty); each hit
+gains a `citable` boolean, with all existing fields preserved. A consumer that
+needs to know whether it was cut asks for a larger `--limit`.
 
 `query` evaluates citability at read time. Only active records are citable;
 current-state claims additionally need a readable observation date no older
@@ -529,7 +529,8 @@ gone unverified — and `--drifted` narrows to the second.
 A drifted claim stays `active` and stays citable. A revision moving is not a
 claim becoming false, so listing it here is not demoting it; `source` in the
 `--json` output is `queue` or `drift` so a consumer can route each to the work
-it actually needs.
+it actually needs. Every queue and drift row includes `kind`, so consumers can
+identify goals directly; empty review results are `[]`.
 
 Drift rows additionally carry an `evidence` object with `repo`,
 `pinned_revision` (the recorded pin, including any abbreviation),
@@ -572,19 +573,22 @@ separately, every refusal is reported rather than stopping the run, and the exit
 code is non-zero if any refused. Every record must satisfy the promotion gate.
 
 `promote` refuses a current-state claim with no `owned_by` and no `source_ref`.
-It also refuses to move the observation date forward unless the evidence is
-demonstrably unchanged — the owning repository is still at the pinned revision —
-or you pass `--reverified` to state that you re-read the source yourself, in
-which case the claim is re-pinned to the revision you read. When
-`policy.gates.brain_promote` is `manual` or `agent`, a complete git identity
-(`user.name` and `user.email` in the brain repository) is required. `reviewed_by`
-is written as `Name <email>` for that promotion; under `auto`, unset identity
-(including unavailable git) removes any earlier `reviewed_by` so the new
-promotion is not attributed to an earlier reviewer. Identity cannot be supplied
-as a flag. Under `agent`, every non-goal record needs a source pin with a path
-whose file exists at the revision being recorded, and a readable source HEAD, including
-with `--reverified`. Non-goal `source_external` records and sources outside
-`vat.yaml` cannot be agent-promoted because their HEAD is unreadable.
+For current-state claims, it also refuses to move the observation date forward
+unless the evidence is demonstrably unchanged — the owning repository is still
+at the pinned revision — or you pass `--reverified` to state that you re-read
+the source yourself, in which case the claim is re-pinned to the revision you
+read. When `policy.gates.brain_promote` is `manual` or `agent`, a complete git
+identity (`user.name` and `user.email` in the brain repository) is required.
+`reviewed_by` is written as `Name <email>` for that promotion; under `auto`,
+unset identity (including unavailable git) removes any earlier `reviewed_by` so
+the new promotion is not attributed to an earlier reviewer. Identity cannot be
+supplied as a flag. Under `agent`, every non-goal record needs a source pin
+with a path whose file exists at the revision being recorded; current-state
+claims also require a readable source HEAD, including with `--reverified`. Non-
+goal `source_external` records and sources outside `vat.yaml` cannot be agent-
+promoted because their pinned evidence cannot be checked. Under every gate,
+non-current-state records retain their original pin even with `--reverified`;
+the agent gate checks the path at that pin without comparing it with HEAD.
 Goals use the manual conditions even under `agent`.
 
 `supersede` leaves the replacement `provisional` when

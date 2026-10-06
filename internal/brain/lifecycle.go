@@ -94,6 +94,7 @@ type DriftClaim struct {
 type ReviewItem struct {
 	Source     ReviewSource   `json:"source"`
 	ID         string         `json:"id"`
+	Kind       Kind           `json:"kind"`
 	Path       string         `json:"path"`
 	Status     Status         `json:"status"`
 	Title      string         `json:"title"`
@@ -129,7 +130,7 @@ func DriftItems(store *Store, reasons map[string]DriftClaim, now time.Time) []Re
 		count := references[record.ID]
 		items = append(items, ReviewItem{
 			Source: ReviewFromDrift,
-			ID:     record.ID, Path: record.Path, Status: record.Status, Title: record.Title,
+			ID:     record.ID, Kind: record.Kind, Path: record.Path, Status: record.Status, Title: record.Title,
 			AgeDays: age, References: count,
 			Priority: priorityOf(record.Status, age, count),
 			Why:      claim.Why,
@@ -177,7 +178,7 @@ func ReviewQueue(store *Store, policy CheckPolicy, now time.Time) []ReviewItem {
 		count := references[record.ID]
 		items = append(items, ReviewItem{
 			Source: ReviewFromQueue,
-			ID:     record.ID, Path: record.Path, Status: record.Status, Title: record.Title,
+			ID:     record.ID, Kind: record.Kind, Path: record.Path, Status: record.Status, Title: record.Title,
 			AgeDays: age, References: count,
 			Priority: priorityOf(record.Status, age, count),
 			Overdue:  policy.ReviewSLADays > 0 && age > policy.ReviewSLADays,
@@ -313,15 +314,15 @@ func Promote(root string, record Record, request PromoteRequest) error {
 		if !ok || isBranchName(revision) || strings.TrimSpace(path) == "" {
 			return fmt.Errorf("%s: agent promotion requires source_ref pinned with a path (<repo>@<revision>:<path>)", record.ID)
 		}
-		if request.Reverified && request.SourceRevision == "" {
+		if record.IsCurrentStateClaim() && request.Reverified && request.SourceRevision == "" {
 			return fmt.Errorf("%s: agent promotion with --reverified requires a readable owning repository HEAD", record.ID)
 		}
 	}
-	if record.IsCurrentStateClaim() || (request.AgentGate && record.Kind != KindGoal) {
+	if record.IsCurrentStateClaim() {
 		if strings.TrimSpace(record.SourceRef) == "" {
 			return fmt.Errorf("%s: a current-state claim needs source_ref before it can be promoted", record.ID)
 		}
-		if record.IsCurrentStateClaim() && strings.TrimSpace(record.OwnedBy) == "" {
+		if strings.TrimSpace(record.OwnedBy) == "" {
 			return fmt.Errorf("%s: a current-state claim needs owned_by before it can be promoted", record.ID)
 		}
 		repointed, err := confirmEvidence(record, request)
