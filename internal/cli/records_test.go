@@ -276,7 +276,7 @@ func TestBrainSweepApplyDemotesRatherThanDeletes(t *testing.T) {
 	h := brainFixture(t, "payments")
 	h.mustRun("brain", "new", "gap", "--title", "Log rotation is weekly",
 		"--claim", "current-state", "--owner", "payments")
-	h.mustRun("brain", "promote", "G-0001", "--reviewer", "test")
+	h.mustRun("brain", "promote", "G-0001")
 	path := findRecord(t, h, "G-0001")
 	content, err := os.ReadFile(path)
 	if err != nil {

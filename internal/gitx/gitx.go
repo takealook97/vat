@@ -73,6 +73,35 @@ func Run(ctx context.Context, dir string, args ...string) (string, error) {
 	return strings.TrimSpace(stdout.String()), nil
 }
 
+// AuthorIdentity reads the identity effective in this repository, including
+// local overrides. A partial identity cannot attribute a review; without git,
+// identity is unset so callers that allow unattributed records can proceed.
+func AuthorIdentity(ctx context.Context, dir string) (string, error) {
+	values := make([]string, 2)
+	for i, key := range []string{"user.name", "user.email"} {
+		value, err := Run(ctx, dir, "config", "--get", key)
+		if err != nil {
+			if errors.Is(err, exec.ErrNotFound) {
+				return "", nil
+			}
+			var commandErr *CommandError
+			var exitErr *exec.ExitError
+			if errors.As(err, &commandErr) && errors.As(commandErr.Err, &exitErr) && exitErr.ExitCode() == 1 {
+				continue
+			}
+			return "", err
+		}
+		if strings.ContainsAny(value, "\r\n") {
+			return "", fmt.Errorf("git %s must be one line", key)
+		}
+		values[i] = strings.TrimSpace(value)
+	}
+	if values[0] == "" || values[1] == "" {
+		return "", nil
+	}
+	return fmt.Sprintf("%s <%s>", values[0], values[1]), nil
+}
+
 // Available reports whether a git executable is on PATH.
 func Available() bool {
 	_, err := exec.LookPath("git")

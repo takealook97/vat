@@ -357,6 +357,18 @@ followed even when the work started at the root.
 Rendered from `policy.gates` so an agent can read its own boundary. Having a
 role that may decide something is not having the capability to do it.
 
+Version 0.7.0 deliberately permits `policy.gates.brain_promote: agent`.
+That setting renders the promotion row as:
+
+| Action | Gate |
+| --- | --- |
+| Promote a claim to canonical | agent promotion under mechanical evidence conditions |
+
+An agent may promote after separate review: non-goal records require a pinned
+source path and git identity, and re-verification requires a readable source
+HEAD. Goals retain manual conditions. Deploy and external-write gates accept
+only `manual` or `auto`.
+
 ---
 
 ## Commands

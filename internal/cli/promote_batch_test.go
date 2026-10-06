@@ -22,7 +22,7 @@ func TestPromoteAcceptsSeveralRecordsAtOnce(t *testing.T) {
 	h.mustRun("brain", "new", "decision", "--title", "Refunds settle next day")
 
 	// Act
-	output := h.mustRun("brain", "promote", "D-0001", "D-0002", "--reviewer", "alex")
+	output := h.mustRun("brain", "promote", "D-0001", "D-0002")
 
 	// Assert
 	for _, id := range []string{"D-0001", "D-0002"} {
@@ -47,7 +47,7 @@ func TestPromoteCanSelectEverythingOneRepositoryOwns(t *testing.T) {
 		"--claim", "current-state", "--owner", "console", "--source-path", "README.md")
 
 	// Act
-	output := h.mustRun("brain", "promote", "--owner", "payments", "--reviewer", "alex")
+	output := h.mustRun("brain", "promote", "--owner", "payments")
 
 	// Assert
 	for _, id := range []string{"G-0001", "G-0002"} {
@@ -76,11 +76,11 @@ func TestPromoteReportsEveryRefusalRatherThanStoppingAtTheFirst(t *testing.T) {
 	h.mustRun("brain", "new", "gap", "--title", "Ordering is not retry-safe",
 		"--claim", "current-state", "--owner", "payments", "--source-path", "README.md")
 	h.mustRun("brain", "new", "decision", "--title", "Orders own their idempotency keys")
-	h.mustRun("brain", "promote", "G-0001", "--reviewer", "alex")
+	h.mustRun("brain", "promote", "G-0001")
 	h.mustRun("brain", "revoke", "G-0001", "--reason", "superseded by a rewrite")
 
 	// Act
-	code, output := h.run("brain", "promote", "G-0001", "D-0001", "--reviewer", "alex")
+	code, output := h.run("brain", "promote", "G-0001", "D-0001")
 
 	// Assert
 	if code == ExitOK {
@@ -99,12 +99,15 @@ func TestPromoteReportsEveryRefusalRatherThanStoppingAtTheFirst(t *testing.T) {
 }
 
 func TestPromoteStillRefusesAnUnattributedBatchWhenTheGateIsManual(t *testing.T) {
+	isolateGitIdentity(t)
 	// Arrange: batching must not become a way around the gate. Promotion is a
 	// claim that a human checked something, and a batch is many such claims.
 	h := brainFixture(t, "payments")
 	h.mustRun("brain", "new", "decision", "--title", "Orders own their idempotency keys")
 	h.mustRun("brain", "new", "decision", "--title", "Refunds settle next day")
 
+	git(t, h.path("brain"), "config", "--unset", "user.name")
+	git(t, h.path("brain"), "config", "--unset", "user.email")
 	// Act
 	code, output := h.run("brain", "promote", "D-0001", "D-0002")
 
@@ -121,7 +124,7 @@ func TestPromoteRefusesBothAnOwnerAndExplicitRecords(t *testing.T) {
 	h.mustRun("brain", "new", "decision", "--title", "Orders own their idempotency keys")
 
 	// Act
-	code, output := h.run("brain", "promote", "D-0001", "--owner", "payments", "--reviewer", "alex")
+	code, output := h.run("brain", "promote", "D-0001", "--owner", "payments")
 
 	// Assert
 	if code == ExitOK {

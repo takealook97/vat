@@ -525,6 +525,7 @@ func checkBrain(ws *workspace.Workspace, now time.Time, driftedClaims []string) 
 	policy := brain.CheckPolicy{
 		StaleAfterDays: ws.Manifest.Policy.Brain.StaleAfterDays,
 		ReviewSLADays:  ws.Manifest.Policy.Brain.ReviewSLADays,
+		PromotionGate:  ws.Manifest.Policy.Gates.BrainPromote,
 	}
 	working := len(store.WorkingSet())
 	detail := fmt.Sprintf("%d in the working set, %d citable", working, len(store.Answerable()))

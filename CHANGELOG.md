@@ -6,7 +6,30 @@ Notable changes to `vat`. The format follows
 
 ## [Unreleased]
 
+### Upgrading to 0.7.0
+
+Remove the reviewer flag from promotion scripts and configure git `user.name`
+and `user.email` in the brain repository. Rebuild projections with
+`vat brain build` after upgrade. Workspaces using the manual or agent promotion
+gate with active records lacking `reviewed_by` will see
+`brain/reviewer-unattributed` warnings (exit 0) until those records are re-promoted.
+
+### Changed
+
+- Breaking: `vat brain promote` removes `--reviewer`. Promotion identity now
+  comes from the brain repository's git author as `Name <email>`. Manual and
+  agent gates refuse unset identity; auto records identity when configured.
+- The promotion model deliberately permits agent promotion after separate
+  judgement and mechanical evidence checks. New records still enter provisional.
+
 ### Added
+
+- `policy.gates.brain_promote: agent` requires pinned source paths for every
+  non-goal record and readable source HEAD for re-verification. Goals retain
+  manual conditions; git attribution does not identify humans versus agents.
+- Optional `recorded_by` stores the git author on `vat brain new`.
+- `brain/reviewer-unattributed` warns about active records without a reviewer
+  under manual or agent promotion gates.
 
 - `vat brain review --json` drift rows carry structured `evidence`: the
   repository, pinned revision, optional source path, and observed HEAD revision.

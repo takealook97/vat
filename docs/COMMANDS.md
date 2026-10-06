@@ -476,7 +476,7 @@ vat brain check     [--only <rule>] [--list]
 vat brain query     <terms...> [--all] [--limit n]
 vat brain review    [--overdue] [--drifted] [--limit n]
 vat brain sweep     [--apply]
-vat brain promote   <id...> | --owner <repo> [--reviewer <name>] [--reverified]
+vat brain promote   <id...> | --owner <repo> [--reverified]
 vat brain supersede <old-id> <new-id>
 vat brain quarantine <id> --reason "..."
 vat brain revoke    <id> --reason "..."
@@ -487,6 +487,9 @@ vat brain adopt     <repository-name>
 
 `new --claim current-state --owner <repo>` records the owning repository's
 current revision as the claim's evidence. Records enter as `provisional`.
+`new` writes optional `recorded_by` from git `user.name` and `user.email` in
+the brain repository as `Name <email>`; unset identity is omitted, including
+when git is unavailable.
 
 `--source-path` additionally pins the file the claim was read from, and vat
 refuses a path the repository does not hold at that revision. Pinned to a
@@ -560,15 +563,23 @@ has changed. A commit that edits a record and does not rebuild leaves
 repository is canonical for — one merge into an active repository is what puts
 twenty claims up for re-verification at the same moment. Every record is judged
 separately, every refusal is reported rather than stopping the run, and the exit
-code is non-zero if any refused. The gate is unchanged: a batch is many claims
-that a human checked, not a way around having to.
+code is non-zero if any refused. Every record must satisfy the promotion gate.
 
 `promote` refuses a current-state claim with no `owned_by` and no `source_ref`.
 It also refuses to move the observation date forward unless the evidence is
 demonstrably unchanged — the owning repository is still at the pinned revision —
 or you pass `--reverified` to state that you re-read the source yourself, in
 which case the claim is re-pinned to the revision you read. When
-`policy.gates.brain_promote` is `manual`, `--reviewer` is required.
+`policy.gates.brain_promote` is `manual` or `agent`, a complete git identity
+(`user.name` and `user.email` in the brain repository) is required. `reviewed_by`
+is written as `Name <email>` for that promotion; under `auto`, unset identity
+(including unavailable git) removes any earlier `reviewed_by` so the new
+promotion is not attributed to an earlier reviewer. Identity cannot be supplied
+as a flag. Under `agent`, every non-goal record needs a source pin with a path
+whose file exists at the revision being recorded, and a readable source HEAD, including
+with `--reverified`. Non-goal `source_external` records and sources outside
+`vat.yaml` cannot be agent-promoted because their HEAD is unreadable.
+Goals use the manual conditions even under `agent`.
 
 `supersede` leaves the replacement `provisional` when
 `policy.brain.require_promotion_gate` is set, so a new decision still crosses the

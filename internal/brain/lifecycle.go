@@ -269,14 +269,15 @@ func Retire(root string, record Record, to Status, reason string) error {
 // PromoteRequest is what a promotion has to satisfy before a record becomes
 // citable.
 type PromoteRequest struct {
-	// Reviewer is who checked it.
+	// Reviewer is the git author identity supplied by the caller; brain stays git-free.
 	Reviewer string
 	// Now is the date the promotion stamps.
 	Now time.Time
 	// RequireReviewer refuses an unattributed promotion. It carries
-	// policy.gates.brain_promote: a manual gate nobody has to sign is not a
-	// gate, it is a note.
+	// policy.gates.brain_promote: manual and agent gates require attribution.
 	RequireReviewer bool
+	// AgentGate requires mechanically checkable evidence for non-goal records.
+	AgentGate bool
 	// SourceRevision is the revision the owning repository is at right now,
 	// when the caller could read it. Empty means it could not be checked.
 	SourceRevision string
@@ -303,15 +304,24 @@ func Promote(root string, record Record, request PromoteRequest) error {
 		return fmt.Errorf("%s is %s; record a new claim rather than reviving this one",
 			record.ID, record.Status)
 	}
-	if request.RequireReviewer && strings.TrimSpace(request.Reviewer) == "" {
-		return fmt.Errorf("%s: policy.gates.brain_promote is manual, so a promotion must name its reviewer", record.ID)
+	if (request.RequireReviewer || request.AgentGate) && strings.TrimSpace(request.Reviewer) == "" {
+		return fmt.Errorf("%s: promotion requires a git identity; set git user.name/user.email in the brain repository", record.ID)
 	}
 	metadata := record.Metadata
-	if record.IsCurrentStateClaim() {
+	if request.AgentGate && record.Kind != KindGoal {
+		_, revision, path, ok := record.SourceParts()
+		if !ok || isBranchName(revision) || strings.TrimSpace(path) == "" {
+			return fmt.Errorf("%s: agent promotion requires source_ref pinned with a path (<repo>@<revision>:<path>)", record.ID)
+		}
+		if request.Reverified && request.SourceRevision == "" {
+			return fmt.Errorf("%s: agent promotion with --reverified requires a readable owning repository HEAD", record.ID)
+		}
+	}
+	if record.IsCurrentStateClaim() || (request.AgentGate && record.Kind != KindGoal) {
 		if strings.TrimSpace(record.SourceRef) == "" {
 			return fmt.Errorf("%s: a current-state claim needs source_ref before it can be promoted", record.ID)
 		}
-		if strings.TrimSpace(record.OwnedBy) == "" {
+		if record.IsCurrentStateClaim() && strings.TrimSpace(record.OwnedBy) == "" {
 			return fmt.Errorf("%s: a current-state claim needs owned_by before it can be promoted", record.ID)
 		}
 		repointed, err := confirmEvidence(record, request)
@@ -328,9 +338,7 @@ func Promote(root string, record Record, request PromoteRequest) error {
 	doc := frontmatter.Split(string(data))
 	metadata.Status = StatusActive
 	metadata.ObservedAt = request.Now.Format("2006-01-02")
-	if request.Reviewer != "" {
-		metadata.ReviewedBy = request.Reviewer
-	}
+	metadata.ReviewedBy = request.Reviewer
 	rendered, err := doc.Merge(metadata)
 	if err != nil {
 		return fmt.Errorf("%s: %w", record.Path, err)

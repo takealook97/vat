@@ -35,6 +35,8 @@ func brainFixture(t *testing.T, repos ...string) *workspaceFixture {
 	t.Helper()
 	h := adoptedFixture(t, repos...)
 	h.mustRun("repo", "new", "brain", "--role", "brain", "--no-remote")
+	git(t, h.path("brain"), "config", "user.name", "Fixture Author")
+	git(t, h.path("brain"), "config", "user.email", "author@example.com")
 	h.mustRun("brain", "init")
 	return h
 }
@@ -106,7 +108,7 @@ func TestABrainRecordIsNotCitableUntilAHumanPromotesIt(t *testing.T) {
 	}
 
 	// Act
-	h.mustRun("brain", "promote", "D-0001", "--reviewer", "test")
+	h.mustRun("brain", "promote", "D-0001")
 	_, after := h.run("brain", "query", "cancellation")
 
 	// Assert

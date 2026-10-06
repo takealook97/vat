@@ -19,7 +19,7 @@ func TestReviewJSONCarriesEvidenceForReverification(t *testing.T) {
 				args = append(args, "--source-path", sourcePath)
 			}
 			h.mustRun(args...)
-			h.mustRun("brain", "promote", "G-0001", "--reviewer", "alex")
+			h.mustRun("brain", "promote", "G-0001")
 			if err := os.WriteFile(filepath.Join(h.path("payments"), "README.md"), []byte("# rewritten\n"), 0o644); err != nil {
 				t.Fatal(err)
 			}
@@ -124,7 +124,7 @@ func driftedClaim(t *testing.T, h *workspaceFixture, repo string) {
 	t.Helper()
 	h.mustRun("brain", "new", "gap", "--title", "Ordering is not retry-safe",
 		"--claim", "current-state", "--owner", repo, "--source-path", "README.md")
-	h.mustRun("brain", "promote", "G-0001", "--reviewer", "alex")
+	h.mustRun("brain", "promote", "G-0001")
 	path := filepath.Join(h.path(repo), "README.md")
 	if err := os.WriteFile(path, []byte("# rewritten\n"), 0o644); err != nil {
 		t.Fatalf("write: %v", err)

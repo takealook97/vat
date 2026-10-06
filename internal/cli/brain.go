@@ -89,6 +89,7 @@ func brainPolicy(ws *workspace.Workspace) brain.CheckPolicy {
 	return brain.CheckPolicy{
 		StaleAfterDays: ws.Manifest.Policy.Brain.StaleAfterDays,
 		ReviewSLADays:  ws.Manifest.Policy.Brain.ReviewSLADays,
+		PromotionGate:  ws.Manifest.Policy.Gates.BrainPromote,
 	}
 }
 

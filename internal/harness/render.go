@@ -202,6 +202,9 @@ func renderGates(m manifest.Manifest) string {
 }
 
 func gateWord(setting string) string {
+	if setting == manifest.GateAgent {
+		return "agent promotion under mechanical evidence conditions"
+	}
 	if setting == "auto" {
 		return "automated"
 	}

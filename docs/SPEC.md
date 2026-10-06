@@ -153,12 +153,12 @@ repos:
 | `policy.brain.repo` | no | the repository holding the knowledge layer |
 | `policy.brain.stale_after_days` | no | the window after which a current-state claim is demoted (§6) |
 | `policy.brain.review_sla_days` | no | the window a queued record is expected to be judged within |
-| `policy.brain.require_promotion_gate` | no | refuse an unattributed promotion (§6.6) |
+| `policy.brain.require_promotion_gate` | no | require an explicit promotion step (§5.6) |
 | `policy.changeset.max_open_days` | no | the age at which an open changeset is reported as stale (§7) |
 | `policy.changeset.require_rollback_point` | no | refuse a participant with no revision to return to |
 | `policy.gates.deploy` | no | `manual` or `auto` |
 | `policy.gates.external_write` | no | `manual` or `auto` |
-| `policy.gates.brain_promote` | no | `manual` or `auto`; `manual` requires a named reviewer (§6.6) |
+| `policy.gates.brain_promote` | no | `manual`, `agent`, or `auto`; manual and agent require git identity (§5.6) |
 
 ### 4.2 Roles
 
@@ -302,7 +302,8 @@ claim_kind: intent
 owned_by: payments
 source_ref: payments@a71c93d0e5f218:docs/orders.md
 observed_at: 2026-03-14
-reviewed_by: alex
+recorded_by: Alex <alex@example.com>
+reviewed_by: Alex <alex@example.com>
 refs: [O-0001]
 ---
 
@@ -324,7 +325,8 @@ refs: [O-0001]
 | `refs` | no | related record identifiers |
 | `axis` | no | groups goals into themes |
 | `reason` | see §5.3 | why a record was quarantined or revoked |
-| `reviewed_by` | no | who promoted it |
+| `recorded_by` | no | git author (`Name <email>`) who created it |
+| `reviewed_by` | no | git author (`Name <email>`) who promoted it |
 
 The filename **SHOULD** begin with the identifier. The filename is **not**
 authoritative: `id` is.
@@ -397,9 +399,34 @@ NOT** let a record reach `active` except through an explicit promotion, and
 **MUST** refuse to promote a `current-state` claim that lacks `owned_by` or
 `source_ref`.
 
+Version 0.7.0 deliberately revises the promotion model: an agent **MAY**
+promote under mechanically checkable evidence conditions. Agent output still
+enters as `provisional`; writing it is never promotion. Under
+`policy.gates.brain_promote: agent`, every non-goal record **MUST** have a
+`source_ref` pinned with a path (`<repo>@<revision>:<path>`), and that file
+**MUST** exist at the revision being recorded. The source repository HEAD **MUST** be
+readable, including when `--reverified` is used. Non-goal records with
+`source_external: true` or sources outside `vat.yaml` cannot be agent-promoted:
+their source HEAD is unreadable. Goals follow the `manual` gate; keeping goals out of agent upkeep is a procedural boundary,
+not a human-versus-agent distinction vat can detect.
+
+Promotion under `manual` or `agent` **MUST** record `reviewed_by` from git
+`user.name` and `user.email` effective in the brain repository, as
+`Name <email>`, and **MUST** refuse an absent or incomplete identity. `auto`
+**MAY** omit identity when unset, including when git is unavailable. Each
+promotion records the identity of that promotion: under `auto`, an unset
+identity **MUST** remove an earlier `reviewed_by` rather than attribute the new
+promotion to the earlier reviewer. `brain new` **SHOULD** record the same
+identity as optional `recorded_by`, omitting it when unset. Identity **MUST
+NOT** be supplied as free text at the command line. A git author attributes the
+action; it does not prove whether a human or an agent performed it.
+
 Re-dating a record's `observed_at` is an assertion that somebody re-read the
-source. An implementation **MUST NOT** move `observed_at` forward automatically
-when the source revision has changed.
+source. An implementation **MUST NOT** move `observed_at` forward solely because
+the source revision has changed. Renewed source review, asserted with
+`--reverified`, is required to advance it against changed evidence. Under the
+agent gate, the readable HEAD becomes the new pin; neither a moving branch nor
+an unreadable source can stand in for this evidence.
 
 ### 5.5.1 Claims about systems the workspace does not govern
 

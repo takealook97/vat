@@ -40,8 +40,12 @@
       "description": "Why a record was revoked or quarantined. A withdrawal with no reason cannot be reviewed.",
       "type": "string"
     },
+    "recorded_by": {
+      "description": "Git author who created the record, as Name <email>, when configured in the brain repository.",
+      "type": "string"
+    },
     "reviewed_by": {
-      "description": "Who promoted the record. A record that reached active without one was never reviewed.",
+      "description": "Git author who promoted the record, as Name <email>. Required by manual and agent gates; auto may omit it when unset.",
       "type": "string"
     }
   },

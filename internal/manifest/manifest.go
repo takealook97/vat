@@ -229,19 +229,20 @@ type ChangesetPolicy struct {
 	RequireRollbackPoint bool `yaml:"require_rollback_point" json:"require_rollback_point"`
 }
 
-// Gate settings. A gate is either crossed by a human or not gated at all;
-// there is deliberately no middle value.
+// Gate settings separate explicit approval from automated action.
 const (
 	// GateManual requires explicit human approval for the action.
 	GateManual = "manual"
 	// GateAuto allows automation to perform the action.
 	GateAuto = "auto"
+	// GateAgent permits brain promotion under mechanical evidence conditions.
+	GateAgent = "agent"
 )
 
 // GatePolicy separates judgement authority from mutation capability. A role
 // that may decide something still needs the matching gate to act on it.
 type GatePolicy struct {
-	// Deploy, ExternalWrite, and BrainPromote are each "manual" or "auto".
+	// Deploy and ExternalWrite are manual or auto; BrainPromote also accepts agent.
 	Deploy        string `yaml:"deploy" json:"deploy"`
 	ExternalWrite string `yaml:"external_write" json:"external_write"`
 	BrainPromote  string `yaml:"brain_promote" json:"brain_promote"`

@@ -230,7 +230,9 @@ type Metadata struct {
 	// Reason explains a quarantine or a revocation. Required for both: a
 	// withdrawal with no stated cause cannot be reviewed later.
 	Reason string `yaml:"reason,omitempty"`
-	// ReviewedBy records who promoted the record.
+	// RecordedBy records the git author who created the record.
+	RecordedBy string `yaml:"recorded_by,omitempty"`
+	// ReviewedBy records the git author who promoted the record.
 	ReviewedBy string `yaml:"reviewed_by,omitempty"`
 }
 

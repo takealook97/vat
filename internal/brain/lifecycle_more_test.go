@@ -641,7 +641,7 @@ func TestPromoteRefusesAnUnattributedPromotionWhenTheGateIsManual(t *testing.T) 
 	if err == nil {
 		t.Fatal("a manual gate accepted a promotion nobody signed")
 	}
-	if !strings.Contains(err.Error(), "reviewer") {
+	if !strings.Contains(err.Error(), "git user.name/user.email") {
 		t.Errorf("error should say what is missing, got %v", err)
 	}
 }

@@ -37,7 +37,7 @@ func TestDoctorSaysNothingAboutDriftWhenEveryClaimIsCurrent(t *testing.T) {
 	h := brainFixture(t, "payments")
 	h.mustRun("brain", "new", "gap", "--title", "Ordering is not retry-safe",
 		"--claim", "current-state", "--owner", "payments", "--source-path", "README.md")
-	h.mustRun("brain", "promote", "G-0001", "--reviewer", "alex")
+	h.mustRun("brain", "promote", "G-0001")
 
 	// Act
 	output := h.mustRun("doctor")

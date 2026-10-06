@@ -129,7 +129,7 @@ Run ` + "`vat brain check`" + ` to see which of these currently hold.
 vat brain query <terms>    # find the records that matter
 vat brain review           # what needs re-checking, most costly first
 vat brain new gap --title "..."
-vat brain promote <id> --reviewer <name>
+vat brain promote <id>
 vat brain archive --apply  # move finished records out of the working set
 vat brain build && vat brain check
 ` + "```" + `
@@ -252,17 +252,18 @@ the canonical check that passed, and the revision it passed on.
 
 // NewRecordInput describes a record to create.
 type NewRecordInput struct {
-	Kind      Kind
-	ID        string
-	Title     string
-	Status    Status
-	ClaimKind ClaimKind
-	OwnedBy   string
-	SourceRef string
-	Axis      string
-	Refs      []string
-	Body      string
-	Now       time.Time
+	RecordedBy string
+	Kind       Kind
+	ID         string
+	Title      string
+	Status     Status
+	ClaimKind  ClaimKind
+	OwnedBy    string
+	SourceRef  string
+	Axis       string
+	Refs       []string
+	Body       string
+	Now        time.Time
 }
 
 // Create writes a new atomic record and returns its path relative to root.
@@ -287,14 +288,15 @@ func Create(root string, input NewRecordInput) (string, error) {
 	}
 
 	metadata := Metadata{
-		ID:        input.ID,
-		Status:    status,
-		Date:      now.Format("2006-01-02"),
-		ClaimKind: input.ClaimKind,
-		OwnedBy:   input.OwnedBy,
-		SourceRef: input.SourceRef,
-		Axis:      input.Axis,
-		Refs:      input.Refs,
+		ID:         input.ID,
+		RecordedBy: input.RecordedBy,
+		Status:     status,
+		Date:       now.Format("2006-01-02"),
+		ClaimKind:  input.ClaimKind,
+		OwnedBy:    input.OwnedBy,
+		SourceRef:  input.SourceRef,
+		Axis:       input.Axis,
+		Refs:       input.Refs,
 	}
 	if input.ClaimKind == ClaimCurrentState {
 		metadata.ObservedAt = now.Format("2006-01-02")

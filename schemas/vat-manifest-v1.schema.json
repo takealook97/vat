@@ -113,13 +113,13 @@
           }
         },
         "gates": {
-          "description": "A gate is crossed by a human or not gated at all; there is deliberately no middle value.",
+          "description": "Deploy and external writes are manual or auto; brain promotion also accepts agent (SPEC section 5.6).",
           "type": "object",
           "additionalProperties": false,
           "properties": {
             "deploy": { "$ref": "#/$defs/gate" },
             "external_write": { "$ref": "#/$defs/gate" },
-            "brain_promote": { "$ref": "#/$defs/gate" }
+            "brain_promote": { "type": "string", "enum": ["manual", "auto", "agent"] }
           }
         }
       }

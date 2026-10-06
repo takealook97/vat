@@ -138,7 +138,8 @@ refs: [O-0003, D-0031]
 | `refs` | related record identifiers |
 | `axis` | grouping, for goals |
 | `reason` | required for `quarantined` and `revoked` |
-| `reviewed_by` | who promoted it |
+| `recorded_by` | git author (`Name <email>`) who created it, when configured |
+| `reviewed_by` | git author (`Name <email>`) who promoted it |
 
 ### `claim_kind` decides which rules apply
 
@@ -273,7 +274,7 @@ process, not of any one record.
 ## The promotion gate
 
 ```console
-$ vat brain promote G-0014 --reviewer alex
+$ vat brain promote G-0014
 error: G-0014: a current-state claim needs source_ref before it can be promoted
 ```
 
@@ -293,7 +294,7 @@ keystroke turns a four-hundred-day-old sentence into "verified today", which is
 the exact failure the whole layer exists to prevent.
 
 ```console
-$ vat brain promote G-0014 --reviewer alex
+$ vat brain promote G-0014
 error: G-0014: payments has moved since this was observed (pinned 3f9a1c2e8b74,
   now 9d4e7b1a0c62), so the observation date cannot be advanced.
   Re-read the source at the new revision, then: vat brain promote G-0014 --reverified
@@ -312,8 +313,25 @@ Leaving the old one would date the record today against something nobody opened.
 stays that way; if the claim turns out to hold after all, record a new one. A
 tombstone that can be flipped back is not a tombstone.
 
-**It will not accept an unsigned promotion** when
-`policy.gates.brain_promote` is `manual`. A gate nobody has to sign is a note.
+**It will not accept an unattributed promotion** under `manual` or `agent`.
+`reviewed_by` comes from git `user.name` and `user.email` in the brain repository,
+formatted as `Name <email>`. Configure both before promoting; there is no typed
+reviewer or default identity. Under `auto`, configured identity is recorded and
+unset identity is omitted. `brain new` records optional `recorded_by` from the
+same git configuration, and permits creation without it.
+
+Version 0.7.0 deliberately revises the model to allow agent promotion after
+separate review. Set `policy.gates.brain_promote: agent` to require every
+non-goal record, including decisions and historical memories, to have
+`source_ref: <repo>@<revision>:<path>` whose file exists at the pinned revision.
+A repo-only pin is insufficient. A readable source repository HEAD is required,
+including with `--reverified`. Non-goal `source_external` records and sources
+outside `vat.yaml` cannot be agent-promoted because their HEAD is unreadable. Unchanged
+pinned evidence allows promotion without that flag; moved evidence requires
+re-reading and re-verification. Goals behave as under `manual`; the upkeep
+procedure excludes them, since git identity cannot distinguish people from
+agents. Agent output still enters `provisional`, and a different model family
+must judge the evidence before the agent acts.
 
 The same gate closes the path around it: with
 `policy.brain.require_promotion_gate` set, `vat brain supersede` leaves the
@@ -489,6 +507,7 @@ knows to look for, so this table and `brain.RuleNames()` are compared by a test.
 | `brain/record-secret-suspected` | error / warn | a line that carries a credential; error for unmistakable shapes, warning for heuristics |
 | `brain/ref-missing` | error | a reference to a record that does not exist |
 | `brain/ref-withdrawn` | warn | a record citing a revoked or quarantined one as support |
+| `brain/reviewer-unattributed` | warn | an active record has no `reviewed_by` under the manual or agent promotion gate |
 | `brain/review-overdue` | warn | a record past `review_sla_days` — a defect of the process, not of the record |
 | `brain/revoke-reason` | error | a tombstone with no stated cause |
 | `brain/schema-newer` | error | a brain written against a contract this build cannot read, whose newer fields would be silently invisible |
@@ -768,7 +787,7 @@ vat brain new gap --title "Retries can double-submit" \
                   --claim current-state --owner payments
 # write the record
 vat brain build && vat brain check
-vat brain promote G-0014 --reviewer alex
+vat brain promote G-0014
 vat brain build
 ```
 

@@ -111,9 +111,11 @@ situation that should bring it back and the condition under which it stops
 applying. If it will not be useful a second time, it does not belong here.
 
 The one thing that does not work is letting a session log become canon
-automatically. Automatic capture is fine; automatic promotion is not, which is
-why anything entering this layer enters as `provisional` and a claim about the
-present cannot be re-dated without someone re-reading its source.
+automatically. Everything entering this layer enters as `provisional`, and a
+claim about the present cannot be re-dated against changed evidence without
+re-reading its source. Version 0.7.0 deliberately permits promotion by an agent
+under the `agent` gate after separate review and mechanical evidence checks;
+a session log alone does not satisfy those conditions.
 
 ### What if my team will not maintain it?
 

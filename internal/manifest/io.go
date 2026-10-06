@@ -299,8 +299,15 @@ func validatePolicy(m Manifest) []string {
 		"policy.gates.external_write": m.Policy.Gates.ExternalWrite,
 		"policy.gates.brain_promote":  m.Policy.Gates.BrainPromote,
 	} {
+		if name == "policy.gates.brain_promote" && value == GateAgent {
+			continue
+		}
 		if value != GateManual && value != GateAuto {
-			problems = append(problems, fmt.Sprintf(`%s must be "manual" or "auto", got %q`, name, value))
+			choices := `"manual" or "auto"`
+			if name == "policy.gates.brain_promote" {
+				choices = `"manual", "auto", or "agent"`
+			}
+			problems = append(problems, fmt.Sprintf(`%s must be %s, got %q`, name, choices, value))
 		}
 	}
 	return problems

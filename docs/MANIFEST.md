@@ -212,7 +212,9 @@ a fast-moving platform may want thirty.
 
 ## `policy.gates`
 
-Each is `manual` or `auto`. They separate judgement authority from mutation
+Deploy and external-write gates are `manual` or `auto`; brain promotion also
+accepts `agent` for mechanical evidence checks and git attribution (SPEC §5.6).
+They separate judgement authority from mutation
 capability: a role that may decide something still needs the matching gate to
 act on it.
 

@@ -44,6 +44,8 @@ type Finding struct {
 
 // CheckPolicy configures the lifecycle rules.
 type CheckPolicy struct {
+	// PromotionGate controls whether active records must be attributed.
+	PromotionGate string
 	// StaleAfterDays is when an observed claim stops counting as verified.
 	StaleAfterDays int
 	// ReviewSLADays is how long a record may stay in a non-answerable state
@@ -111,6 +113,7 @@ func RuleNames() []string {
 		"brain/ref-missing",
 		"brain/ref-withdrawn",
 		"brain/review-overdue",
+		"brain/reviewer-unattributed",
 		"brain/revoke-reason",
 		"brain/schema-newer",
 		"brain/status-unknown",
@@ -134,6 +137,14 @@ func Check(store *Store, policy CheckPolicy, now time.Time) []Finding {
 	findings := make([]Finding, 0, len(store.Records))
 	index := store.ByID()
 
+	if policy.PromotionGate == "manual" || policy.PromotionGate == "agent" {
+		for _, record := range store.Records {
+			if record.Status == StatusActive && strings.TrimSpace(record.ReviewedBy) == "" {
+				findings = append(findings, Finding{Rule: "brain/reviewer-unattributed", Severity: SeverityWarn,
+					Path: record.Path, ID: record.ID, Message: "active record has no reviewed_by; re-check and promote with a configured git identity"})
+			}
+		}
+	}
 	findings = append(findings, checkSchema(store)...)
 	findings = append(findings, checkMalformed(store)...)
 	findings = append(findings, checkSecrets(store)...)

@@ -31,7 +31,11 @@ having been written.
 For a claim about the present, pass --claim current-state and name the
 repository that owns the fact. vat records the current revision of that
 repository as the evidence, so the claim can later be checked against what has
-changed since.`,
+changed since.
+
+When git user.name and user.email are configured in the brain repository,
+recorded_by records that author identity as Name <email>. Unset identity is
+omitted; creating a provisional record remains possible.`,
 		Examples: []string{
 			`vat brain new decision --title "Orders own their own idempotency keys"`,
 			`vat brain new gap --title "Retries can double-submit" --claim current-state --owner payments`,
@@ -107,6 +111,10 @@ func runBrainNew(ctx context.Context, env *Env, args []string) error {
 		return usageErrorf("--source-path names the evidence for a claim about the present; pass --claim current-state --owner <repo> as well")
 	}
 
+	input.RecordedBy, err = gitx.AuthorIdentity(ctx, store.Root)
+	if err != nil {
+		return err
+	}
 	path, err := brain.Create(store.Root, input)
 	if err != nil {
 		return err
@@ -174,7 +182,7 @@ func currentRevisionOf(ctx context.Context, ws *workspace.Workspace, owner strin
 		return ""
 	}
 	dir := ws.RepoPath(repo)
-	if !fsx.IsDir(dir) {
+	if !gitx.IsRepository(dir) {
 		return ""
 	}
 	revision, err := headRevision(ctx, dir)
@@ -188,8 +196,14 @@ func brainPromoteCommand() *Command {
 	return &Command{
 		Name:    "promote",
 		Summary: "Mark a reviewed record as citable",
-		Usage:   "vat brain promote <id...> | --owner <repo> [--reviewer <name>] [--reverified]",
-		Long: `Move records to active after a human has checked them.
+		Usage:   "vat brain promote <id...> | --owner <repo> [--reverified]",
+		Long: `Move records to active after review. Identity comes from git user.name and
+user.email in the brain repository. Manual and agent gates require both.
+The agent gate additionally requires pinned source paths for non-goal records,
+whose files exist at the pinned revisions, and a readable source HEAD.
+External sources and repositories outside vat.yaml cannot satisfy this gate.
+Goals follow manual conditions; git identity cannot distinguish a human from
+an agent.
 
 A current-state claim with no owner and no source revision cannot be promoted at
 all. That refusal is what makes the promotion gate real rather than an honour
@@ -206,14 +220,13 @@ Several records can be named at once, and --owner selects everything one
 repository is canonical for, because one merge into an active repository is what
 puts twenty claims up for re-verification at the same moment. Every record is
 still judged separately and the gate is unchanged: a batch is many claims that a
-human checked, not a way around having to.`,
+reviewer checked; every record must satisfy the gate.`,
 		Examples: []string{
-			`vat brain promote G-0014 --reviewer alex`,
-			`vat brain promote --owner payments --reviewer alex --reverified`,
+			`vat brain promote G-0014`,
+			`vat brain promote --owner payments --reverified`,
 		},
 		Run: func(ctx context.Context, env *Env, args []string) error {
 			set := newFlagSet("brain promote")
-			reviewer := set.String("reviewer", "", "who reviewed it")
 			reverified := set.Bool("reverified", false, "you re-read the source yourself")
 			owner := set.String("owner", "", "promote every record this repository owns")
 			if err := parseFlags(set, args); err != nil {
@@ -237,18 +250,36 @@ human checked, not a way around having to.`,
 			if err != nil {
 				return err
 			}
+			reviewer, err := gitx.AuthorIdentity(ctx, store.Root)
+			if err != nil {
+				return err
+			}
 			refused := 0
 			for _, record := range records {
+				sourceOwner := record.OwnedBy
+				if ws.Manifest.Policy.Gates.BrainPromote == manifest.GateAgent && record.Kind != brain.KindGoal {
+					if repo, _, _, ok := record.SourceParts(); ok {
+						sourceOwner = repo
+					}
+					if record.SourceExternal {
+						sourceOwner = ""
+					}
+				}
 				request := brain.PromoteRequest{
-					Reviewer: *reviewer, Now: env.Now, Reverified: *reverified,
-					RequireReviewer: ws.Manifest.Policy.Gates.BrainPromote == manifest.GateManual,
-					SourceRevision:  currentRevisionOf(ctx, ws, record.OwnedBy),
+					Reviewer: reviewer, Now: env.Now, Reverified: *reverified,
+					RequireReviewer: ws.Manifest.Policy.Gates.BrainPromote != manifest.GateAuto,
+					AgentGate:       ws.Manifest.Policy.Gates.BrainPromote == manifest.GateAgent,
+					SourceRevision:  currentRevisionOf(ctx, ws, sourceOwner),
 				}
 				// Every record is reported, refusals included. These commands
 				// run in a loop while somebody clears a queue, and stopping at
 				// the first refusal hides both the rest of the refusals and the
 				// records that would have gone through.
-				if err := brain.Promote(store.Root, record, request); err != nil {
+				err := checkAgentSourcePath(ctx, ws, record, request)
+				if err == nil {
+					err = brain.Promote(store.Root, record, request)
+				}
+				if err != nil {
 					env.Printer.Status(ui.LevelFail, record.ID, firstLine(err.Error()))
 					refused++
 					continue
@@ -263,6 +294,33 @@ human checked, not a way around having to.`,
 			return nil
 		},
 	}
+}
+
+// checkAgentSourcePath keeps git evidence checks at the CLI boundary: the brain
+// package cannot read repository contents, and a plausible pin is not evidence
+// if the named file never existed there.
+func checkAgentSourcePath(ctx context.Context, ws *workspace.Workspace, record brain.Record, request brain.PromoteRequest) error {
+	if !request.AgentGate || record.Kind == brain.KindGoal || record.Status.Terminal() ||
+		strings.TrimSpace(request.Reviewer) == "" || request.SourceRevision == "" {
+		return nil
+	}
+	owner, revision, path, ok := record.SourceParts()
+	if !ok || strings.TrimSpace(path) == "" {
+		return nil
+	}
+	repo, ok := ws.Manifest.Find(owner)
+	if !ok {
+		return nil
+	}
+	if _, err := gitx.FileAtRevision(ctx, ws.RepoPath(repo), revision, path); err != nil {
+		return fmt.Errorf("%s: %s does not hold %s at %s", record.ID, owner, path, shortRevision(revision))
+	}
+	if request.Reverified && request.SourceRevision != revision {
+		if _, err := gitx.FileAtRevision(ctx, ws.RepoPath(repo), request.SourceRevision, path); err != nil {
+			return fmt.Errorf("%s: %s does not hold %s at %s", record.ID, owner, path, shortRevision(request.SourceRevision))
+		}
+	}
+	return nil
 }
 
 // recordsToPromote resolves the selection, in a stable order so that a batch

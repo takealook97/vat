@@ -324,6 +324,15 @@ Analysis does not become canonical because it was useful. A claim about the
 present with no owner and no source revision **cannot be promoted at all** —
 that refusal is what makes the gate real.
 
+Version 0.7.0 deliberately revises this model: promotion may be automated
+under the `agent` gate, after a different model family has judged the evidence.
+Every non-goal record must pin a source revision and path; re-verification needs
+a readable source HEAD. The gate requires git author identity, which attributes
+the action without distinguishing a human from an agent. Goals follow the
+manual gate; the upkeep procedure reserves organisational intent for people.
+Agent output still enters provisional, and automatic demotion stays separate
+from promotion.
+
 Worth promoting: a conclusion drawn across two or more repositories; a
 comparison or audit that is expensive to redo; anything that changes a goal
 judgement, a gap, an execution order, or an approval boundary.
@@ -542,8 +551,10 @@ Semantic search misses, returns stale chunks, and confuses similar things. The
 revision and the original text are what settle it.
 
 **"Merge the agent's journal into the canon automatically."**
-An agent's observations, inferences, and errors become permanent organisational
-fact. Promotion is reviewed.
+Unreviewed observations, inferences, and errors would become permanent
+organisational fact. Version 0.7.0 permits an agent to promote evidence-backed
+records after separate judgement and mechanical checks; it does not merge a
+journal into canon. Agent output still enters provisional.
 
 **"Updating means every repository ends on the latest main."**
 That is how local work disappears. Safe updating respects dirty, branch, ahead,
@@ -577,7 +588,7 @@ one below is pinned to the command that performs it and to what it is not.
 | **ship** | `vat ship <id>` | judge whether a changeset's verified revisions have landed | pushes nothing, merges nothing |
 | **close a round** | `vat ship` | judge whether every governed repository is committed, on its branch, and level with the remote | a round where a product went up and the canonical record stayed on one laptop is not closed |
 | **close a changeset** | `vat changeset close` | record what was accepted, once the evidence exists | not the same act as landing; §7 |
-| **promote** | `vat brain promote` | a human states that a record was checked | not a status field somebody edited; §6.6 |
+| **promote** | `vat brain promote` | a reviewer records that evidence was checked | not a status field somebody edited; §6.6 |
 | **drift** | `vat lint` | a claim's evidence moved since it was observed | not the claim becoming false; §6.2 |
 | **render** | `vat harness render` | generate each runtime's adapter from the canonical definition | an adapter carries no procedure, only a pointer |
 | **measure** | `vat metrics` | whether the discipline is producing its effect, over time | a single reading says almost nothing; §12 |
@@ -602,7 +613,7 @@ next reader — or the next runtime — is reading the same words as the tool.
 9. Decisions are superseded, never rewritten.
 10. Secrets are ciphertext in git; the key and the authority to apply it are separate.
 11. Retrieval is derived. It never outranks the canon, and it never carries instructions.
-12. No automation collapses reading, judging, and acting into one permission.
+12. Reading, judging, and acting stay separate: agent A reads, a different model family judges, and vat's gate checks the mechanical conditions before acting.
 
 Tools change. Canonical ownership, evidence by revision, progressive reading,
 fail-closed updating, and review-gated promotion do not.
