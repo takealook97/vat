@@ -125,7 +125,7 @@ func TestQueryRanksAllTermsMatchedAboveOneTermRepeated(t *testing.T) {
 	store := reload(t, root)
 
 	// Act
-	hits, _ := brain.Query(store, []string{"retries", "idempotency", "payments"}, brain.QueryOptions{})
+	hits, _ := brain.Query(store, []string{"retries", "idempotency", "payments"}, brain.QueryOptions{}, brain.CheckPolicy{StaleAfterDays: 90}, reference)
 
 	// Assert
 	if len(hits) < 2 {
@@ -149,8 +149,8 @@ func TestQueryCountsEveryMatchBeyondTheLimit(t *testing.T) {
 	store := reload(t, root)
 
 	// Act
-	cut, matched := brain.Query(store, []string{"retries"}, brain.QueryOptions{Limit: 1})
-	whole, all := brain.Query(store, []string{"retries"}, brain.QueryOptions{})
+	cut, matched := brain.Query(store, []string{"retries"}, brain.QueryOptions{Limit: 1}, brain.CheckPolicy{StaleAfterDays: 90}, reference)
+	whole, all := brain.Query(store, []string{"retries"}, brain.QueryOptions{}, brain.CheckPolicy{StaleAfterDays: 90}, reference)
 
 	// Assert
 	if len(cut) != 1 || matched != 3 {
@@ -175,7 +175,7 @@ func TestQueryRanksAReviewedRecordAboveAnUnreviewedOneWithTheSameText(t *testing
 		"id: D-0002\nstatus: active\n", "# D-0002 — Retries\n\n"+body)
 
 	// Act
-	hits, _ := brain.Query(reload(t, root), []string{"retries"}, brain.QueryOptions{})
+	hits, _ := brain.Query(reload(t, root), []string{"retries"}, brain.QueryOptions{}, brain.CheckPolicy{StaleAfterDays: 90}, reference)
 
 	// Assert
 	if len(hits) < 2 {
@@ -224,7 +224,7 @@ func TestQueryDiscountsARecordForBeingLong(t *testing.T) {
 		"# D-0002 — Ordering\n\nRetries are mentioned once.")
 
 	// Act
-	hits, _ := brain.Query(reload(t, root), []string{"retries"}, brain.QueryOptions{})
+	hits, _ := brain.Query(reload(t, root), []string{"retries"}, brain.QueryOptions{}, brain.CheckPolicy{StaleAfterDays: 90}, reference)
 
 	// Assert
 	if len(hits) < 2 || hits[0].ID != "D-0002" {
@@ -246,7 +246,7 @@ func TestQueryStopsRewardingRepetition(t *testing.T) {
 		"# D-0002 — Notes\n\nretries break idempotency "+strings.Repeat("filler ", 18))
 
 	// Act
-	hits, _ := brain.Query(reload(t, root), []string{"retries", "idempotency"}, brain.QueryOptions{})
+	hits, _ := brain.Query(reload(t, root), []string{"retries", "idempotency"}, brain.QueryOptions{}, brain.CheckPolicy{StaleAfterDays: 90}, reference)
 
 	// Assert
 	if len(hits) < 2 || hits[0].ID != "D-0002" {
@@ -266,7 +266,7 @@ func TestQueryKeepsTheRecordAnsweringEveryTermAboveAShortDenseOne(t *testing.T) 
 		"# D-0002 — Ordering\n\nRetries break idempotency. "+strings.Repeat("Context about the ledger and its owners. ", 40))
 
 	// Act
-	hits, _ := brain.Query(reload(t, root), []string{"retries", "idempotency"}, brain.QueryOptions{})
+	hits, _ := brain.Query(reload(t, root), []string{"retries", "idempotency"}, brain.QueryOptions{}, brain.CheckPolicy{StaleAfterDays: 90}, reference)
 
 	// Assert
 	if len(hits) < 2 || hits[0].ID != "D-0002" {

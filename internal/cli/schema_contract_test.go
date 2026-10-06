@@ -438,13 +438,6 @@ func scalarsTypedAsSomethingElse(node *yaml.Node, path string) []mistypedScalar 
 // the first thing a reader who copied it saw was `vat lint` failing on drift in
 // a file they had not touched. The schema tests beside this one check the
 // example's hand-written files; this checks the one vat generates.
-//
-// graph.json and not CURRENT.md, though both are generated and both were stale.
-// CURRENT.md carries the date it was rebuilt and an age in days computed from
-// it, so it is drifted on every day but the one it was written — an invariant
-// no committed file can hold, and a test asserting it would go red overnight on
-// every machine with nothing changed. graph.json carries no clock, which is why
-// it is the one a test can hold to.
 func TestThePublishedExampleCarriesTheGraphThisBuildWrites(t *testing.T) {
 	// Arrange
 	root := "../../examples/workspace/brain"
@@ -455,20 +448,34 @@ func TestThePublishedExampleCarriesTheGraphThisBuildWrites(t *testing.T) {
 	if len(store.Records) == 0 {
 		t.Fatal("the example brain lost its records, and this test stopped checking anything")
 	}
+	// The window comes from the example's own manifest: a hard-coded one would
+	// keep passing after someone edits vat.yaml, while `vat lint` on the example
+	// reports drift.
+	example, err := manifest.Load("../../examples/workspace/vat.yaml")
+	if err != nil {
+		t.Fatalf("load the example manifest: %v", err)
+	}
+	policy := brain.CheckPolicy{StaleAfterDays: example.Policy.Brain.StaleAfterDays}
 	committed, err := os.ReadFile(filepath.Join(root, brain.GraphFile))
 	if err != nil {
 		t.Fatalf("read the example %s: %v", brain.GraphFile, err)
 	}
 
 	// Act
-	rendered, err := brain.RenderGraph(store)
+	rendered, err := brain.RenderGraph(store, policy)
 	if err != nil {
 		t.Fatalf("RenderGraph: %v", err)
 	}
 
 	// Assert
-	if fsx.NormaliseNewlines(string(committed)) != fsx.NormaliseNewlines(string(rendered)) {
-		t.Errorf("the published example's %s is not what this build writes\n"+
-			"run `vat brain build` in examples/workspace", brain.GraphFile)
+	if fsx.NormaliseNewlines(string(committed)) != string(rendered) {
+		t.Errorf("the published example's %s differs from this build", brain.GraphFile)
+	}
+	current, err := os.ReadFile(filepath.Join(root, brain.CurrentFile))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if fsx.NormaliseNewlines(string(current)) != brain.RenderCurrent(store, policy) {
+		t.Error("the published example's CURRENT.md differs from this build")
 	}
 }

@@ -6,6 +6,19 @@ Notable changes to `vat`. The format follows
 
 ## [Unreleased]
 
+### Fixed
+
+- Brain query applies the observation window when deciding whether active
+  current-state claims are citable. Expired hits warn as `expired` and lose the
+  citable ranking bonus; query JSON adds `citable`. Claims at the window
+  boundary and active historical or intent records remain citable.
+- Brain projections stay clock-free and deterministic. Graph schema version 2
+  adds `citable_until` on dated current-state nodes and `stale_after_days` at
+  the graph level. `CURRENT.md` shows expiry dates for readers to compare with
+  today. Build, lint repair, and drift checks all use the workspace policy.
+  Existing brains report `brain/generated-drift` after upgrade until
+  `vat brain build` runs. Readers never rewrite records.
+
 ## [0.6.5] - 2026-09-26
 
 ### Changed

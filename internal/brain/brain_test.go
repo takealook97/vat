@@ -404,15 +404,15 @@ func TestBuildIsDeterministicAndDriftIsDetected(t *testing.T) {
 	writeRecord(t, root, "decisions/D-0001-x.md", "id: D-0001\nstatus: active", "# D-0001 — Something")
 
 	// Act
-	first, err := brain.Build(reload(t, root), reference)
+	first, err := brain.Build(reload(t, root), brain.CheckPolicy{StaleAfterDays: 90})
 	if err != nil {
 		t.Fatalf("first Build returned an error: %v", err)
 	}
-	second, err := brain.Build(reload(t, root), reference)
+	second, err := brain.Build(reload(t, root), brain.CheckPolicy{StaleAfterDays: 90})
 	if err != nil {
 		t.Fatalf("second Build returned an error: %v", err)
 	}
-	drift, err := brain.Drift(reload(t, root), reference)
+	drift, err := brain.Drift(reload(t, root), brain.CheckPolicy{StaleAfterDays: 90})
 	if err != nil {
 		t.Fatalf("Drift returned an error: %v", err)
 	}
@@ -436,7 +436,7 @@ func TestDriftIsReportedWhenAGeneratedFileIsEditedByHand(t *testing.T) {
 	// covers that case.
 	root, _ := newStore(t)
 	writeRecord(t, root, "decisions/D-0001-x.md", "id: D-0001\nstatus: active", "# D-0001 — Something")
-	if _, err := brain.Build(reload(t, root), reference); err != nil {
+	if _, err := brain.Build(reload(t, root), brain.CheckPolicy{StaleAfterDays: 90}); err != nil {
 		t.Fatalf("Build returned an error: %v", err)
 	}
 	path := filepath.Join(root, brain.CurrentFile)
@@ -450,7 +450,7 @@ func TestDriftIsReportedWhenAGeneratedFileIsEditedByHand(t *testing.T) {
 	}
 
 	// Act
-	drift, err := brain.Drift(reload(t, root), reference)
+	drift, err := brain.Drift(reload(t, root), brain.CheckPolicy{StaleAfterDays: 90})
 
 	// Assert
 	if err != nil {
@@ -470,7 +470,7 @@ func TestQueryPrefersARecordMatchingEveryTerm(t *testing.T) {
 		"# D-0002 — Retries retries retries retries")
 
 	// Act
-	hits, _ := brain.Query(reload(t, root), []string{"retries", "idempotency"}, brain.QueryOptions{})
+	hits, _ := brain.Query(reload(t, root), []string{"retries", "idempotency"}, brain.QueryOptions{}, brain.CheckPolicy{StaleAfterDays: 90}, reference)
 
 	// Assert
 	if len(hits) == 0 {
@@ -497,8 +497,8 @@ supersedes: [D-0001]
 `, "# D-0002 — Something else entirely")
 
 	// Act
-	narrow, _ := brain.Query(reload(t, root), []string{"pricing"}, brain.QueryOptions{})
-	wide, _ := brain.Query(reload(t, root), []string{"pricing"}, brain.QueryOptions{IncludeTerminal: true})
+	narrow, _ := brain.Query(reload(t, root), []string{"pricing"}, brain.QueryOptions{}, brain.CheckPolicy{StaleAfterDays: 90}, reference)
+	wide, _ := brain.Query(reload(t, root), []string{"pricing"}, brain.QueryOptions{IncludeTerminal: true}, brain.CheckPolicy{StaleAfterDays: 90}, reference)
 
 	// Assert
 	if len(narrow) != 0 {
@@ -584,7 +584,7 @@ func TestTheIndexStaysBoundedAsRecordsAccumulate(t *testing.T) {
 	store := reload(t, root)
 
 	// Act
-	index := brain.RenderCurrent(store, reference)
+	index := brain.RenderCurrent(store, brain.CheckPolicy{StaleAfterDays: 90})
 
 	// Assert
 	rows := strings.Count(index, "| `D-")
@@ -712,7 +712,7 @@ func TestALineEndingIsNotProjectionDrift(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Load: %v", err)
 	}
-	if _, err := brain.Build(store, reference); err != nil {
+	if _, err := brain.Build(store, brain.CheckPolicy{StaleAfterDays: 90}); err != nil {
 		t.Fatalf("Build: %v", err)
 	}
 	for _, name := range brain.Generated() {
@@ -728,11 +728,11 @@ func TestALineEndingIsNotProjectionDrift(t *testing.T) {
 	}
 
 	// Act
-	drifted, err := brain.Drift(store, reference)
+	drifted, err := brain.Drift(store, brain.CheckPolicy{StaleAfterDays: 90})
 	if err != nil {
 		t.Fatalf("Drift: %v", err)
 	}
-	rebuilt, err := brain.Build(store, reference)
+	rebuilt, err := brain.Build(store, brain.CheckPolicy{StaleAfterDays: 90})
 	if err != nil {
 		t.Fatalf("Build: %v", err)
 	}

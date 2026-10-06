@@ -23,7 +23,7 @@ type FixResult struct {
 // Nothing here touches a fact, a decision, or a working tree. A rule whose
 // repair would require deciding what someone meant is reported and left alone —
 // automatically resolving those is how a lint tool starts destroying work.
-func Fix(ws *workspace.Workspace, now time.Time) (FixResult, error) {
+func Fix(ws *workspace.Workspace, _ time.Time) (FixResult, error) {
 	var result FixResult
 
 	changed, err := ws.SyncGitignore(ws.Manifest)
@@ -45,7 +45,7 @@ func Fix(ws *workspace.Workspace, now time.Time) (FixResult, error) {
 		if err != nil {
 			return result, err
 		}
-		build, err := brain.Build(store, now)
+		build, err := brain.Build(store, brain.CheckPolicy{StaleAfterDays: ws.Manifest.Policy.Brain.StaleAfterDays})
 		if err != nil {
 			return result, err
 		}

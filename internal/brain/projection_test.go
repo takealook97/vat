@@ -23,7 +23,7 @@ func TestCurrentRoutesToCanonicalViewsThatExist(t *testing.T) {
 	}
 
 	// Act
-	index := brain.RenderCurrent(store, reference)
+	index := brain.RenderCurrent(store, brain.CheckPolicy{StaleAfterDays: 90})
 
 	// Assert
 	// The link text is the file, as it is in every other table this index
@@ -51,7 +51,7 @@ func TestCurrentRecognisesThePortfolioStatusNameUsedByAnAdoptedBrain(t *testing.
 	}
 
 	// Act
-	index := brain.RenderCurrent(store, reference)
+	index := brain.RenderCurrent(store, brain.CheckPolicy{StaleAfterDays: 90})
 
 	// Assert
 	if !strings.Contains(index, "| Current state | [PORTFOLIO_STATUS.md](PORTFOLIO_STATUS.md) |") {
@@ -76,7 +76,7 @@ func TestBuildLeavesAProjectionItDidNotWrite(t *testing.T) {
 	}
 
 	// Act
-	result, err := brain.Build(reload(t, root), reference)
+	result, err := brain.Build(reload(t, root), brain.CheckPolicy{StaleAfterDays: 90})
 
 	// Assert
 	if err != nil {
@@ -107,7 +107,7 @@ func TestBuildRewritesAProjectionCarryingItsOwnProvenance(t *testing.T) {
 	// file, and the difference is the marker the render puts in it.
 	root, _ := newStore(t)
 	writeRecord(t, root, "decisions/D-0001-x.md", "id: D-0001\nstatus: active", "# D-0001 — Something")
-	if _, err := brain.Build(reload(t, root), reference); err != nil {
+	if _, err := brain.Build(reload(t, root), brain.CheckPolicy{StaleAfterDays: 90}); err != nil {
 		t.Fatalf("first Build returned an error: %v", err)
 	}
 	path := filepath.Join(root, brain.CurrentFile)
@@ -121,7 +121,7 @@ func TestBuildRewritesAProjectionCarryingItsOwnProvenance(t *testing.T) {
 	}
 
 	// Act
-	result, err := brain.Build(reload(t, root), reference)
+	result, err := brain.Build(reload(t, root), brain.CheckPolicy{StaleAfterDays: 90})
 
 	// Assert
 	if err != nil {
@@ -149,7 +149,7 @@ func TestAForeignProjectionIsReportedAsUnmanagedRatherThanDrift(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Unmanaged returned an error: %v", err)
 	}
-	drift, err := brain.Drift(reload(t, root), reference)
+	drift, err := brain.Drift(reload(t, root), brain.CheckPolicy{StaleAfterDays: 90})
 	if err != nil {
 		t.Fatalf("Drift returned an error: %v", err)
 	}
@@ -222,7 +222,7 @@ func TestCurrentNamesNewDecisionsTheCitationRankingWouldHide(t *testing.T) {
 		"id: G-0001\nstatus: active\nrefs: ["+strings.Join(refs, ", ")+"]", "# G-0001 — A goal")
 
 	// Act
-	index := brain.RenderCurrent(reload(t, root), reference)
+	index := brain.RenderCurrent(reload(t, root), brain.CheckPolicy{StaleAfterDays: 90})
 
 	// Assert
 	if !strings.Contains(index, "D-0020") {

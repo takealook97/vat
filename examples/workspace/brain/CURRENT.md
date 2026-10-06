@@ -6,41 +6,44 @@ Start every question here. Find the identifiers that matter, then open only
 those records. Reading the whole repository makes answers worse, not better:
 superseded reasoning and current fact become indistinguishable.
 
-Rebuilt 2026-09-03.
+Observation window: 90 days.
+
+For current-state claims, compare the citable-until date with today before citing.
+Stored status alone does not establish current citability.
 
 ## Inventory
 
 | Status | Records | Meaning |
 | --- | --- | --- |
-| `active` | 2 | Reviewed and citable. |
+| `active` | 2 | Reviewed; current-state claims also require an observation within the window. |
 | `stale` | 1 | Was true when observed; nobody has re-checked it since. |
 
 
 ## Goals
 
-| ID | Status | Title | Record |
-| --- | --- | --- | --- |
-| `O-0001` | active | One order never becomes two | [O-0001-one-order-never-becomes-two.md](goals/O-0001-one-order-never-becomes-two.md) |
+| ID | Status | Citable until | Title | Record |
+| --- | --- | --- | --- | --- |
+| `O-0001` | active |  | One order never becomes two | [O-0001-one-order-never-becomes-two.md](goals/O-0001-one-order-never-becomes-two.md) |
 
 ## Open gaps
 
-| ID | Status | Title | Record |
-| --- | --- | --- | --- |
-| `G-0001` | stale | Retries can double-submit an order | [G-0001-retries-can-double-submit.md](gaps/G-0001-retries-can-double-submit.md) |
+| ID | Status | Citable until | Title | Record |
+| --- | --- | --- | --- | --- |
+| `G-0001` | stale | 2026-07-31 | Retries can double-submit an order | [G-0001-retries-can-double-submit.md](gaps/G-0001-retries-can-double-submit.md) |
 
 ## Active decisions
 
-| ID | Status | Title | Record |
-| --- | --- | --- | --- |
-| `D-0001` | active | Orders own their own idempotency keys | [D-0001-orders-own-their-idempotency-keys.md](decisions/D-0001-orders-own-their-idempotency-keys.md) |
+| ID | Status | Citable until | Title | Record |
+| --- | --- | --- | --- | --- |
+| `D-0001` | active |  | Orders own their own idempotency keys | [D-0001-orders-own-their-idempotency-keys.md](decisions/D-0001-orders-own-their-idempotency-keys.md) |
 
 ## Needs attention
 
 These are not answers. Re-verify or retire them.
 
-| ID | Status | Age (days) | Record |
-| --- | --- | --- | --- |
-| `G-0001` | stale | 124 | [G-0001-retries-can-double-submit.md](gaps/G-0001-retries-can-double-submit.md) |
+| ID | Status | Observed | Citable until | Record | Reason |
+| --- | --- | --- | --- | --- | --- |
+| `G-0001` | stale | 2026-05-02 | 2026-07-31 | [G-0001-retries-can-double-submit.md](gaps/G-0001-retries-can-double-submit.md) |  |
 
 ## Reading contract
 

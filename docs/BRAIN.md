@@ -547,6 +547,14 @@ it rather than leaving the ranking to punish it silently. Splitting stays a
 human judgement — which paragraph belongs to which record is a question about
 content, and this tool does not answer those.
 
+Only citable hits receive the reviewed-record ranking bonus. An active
+current-state claim older than `policy.brain.stale_after_days` is shown as
+`expired` with the same warning as a stale hit, even before sweep changes its
+stored status. Exactly the window's age remains citable. A missing or unreadable
+observation date also prevents citation; historical and intent claims do not
+expire. Query JSON adds `citable` to every hit and preserves the stored `status`.
+Readers leave the record files unchanged.
+
 The reading contract:
 
 1. Find identifiers in `CURRENT.md`.
@@ -578,7 +586,7 @@ it and read by nothing else:
 | --- | --- |
 | `goals/`, `gaps/`, `decisions/`, `memory/` | atomic records, one fact each, with provenance in the header |
 | `CURRENT.md` and the root projections | vat's own summary layer, already written |
-| `graph.json` | every record's id, kind, **status**, path, owner, `source_ref`, and a `content_hash` per record, under a `schema_version` for the whole file |
+| `graph.json` | every record's id, kind, **status**, `citable_until` for dated current-state claims, path, owner, `source_ref`, and a `content_hash` per record, under graph `schema_version: 2` |
 | `archive/`, `history/` | everything finished with, in directories of their own |
 
 Four rules make that safe to index:
@@ -602,7 +610,7 @@ Re-indexing is meant to be cheap. Each node in `graph.json` carries a
 `content_hash` over its record file, header included, so an index that kept the
 hashes from its last pass opens only the records whose hash moved — including
 the ones whose only change was a status, which is the change it can least afford
-to miss. The file's `schema_version` says which record contract those fields
+to miss. The file's `schema_version` says which graph contract those fields
 were written against; a value the index does not recognise means re-read rather
 than reuse. Neither field makes the graph authoritative: it is still a
 projection, and the Markdown still wins.
@@ -725,6 +733,19 @@ different questions:
 - **Newest decisions** names up to five recent ones the ranking left out. A
   decision taken yesterday is cited by nothing yet, so ranking can only hide it,
   and an index that cannot show the newest decision gets read as stale.
+
+Current-state claims with readable observation dates remain in their sections
+with a citable-until date: the observation plus the policy window. Compare that
+date with today before citing; an active stored status alone is insufficient.
+Active current-state claims without a readable observation date appear under
+**Needs attention**. Stored statuses remain intact.
+
+Graph schema version 2 carries `citable_until` on dated current-state nodes and
+`stale_after_days` at the graph level. Neither projection carries a clock or a
+live citability boolean. Query computes citability at read time. Projections are
+deterministic: time passing causes no drift or build churn, while a change to
+the workspace observation window requires rebuilding. Record content hashes do
+not change merely because evidence ages.
 
 Above them, **Canonical views** links the maintained synthesis documents that
 exist — `STATUS.md`, `GOAL.md`, `ROADMAP.md` and the rest. An adopted repository

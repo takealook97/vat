@@ -38,13 +38,13 @@ are auditing why something was decided rather than asking what is true now.`,
 			if set.NArg() == 0 {
 				return usageErrorf("expected at least one search term")
 			}
-			_, store, err := openBrain(env)
+			ws, store, err := openBrain(env)
 			if err != nil {
 				return err
 			}
 			hits, matched := brain.Query(store, set.Args(), brain.QueryOptions{
 				IncludeHistory: *all, IncludeTerminal: *all, Limit: *limit,
-			})
+			}, brainPolicy(ws), env.Now)
 			if env.JSON {
 				return emitJSON(env, hits)
 			}
@@ -60,11 +60,15 @@ are auditing why something was decided rather than asking what is true now.`,
 				if hit.ID != "" {
 					label = fmt.Sprintf("%s  %s", hit.ID, hit.Title)
 				}
+				status := string(hit.Status)
+				if hit.Status == brain.StatusActive && !hit.Citable {
+					status = "expired"
+				}
 				level := ui.LevelInfo
-				if hit.Status == brain.StatusStale || hit.Status == brain.StatusQuarantined {
+				if hit.Status == brain.StatusStale || hit.Status == brain.StatusQuarantined || status == "expired" {
 					level = ui.LevelWarn
 				}
-				env.Printer.Status(level, label, string(hit.Status))
+				env.Printer.Status(level, label, status)
 				env.Printer.Hint("      %s", hit.Path)
 				for _, line := range hit.Excerpt {
 					env.Printer.Hint("      │ %s", truncate(line, 96))

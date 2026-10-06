@@ -501,8 +501,16 @@ than asking what is true now.
 
 When `--limit` cuts the results, the closing line says so — `15 of 42 results;
 27 more past the limit` — because a cut nobody can see reads as the whole
-answer. `--json` is the array of the hits shown, unchanged in shape; a consumer
-that needs to know whether it was cut asks for a larger `--limit`.
+answer. `--json` remains the array of hits shown; each hit gains a `citable`
+boolean, with all existing fields preserved. A consumer that needs to know
+whether it was cut asks for a larger `--limit`.
+
+`query` evaluates citability at read time. Only active records are citable;
+current-state claims additionally need a readable observation date no older
+than `policy.brain.stale_after_days` (equality is allowed). An active claim
+outside that window is warned as `expired` and loses the citable ranking bonus.
+Its stored status remains `active` in JSON and on disk. Historical and intent
+claims are unaffected by age. No query rewrites a record.
 
 `review` lists two things that need different work: a record whose status asks
 for judgement, and an active claim whose evidence moved. It orders both by
@@ -521,11 +529,17 @@ but the states these rules report accumulate — a workspace measured while
 should not have to count forty lines to learn that one run of `archive` ends
 them.
 
-`build` renders `CURRENT.md` and `graph.json` from the records. `graph.json`
-carries `schema_version` — the record contract it was written against — and a
-`content_hash` on every node, so an index built over the brain re-reads only the
-records that changed. Both are projections: a hand edit is drift, and the next
-build overwrites it.
+`build` renders `CURRENT.md` and `graph.json` from the records and workspace
+policy. `graph.json` carries graph `schema_version: 2`, the window
+`stale_after_days`, `citable_until` on dated current-state nodes, and
+`content_hash` on every node, so an index re-reads only the records that changed.
+Both are projections: a hand edit is drift, and the next build overwrites it.
+`CURRENT.md` shows expiry dates and routes active current-state claims without
+readable observation dates to **Needs attention**. Compare expiry dates with
+today before citing. Neither projection carries a build clock or live
+citability boolean; query computes citability at read time. Repeated builds
+with unchanged records and policy change nothing. Changing the workspace window
+causes projection drift until a rebuild; lint repair uses that same policy.
 
 Because the hash covers the record file, `graph.json` moves whenever any byte of
 any record moves — a typo fix included, even though nothing the graph projects

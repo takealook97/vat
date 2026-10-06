@@ -359,7 +359,18 @@ therefore decays. For such a record:
   report the record as aged out and **MUST NOT** present it as verified.
   Demoting it to `stale` on disk **MAY** require an explicit action, so that a
   read-only reader never rewrites records. It is the age test, not the stored
-  status, that decides whether a claim may be cited as current.
+  status, that decides whether a claim may be cited as current. A record is
+  citable only when its stored status is `active` and either it is not a
+  `current-state` claim or its observation age in whole days is at most
+  `policy.brain.stale_after_days`. Equality remains citable. An absent or
+  unreadable observation date makes a current-state claim non-citable.
+  Readers that run evaluate this at read time without rewriting records.
+  Query labels a non-citable active claim `expired`, warns as for stale
+  records, and omits the citable ranking bonus; its JSON preserves `status`
+  and adds `citable`. Clock-free projections carry an expiry date for
+  current-state claims; readers compare it with today before citing.
+  `CURRENT.md` routes active current-state claims without a readable
+  observation date to **Needs attention**.
 
 `historical` records what happened and does not decay. `intent` records what the
 organisation means to do. Neither requires provenance.
@@ -447,11 +458,27 @@ tell a projection it produced from a file that merely holds the same name:
   the string `vat brain build`.
 
 `graph.json` **MUST** also carry the top-level field `schema_version`, an
-integer holding the record contract the **writing implementation** implements —
+integer holding the graph contract the **writing implementation** implements —
 not the value the marker declares, which may be lower in a brain that has not
 been rebuilt since the writer was upgraded. A reader that does not recognise the
 value **MUST NOT** assume the node fields still mean what it was written
 against.
+
+Graph schema version **2** adds `citable_until` to current-state nodes with a
+readable observation date: that date plus `policy.brain.stale_after_days`, as
+`YYYY-MM-DD`. The date is inclusive: the claim is citable through the end of
+that day and aged out from the next. Other nodes **MUST** omit this field. The stored `status` remains
+unchanged; the expiry date alone does not certify citability.
+The graph **MUST** carry `stale_after_days`, the observation window used for
+that build. `CURRENT.md` records its window as
+`Observation window: <days> days.` and shows expiry dates for current-state
+claims with readable observation dates. Neither projection carries a build
+clock or a live `citable` boolean. They are deterministic from the records,
+maintained-view filenames, and policy. Readers that run **MUST** apply §5.4 at
+read time; static projection readers compare the expiry date against today.
+Drift compares against the current workspace policy, so changing the window
+requires rebuilding, while elapsed time alone does not cause drift.
+The atomic record and `.brain` marker contract remains version **1**.
 
 Each node **MUST** carry `content_hash`: the record file hashed with SHA-256,
 hex-encoded, prefixed `sha256:`. The hash covers the whole file, header
@@ -707,7 +734,8 @@ conforming: it is the one instruction the agent cannot derive for itself.
 | Format | Current | Declared in |
 | --- | --- | --- |
 | manifest | 1 | `version:` in `vat.yaml` |
-| brain | 1 | `schema:` in `.brain`, and `schema_version` in `graph.json` |
+| brain | 1 | `schema:` in `.brain` |
+| brain graph | 2 | `schema_version` in `graph.json` |
 | changeset | 1 | implied by `id` pattern `CS-NNNN` |
 
 A version is incremented when a change would make an existing conforming reader

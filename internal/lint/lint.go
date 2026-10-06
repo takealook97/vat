@@ -129,7 +129,7 @@ func Run(ctx context.Context, ws *workspace.Workspace, opts Options) (Report, er
 	add(checkTrustPolicy(ws)...)
 	add(checkLayersAreChecked(ws)...)
 
-	brainFindings, err := checkBrain(ctx, ws, opts, now)
+	brainFindings, err := checkBrain(ctx, ws, opts)
 	if err != nil {
 		return report, err
 	}
@@ -524,7 +524,7 @@ func sameDirectory(a, b string) bool {
 	return errA == nil && errB == nil && resolvedA == resolvedB
 }
 
-func checkBrain(ctx context.Context, ws *workspace.Workspace, opts Options, now time.Time) ([]Finding, error) {
+func checkBrain(ctx context.Context, ws *workspace.Workspace, opts Options) ([]Finding, error) {
 	root, ok := ws.BrainPath()
 	if !ok || !fsx.IsDir(root) {
 		return nil, nil
@@ -574,7 +574,7 @@ func checkBrain(ctx context.Context, ws *workspace.Workspace, opts Options, now 
 			Fix:     "move or delete it, then `vat brain build`",
 		})
 	}
-	drifted, err := brain.Drift(store, now)
+	drifted, err := brain.Drift(store, brain.CheckPolicy{StaleAfterDays: ws.Manifest.Policy.Brain.StaleAfterDays})
 	if err != nil {
 		return nil, err
 	}

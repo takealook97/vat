@@ -583,7 +583,7 @@ func checkBrain(ws *workspace.Workspace, now time.Time, driftedClaims []string) 
 		})
 	}
 
-	drifted, err := brain.Drift(store, now)
+	drifted, err := brain.Drift(store, brain.CheckPolicy{StaleAfterDays: ws.Manifest.Policy.Brain.StaleAfterDays})
 	if err == nil && len(drifted) > 0 {
 		findings = append(findings, Finding{
 			Section: sectionBrain, Subject: "generated files", Status: StatusWarn,

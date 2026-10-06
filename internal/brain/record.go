@@ -432,3 +432,16 @@ func FileName(id, title string) string {
 
 // JoinPath joins brain-relative path segments with forward slashes.
 func JoinPath(parts ...string) string { return path.Join(parts...) }
+
+// Citable applies the observation window at read time so an unswept active
+// claim cannot remain an answer after its evidence expires.
+func Citable(record Record, policy CheckPolicy, now time.Time) bool {
+	if record.Status != StatusActive {
+		return false
+	}
+	if !record.IsCurrentStateClaim() {
+		return true
+	}
+	age, ok := record.AgeDays(now)
+	return ok && age <= policy.StaleAfterDays
+}

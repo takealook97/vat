@@ -116,11 +116,11 @@ func brainBuildCommand() *Command {
 			if err := parseFlags(set, args); err != nil {
 				return err
 			}
-			_, store, err := openBrain(env)
+			ws, store, err := openBrain(env)
 			if err != nil {
 				return err
 			}
-			result, err := brain.Build(store, env.Now)
+			result, err := brain.Build(store, brainPolicy(ws))
 			if err != nil {
 				return err
 			}
@@ -299,7 +299,7 @@ migrate needs and what a list of two hundred findings does not give.`,
 			// drift, and adoption that hands back a workspace failing its own
 			// lint has not finished. Only generated files are written; the
 			// records are read and left exactly as they are.
-			built, err := brain.Build(store, env.Now)
+			built, err := brain.Build(store, brainPolicy(ws))
 			if err != nil {
 				return err
 			}

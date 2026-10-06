@@ -352,7 +352,7 @@ func TestBuildProducesEveryGeneratedFileAndCheckStillPasses(t *testing.T) {
 	})
 
 	// Act
-	if _, err := Build(mustLoad(t, root), observedOn); err != nil {
+	if _, err := Build(mustLoad(t, root), CheckPolicy{StaleAfterDays: 90}); err != nil {
 		t.Fatalf("build: %v", err)
 	}
 
@@ -374,13 +374,13 @@ func TestBuildIsIdempotent(t *testing.T) {
 	mustCreate(t, root, NewRecordInput{
 		Kind: KindDecision, ID: "D-0001", Title: "Pricing is per seat", Status: StatusActive,
 	})
-	if _, err := Build(mustLoad(t, root), observedOn); err != nil {
+	if _, err := Build(mustLoad(t, root), CheckPolicy{StaleAfterDays: 90}); err != nil {
 		t.Fatalf("build: %v", err)
 	}
 	first := readGenerated(t, root)
 
 	// Act
-	if _, err := Build(mustLoad(t, root), observedOn); err != nil {
+	if _, err := Build(mustLoad(t, root), CheckPolicy{StaleAfterDays: 90}); err != nil {
 		t.Fatalf("build again: %v", err)
 	}
 	second := readGenerated(t, root)
@@ -424,8 +424,8 @@ func TestQueryLeavesSupersededReasoningOutOfTheDefaultSurface(t *testing.T) {
 	store := mustLoad(t, root)
 
 	// Act
-	narrow, _ := Query(store, []string{"pricing"}, QueryOptions{Limit: 10})
-	wide, _ := Query(store, []string{"pricing"}, QueryOptions{Limit: 10, IncludeTerminal: true})
+	narrow, _ := Query(store, []string{"pricing"}, QueryOptions{Limit: 10}, CheckPolicy{StaleAfterDays: 90}, observedOn)
+	wide, _ := Query(store, []string{"pricing"}, QueryOptions{Limit: 10, IncludeTerminal: true}, CheckPolicy{StaleAfterDays: 90}, observedOn)
 
 	// Assert
 	for _, hit := range narrow {

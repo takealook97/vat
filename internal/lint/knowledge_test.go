@@ -64,7 +64,7 @@ func TestAnInitialisedBrainWithNoDriftReportsNothing(t *testing.T) {
 	if err != nil {
 		t.Fatalf("load: %v", err)
 	}
-	if _, err := brain.Build(store, reference); err != nil {
+	if _, err := brain.Build(store, brain.CheckPolicy{StaleAfterDays: 90}); err != nil {
 		t.Fatalf("build: %v", err)
 	}
 
@@ -118,7 +118,7 @@ func TestAProjectionVatDidNotWriteIsReportedApartFromDrift(t *testing.T) {
 	if err != nil {
 		t.Fatalf("load: %v", err)
 	}
-	if _, err := brain.Build(store, reference); err != nil {
+	if _, err := brain.Build(store, brain.CheckPolicy{StaleAfterDays: 90}); err != nil {
 		t.Fatalf("build: %v", err)
 	}
 	if err := os.WriteFile(filepath.Join(root, brain.CurrentFile),

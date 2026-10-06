@@ -5,10 +5,12 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"time"
 )
 
 // Hit is one search result.
 type Hit struct {
+	Citable bool     `json:"citable"`
 	Path    string   `json:"path"`
 	ID      string   `json:"id,omitempty"`
 	Status  Status   `json:"status,omitempty"`
@@ -38,7 +40,7 @@ type QueryOptions struct {
 // The count is returned because a cut nobody can see reads as "this is
 // everything": a reader cannot tell a short answer from a truncated one, and
 // the index and the review queue already say what they left out.
-func Query(store *Store, terms []string, opts QueryOptions) ([]Hit, int) {
+func Query(store *Store, terms []string, opts QueryOptions, policy CheckPolicy, now time.Time) ([]Hit, int) {
 	if len(terms) == 0 {
 		return nil, 0
 	}
@@ -78,7 +80,7 @@ func Query(store *Store, terms []string, opts QueryOptions) ([]Hit, int) {
 		if record.Status.Terminal() && !opts.IncludeTerminal {
 			continue
 		}
-		add(Hit{Path: record.Path, ID: record.ID, Status: record.Status, Title: record.Title},
+		add(Hit{Path: record.Path, ID: record.ID, Status: record.Status, Title: record.Title, Citable: Citable(record, policy, now)},
 			strings.ToLower(record.Title+"\n"+record.Body+"\n"+record.ID), record.Body)
 	}
 	for _, path := range surfaceFiles(store.Root, opts.IncludeHistory) {
@@ -102,7 +104,7 @@ func Query(store *Store, terms []string, opts QueryOptions) ([]Hit, int) {
 		if score == 0 {
 			continue
 		}
-		if entry.hit.Status.Answerable() {
+		if entry.hit.Citable {
 			// Prefer a reviewed record over an unreviewed one at the same
 			// textual relevance.
 			score += 5

@@ -1,6 +1,7 @@
 {
   "generated_by": "vat brain build",
-  "schema_version": 1,
+  "stale_after_days": 90,
+  "schema_version": 2,
   "nodes": [
     {
       "id": "D-0001",
@@ -14,6 +15,7 @@
       "content_hash": "sha256:746d775ecbb714c62a8e8cd927f26e17ac0d2dd8973326b540421a600510468d"
     },
     {
+      "citable_until": "2026-07-31",
       "id": "G-0001",
       "kind": "gap",
       "status": "stale",

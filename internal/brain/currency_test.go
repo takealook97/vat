@@ -6,32 +6,21 @@ import (
 	"github.com/takealook97/vat/internal/brain"
 )
 
-// The projection embeds the day it was built and an age in days for every
-// record, both derived from the clock. Comparing it against a re-render made
-// with today's clock therefore reports drift on the first run of every new
-// calendar day, on a repository nobody has touched.
-//
-// It was live in two of the three workspaces running vat: both had committed
-// CURRENT.md alongside the records it was built from, both had clean trees and
-// no commits since, and both failed `vat lint` the next morning. The third had
-// rebuilt that day and was green. The remedy genuinely works, which is why it
-// went unexamined — `vat brain build` rewrites the date, so the error clears
-// every day and returns every night.
-//
-// This is the same class as the line-ending case: a difference that is not a
-// difference between the records and their projection.
+// Projections used to embed a build date and observation ages. These changed
+// overnight without any record edits. Keeping rendering clock-free prevents
+// both false drift findings and rebuild churn.
 func TestTimePassingIsNotProjectionDrift(t *testing.T) {
 	// Arrange
 	root := t.TempDir()
 	if _, err := brain.Init(root, reference); err != nil {
 		t.Fatalf("Init: %v", err)
 	}
-	if _, err := brain.Build(reload(t, root), reference); err != nil {
+	if _, err := brain.Build(reload(t, root), brain.CheckPolicy{StaleAfterDays: 90}); err != nil {
 		t.Fatalf("Build: %v", err)
 	}
 
-	// Act: the same records, a day later, nothing else changed.
-	drifted, err := brain.Drift(reload(t, root), reference.AddDate(0, 0, 1))
+	// Act: projection checks take no clock, so time passing cannot change them.
+	drifted, err := brain.Drift(reload(t, root), brain.CheckPolicy{StaleAfterDays: 90})
 	if err != nil {
 		t.Fatalf("Drift: %v", err)
 	}
@@ -51,7 +40,7 @@ func TestAProjectionBehindItsRecordsStillDriftsLater(t *testing.T) {
 	if _, err := brain.Init(root, reference); err != nil {
 		t.Fatalf("Init: %v", err)
 	}
-	if _, err := brain.Build(reload(t, root), reference); err != nil {
+	if _, err := brain.Build(reload(t, root), brain.CheckPolicy{StaleAfterDays: 90}); err != nil {
 		t.Fatalf("Build: %v", err)
 	}
 	if _, err := brain.Create(root, brain.NewRecordInput{
@@ -60,8 +49,8 @@ func TestAProjectionBehindItsRecordsStillDriftsLater(t *testing.T) {
 		t.Fatalf("Create: %v", err)
 	}
 
-	// Act: a record was added and nothing rebuilt, a day later.
-	drifted, err := brain.Drift(reload(t, root), reference.AddDate(0, 0, 1))
+	// Act: a record was added and nothing rebuilt.
+	drifted, err := brain.Drift(reload(t, root), brain.CheckPolicy{StaleAfterDays: 90})
 	if err != nil {
 		t.Fatalf("Drift: %v", err)
 	}

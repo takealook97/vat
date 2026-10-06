@@ -31,7 +31,7 @@ func buildGraph(t *testing.T, root string) graphDoc {
 	if err != nil {
 		t.Fatalf("Load: %v", err)
 	}
-	if _, err := brain.Build(store, reference); err != nil {
+	if _, err := brain.Build(store, brain.CheckPolicy{StaleAfterDays: 90}); err != nil {
 		t.Fatalf("Build: %v", err)
 	}
 	content, err := os.ReadFile(filepath.Join(root, "graph.json"))
@@ -91,8 +91,8 @@ date: 2026-08-01
 	graph := buildGraph(t, root)
 
 	// Assert
-	if graph.SchemaVersion != brain.SchemaVersion {
-		t.Errorf("graph schema_version = %d, want %d", graph.SchemaVersion, brain.SchemaVersion)
+	if graph.SchemaVersion != brain.GraphSchemaVersion {
+		t.Errorf("graph schema_version = %d, want %d", graph.SchemaVersion, brain.GraphSchemaVersion)
 	}
 	if len(graph.Nodes) == 0 {
 		t.Fatal("graph carries no nodes")

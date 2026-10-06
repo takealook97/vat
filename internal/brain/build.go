@@ -4,11 +4,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"path/filepath"
-	"regexp"
 	"slices"
 	"sort"
 	"strings"
-	"time"
 
 	"github.com/takealook97/vat/internal/fsx"
 )
@@ -31,7 +29,7 @@ type BuildResult struct {
 // repository readable as it grows. Detail accumulates in one file per fact;
 // the index stays a fixed-size entry point. Appending detail into a summary
 // instead produces a file nobody reads and an agent quotes the stale top of.
-func Build(store *Store, now time.Time) (BuildResult, error) {
+func Build(store *Store, policy CheckPolicy) (BuildResult, error) {
 	var result BuildResult
 
 	// Asked before anything is rendered. A projection vat did not write is
@@ -44,10 +42,10 @@ func Build(store *Store, now time.Time) (BuildResult, error) {
 	result.Skipped = foreign
 
 	renders := map[string][]byte{
-		CurrentFile: []byte(RenderCurrent(store, now)),
+		CurrentFile: []byte(RenderCurrent(store, policy)),
 		GraphFile:   nil,
 	}
-	graph, err := RenderGraph(store)
+	graph, err := RenderGraph(store, policy)
 	if err != nil {
 		return result, err
 	}
@@ -84,8 +82,8 @@ func Build(store *Store, now time.Time) (BuildResult, error) {
 
 // Drift returns the generated files whose on-disk content no longer matches
 // what the atomic records would produce.
-func Drift(store *Store, now time.Time) ([]string, error) {
-	graph, err := RenderGraph(store)
+func Drift(store *Store, policy CheckPolicy) ([]string, error) {
+	graph, err := RenderGraph(store, policy)
 	if err != nil {
 		return nil, err
 	}
@@ -114,16 +112,7 @@ func Drift(store *Store, now time.Time) ([]string, error) {
 		}
 		expected := graph
 		if name == CurrentFile {
-			// Rendered as of the day the file on disk says it was built, not
-			// today. CURRENT.md carries that date and an age in days per
-			// record, both from the clock, so comparing against a re-render
-			// made now reported drift on the first run of every new day for a
-			// repository nobody had touched — and `vat brain build` cleared it
-			// by rewriting the date, so it returned every night and was read as
-			// the projection being stale rather than as the check being wrong.
-			// Asking the question as of the file's own stamp leaves exactly one
-			// thing that can differ: the records.
-			expected = []byte(RenderCurrent(store, renderedAt(string(current), now)))
+			expected = []byte(RenderCurrent(store, policy))
 		}
 		// The same question the harness asks of its own generated files: a line
 		// ending is not drift, and reporting it as one gave a Windows checkout
@@ -136,55 +125,39 @@ func Drift(store *Store, now time.Time) ([]string, error) {
 	return drifted, nil
 }
 
-// rebuiltStamp matches the line RenderCurrent writes to date the projection.
-var rebuiltStamp = regexp.MustCompile(`(?m)^Rebuilt (\d{4}-\d{2}-\d{2})\.$`)
-
-// renderedAt reads the day a projection says it was built, falling back to the
-// given time when the line is missing or unreadable — an older projection, or
-// one edited by hand, is then compared as it always was rather than trusted.
-func renderedAt(content string, fallback time.Time) time.Time {
-	match := rebuiltStamp.FindStringSubmatch(content)
-	if match == nil {
-		return fallback
-	}
-	stamped, err := time.Parse("2006-01-02", match[1])
-	if err != nil {
-		return fallback
-	}
-	return stamped
-}
-
 // RenderCurrent produces the bounded entry point: enough to find the right
 // record, and deliberately not enough to answer from on its own.
-func RenderCurrent(store *Store, now time.Time) string {
+func RenderCurrent(store *Store, policy CheckPolicy) string {
 	var b strings.Builder
 	b.WriteString("# Current index\n\n")
 	b.WriteString(CurrentNotice + "\n\n")
 	b.WriteString("Start every question here. Find the identifiers that matter, then open only\n")
 	b.WriteString("those records. Reading the whole repository makes answers worse, not better:\n")
 	b.WriteString("superseded reasoning and current fact become indistinguishable.\n\n")
-	fmt.Fprintf(&b, "Rebuilt %s.\n\n", now.Format("2006-01-02"))
+	fmt.Fprintf(&b, "Observation window: %d days.\n\n", policy.StaleAfterDays)
+	b.WriteString("For current-state claims, compare the citable-until date with today before citing.\n")
+	b.WriteString("Stored status alone does not establish current citability.\n\n")
 
 	b.WriteString(renderCounts(store))
 	b.WriteString("\n")
 	b.WriteString(renderCanonicalViews(store.Root))
-	goals, _ := renderSection(store, KindGoal, "Goals", "GOAL.md", func(r Record) bool {
-		return !r.Status.Terminal()
+	goals, _ := renderSection(store, policy, KindGoal, "Goals", "GOAL.md", func(r Record) bool {
+		return !r.Status.Terminal() && (r.Status != StatusActive || projectionEligible(r))
 	})
 	b.WriteString(goals)
-	gaps, _ := renderSection(store, KindGap, "Open gaps", "GAP_ANALYSIS.md", func(r Record) bool {
-		return !r.Status.Terminal()
+	gaps, _ := renderSection(store, policy, KindGap, "Open gaps", "GAP_ANALYSIS.md", func(r Record) bool {
+		return !r.Status.Terminal() && (r.Status != StatusActive || projectionEligible(r))
 	})
 	b.WriteString(gaps)
-	decisions, shownDecisions := renderSection(store, KindDecision, "Active decisions", "DECISIONS.md",
+	decisions, shownDecisions := renderSection(store, policy, KindDecision, "Active decisions", "DECISIONS.md",
 		func(r Record) bool {
-			return r.Status == StatusActive || r.Status == StatusProvisional
+			return projectionEligible(r) || r.Status == StatusProvisional
 		})
 	b.WriteString(decisions)
-	b.WriteString(renderNewestDecisions(store, shownDecisions))
+	b.WriteString(renderNewestDecisions(store, shownDecisions, policy))
 
-	b.WriteString(renderAttention(store, now))
-	b.WriteString(renderRecentMemory(store))
+	b.WriteString(renderAttention(store, policy))
+	b.WriteString(renderRecentMemory(store, policy))
 
 	b.WriteString("\n## Reading contract\n\n")
 	b.WriteString("1. Locate identifiers here.\n")
@@ -272,7 +245,7 @@ func statusMeaning(status Status) string {
 	case StatusProvisional:
 		return "Recorded, not yet reviewed. Not citable as fact."
 	case StatusActive:
-		return "Reviewed and citable."
+		return "Reviewed; current-state claims also require an observation within the window."
 	case StatusStale:
 		return "Was true when observed; nobody has re-checked it since."
 	case StatusQuarantined:
@@ -298,7 +271,7 @@ const sectionLimit = 15
 
 // renderSection returns the rendered table and the records it listed, so a
 // caller can say what the ranking left out without ranking again.
-func renderSection(store *Store, kind Kind, heading, projection string, include func(Record) bool) (string, []Record) {
+func renderSection(store *Store, policy CheckPolicy, kind Kind, heading, projection string, include func(Record) bool) (string, []Record) {
 	records := make([]Record, 0)
 	for _, record := range store.OfKind(kind) {
 		if include(record) && !record.Archived {
@@ -317,11 +290,11 @@ func renderSection(store *Store, kind Kind, heading, projection string, include 
 		// they had just made concluded the index was stale rather than ranked.
 		b.WriteString("Ranked by how many records cite them.\n\n")
 	}
-	b.WriteString("| ID | Status | Title | Record |\n")
-	b.WriteString("| --- | --- | --- | --- |\n")
+	b.WriteString("| ID | Status | Citable until | Title | Record |\n")
+	b.WriteString("| --- | --- | --- | --- | --- |\n")
 	for _, record := range shown {
-		fmt.Fprintf(&b, "| `%s` | %s | %s | [%s](%s) |\n",
-			record.ID, record.Status, escapePipes(record.Title),
+		fmt.Fprintf(&b, "| `%s` | %s | %s | %s | [%s](%s) |\n",
+			record.ID, record.Status, citableUntil(record, policy), escapePipes(record.Title),
 			filepath.Base(record.Path), record.Path)
 	}
 	if remaining > 0 {
@@ -355,47 +328,77 @@ func mostDependedOn(store *Store, records []Record, limit int) ([]Record, int) {
 	return SortRecords(ranked[:limit]), len(records) - limit
 }
 
-func renderAttention(store *Store, now time.Time) string {
-	type item struct {
-		record Record
-		age    int
-	}
-	var items []item
+func renderAttention(store *Store, policy CheckPolicy) string {
+	var records []Record
 	for _, record := range store.WorkingSet() {
-		switch record.Status {
-		case StatusStale, StatusQuarantined, StatusProvisional:
-			age, _ := record.AgeDays(now)
-			items = append(items, item{record: record, age: age})
+		if record.Status == StatusStale || record.Status == StatusQuarantined || record.Status == StatusProvisional || (record.Status == StatusActive && !projectionEligible(record)) {
+			records = append(records, record)
 		}
 	}
-	if len(items) == 0 {
+	if len(records) == 0 {
 		return ""
 	}
-	sort.SliceStable(items, func(i, j int) bool { return items[i].age > items[j].age })
+	// Oldest observations come first without introducing a build clock.
+	sort.SliceStable(records, func(i, j int) bool {
+		left, _ := records[i].ObservedDate()
+		right, _ := records[j].ObservedDate()
+		return left.Before(right)
+	})
 	remaining := 0
-	if len(items) > sectionLimit {
-		remaining = len(items) - sectionLimit
-		items = items[:sectionLimit]
+	if len(records) > sectionLimit {
+		remaining = len(records) - sectionLimit
+		records = records[:sectionLimit]
 	}
-
 	var b strings.Builder
 	b.WriteString("\n## Needs attention\n\n")
 	b.WriteString("These are not answers. Re-verify or retire them.\n\n")
-	b.WriteString("| ID | Status | Age (days) | Record |\n")
-	b.WriteString("| --- | --- | --- | --- |\n")
-	for _, entry := range items {
-		age := "unknown"
-		if _, ok := entry.record.ObservedDate(); ok {
-			age = fmt.Sprintf("%d", entry.age)
+	b.WriteString("| ID | Status | Observed | Citable until | Record | Reason |\n")
+	b.WriteString("| --- | --- | --- | --- | --- | --- |\n")
+	for _, record := range records {
+		observed := "unknown"
+		if date, ok := record.ObservedDate(); ok {
+			observed = date.Format("2006-01-02")
 		}
-		fmt.Fprintf(&b, "| `%s` | %s | %s | [%s](%s) |\n",
-			entry.record.ID, entry.record.Status, age,
-			filepath.Base(entry.record.Path), entry.record.Path)
+		reason := ""
+		if record.Status == StatusActive && !projectionEligible(record) {
+			reason = "observation date missing or unreadable"
+		}
+		fmt.Fprintf(&b, "| `%s` | %s | %s | %s | [%s](%s) | %s |\n", record.ID, record.Status, observed, citableUntil(record, policy), filepath.Base(record.Path), record.Path, reason)
 	}
 	if remaining > 0 {
 		fmt.Fprintf(&b, "\n%d more waiting on review. The full queue: `vat brain review`.\n", remaining)
 	}
 	return b.String()
+}
+
+// projectionEligible checks only record fields; live readers apply the age test.
+func projectionEligible(record Record) bool {
+	if record.Status != StatusActive {
+		return false
+	}
+	if !record.IsCurrentStateClaim() {
+		return true
+	}
+	_, ok := record.ObservedDate()
+	return ok
+}
+
+func citableUntil(record Record, policy CheckPolicy) string {
+	if !record.IsCurrentStateClaim() {
+		return ""
+	}
+	observed, ok := record.ObservedDate()
+	if !ok {
+		return ""
+	}
+	return observed.AddDate(0, 0, policy.StaleAfterDays).Format("2006-01-02")
+}
+
+func expirySuffix(record Record, policy CheckPolicy) string {
+	if until := citableUntil(record, policy); until != "" {
+		return " (citable until " + until + ")"
+	}
+	return ""
 }
 
 // recencyLimit is how many newly recorded decisions the index names beside the
@@ -409,7 +412,7 @@ const recencyLimit = 5
 // a decision taken yesterday is cited by nothing yet, so ranking can only hide
 // it. Reaching for the newest decision and not finding it is how a generated
 // index gets read as stale and then stops being read.
-func renderNewestDecisions(store *Store, shown []Record) string {
+func renderNewestDecisions(store *Store, shown []Record, policy CheckPolicy) string {
 	listed := map[string]bool{}
 	for _, record := range shown {
 		listed[record.ID] = true
@@ -419,7 +422,7 @@ func renderNewestDecisions(store *Store, shown []Record) string {
 		if record.Archived || listed[record.ID] {
 			continue
 		}
-		if record.Status == StatusActive || record.Status == StatusProvisional {
+		if projectionEligible(record) || record.Status == StatusProvisional {
 			candidates = append(candidates, record)
 		}
 	}
@@ -438,20 +441,26 @@ func renderNewestDecisions(store *Store, shown []Record) string {
 	b.WriteString("\n## Newest decisions\n\n")
 	b.WriteString("Recorded most recently, and not yet cited enough to rank above.\n\n")
 	for _, record := range SortRecords(candidates) {
-		fmt.Fprintf(&b, "- `%s` [%s](%s)\n", record.ID, escapePipes(record.Title), record.Path)
+		fmt.Fprintf(&b, "- `%s` [%s](%s)%s\n", record.ID, escapePipes(record.Title), record.Path, expirySuffix(record, policy))
 	}
 	return b.String()
 }
 
-func renderRecentMemory(store *Store) string {
-	memories := store.RecentMemories(7)
+func renderRecentMemory(store *Store, policy CheckPolicy) string {
+	eligible := &Store{Root: store.Root}
+	for _, record := range store.Records {
+		if record.Status != StatusActive || projectionEligible(record) {
+			eligible.Records = append(eligible.Records, record)
+		}
+	}
+	memories := eligible.RecentMemories(7)
 	if len(memories) == 0 {
 		return ""
 	}
 	var b strings.Builder
 	b.WriteString("\n## Recent observations\n\n")
 	for _, record := range memories {
-		fmt.Fprintf(&b, "- [%s](%s)\n", escapePipes(record.Title), record.Path)
+		fmt.Fprintf(&b, "- [%s](%s)%s\n", escapePipes(record.Title), record.Path, expirySuffix(record, policy))
 	}
 	return b.String()
 }
@@ -460,17 +469,21 @@ func escapePipes(text string) string {
 	return strings.ReplaceAll(strings.TrimSpace(text), "|", `\|`)
 }
 
+// GraphSchemaVersion changes when consumers must interpret node fields differently.
+const GraphSchemaVersion = 2
+
 // GraphNode is one record in the exported knowledge graph.
 type GraphNode struct {
-	ID        string   `json:"id"`
-	Kind      Kind     `json:"kind"`
-	Status    Status   `json:"status"`
-	Title     string   `json:"title"`
-	Path      string   `json:"path"`
-	OwnedBy   string   `json:"owned_by,omitempty"`
-	SourceRef string   `json:"source_ref,omitempty"`
-	Observed  string   `json:"observed_at,omitempty"`
-	Refs      []string `json:"refs,omitempty"`
+	CitableUntil string   `json:"citable_until,omitempty"`
+	ID           string   `json:"id"`
+	Kind         Kind     `json:"kind"`
+	Status       Status   `json:"status"`
+	Title        string   `json:"title"`
+	Path         string   `json:"path"`
+	OwnedBy      string   `json:"owned_by,omitempty"`
+	SourceRef    string   `json:"source_ref,omitempty"`
+	Observed     string   `json:"observed_at,omitempty"`
+	Refs         []string `json:"refs,omitempty"`
 	// ContentHash is Record.ContentHash, published.
 	//
 	// Never omitted when empty: an absent field would be indistinguishable from
@@ -489,13 +502,9 @@ type GraphEdge struct {
 
 // Graph is the exported projection of the record relations.
 type Graph struct {
-	Generated string `json:"generated_by"`
-	// SchemaVersion is the record contract this build implements, which is not
-	// necessarily the one the marker declares: a brain written by an older vat
-	// keeps its marker until something rewrites it, and the graph is rewritten
-	// on every build. A reader that does not recognise the value knows the
-	// field meanings may have moved under it, which is the one thing a consumer
-	// outside this repository cannot find out any other way.
+	Generated      string `json:"generated_by"`
+	StaleAfterDays int    `json:"stale_after_days"`
+	// SchemaVersion distinguishes consumers that understand read-time citability.
 	SchemaVersion int         `json:"schema_version"`
 	Nodes         []GraphNode `json:"nodes"`
 	Edges         []GraphEdge `json:"edges"`
@@ -504,11 +513,14 @@ type Graph struct {
 // RenderGraph serialises the record relations. The graph is a projection for
 // navigation, never a source of truth: if it disagrees with the Markdown, the
 // Markdown wins and the graph is rebuilt.
-func RenderGraph(store *Store) ([]byte, error) {
-	graph := Graph{Generated: "vat brain build", SchemaVersion: SchemaVersion}
+func RenderGraph(store *Store, policy CheckPolicy) ([]byte, error) {
+	graph := Graph{
+		Generated: "vat brain build", SchemaVersion: GraphSchemaVersion,
+		StaleAfterDays: policy.StaleAfterDays,
+	}
 	for _, record := range SortRecords(store.Records) {
 		graph.Nodes = append(graph.Nodes, GraphNode{
-			ID: record.ID, Kind: record.Kind, Status: record.Status,
+			ID: record.ID, Kind: record.Kind, Status: record.Status, CitableUntil: citableUntil(record, policy),
 			Title: record.Title, Path: record.Path, OwnedBy: record.OwnedBy,
 			SourceRef: record.SourceRef, Observed: record.ObservedAt, Refs: record.Refs,
 			ContentHash: record.ContentHash,
