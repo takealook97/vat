@@ -6,6 +6,8 @@ Notable changes to `vat`. The format follows
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-10-06
+
 ### Upgrading to 0.7.0
 
 - Configure git `user.name` and `user.email` in the brain repository and remove
