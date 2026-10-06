@@ -584,9 +584,9 @@ unset identity (including unavailable git) removes any earlier `reviewed_by` so
 the new promotion is not attributed to an earlier reviewer. Identity cannot be
 supplied as a flag. Under `agent`, every non-goal record needs a source pin
 with a path whose file exists at the revision being recorded; current-state
-claims also require a readable source HEAD, including with `--reverified`. Non-
-goal `source_external` records and sources outside `vat.yaml` cannot be agent-
-promoted because their pinned evidence cannot be checked. Under every gate,
+claims also require a readable source HEAD, including with `--reverified`.
+Non-goal `source_external` records and sources outside `vat.yaml` cannot be
+agent-promoted because their pinned evidence cannot be checked. Under every gate,
 non-current-state records retain their original pin even with `--reverified`;
 the agent gate checks the path at that pin without comparing it with HEAD.
 Goals use the manual conditions even under `agent`.

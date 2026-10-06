@@ -330,20 +330,19 @@ unset identity is omitted. `brain new` records optional `recorded_by` from the
 same git configuration, and permits creation without it.
 
 Version 0.7.0 deliberately revises the model to allow agent promotion after
-separate review. Set `policy.gates.brain_promote: agent` to require every non-
-goal record, including decisions and historical memories, to have `source_ref:
+separate review. Set `policy.gates.brain_promote: agent` to require every
+non-goal record, including decisions and historical memories, to have `source_ref:
 <repo>@<revision>:<path>` whose file exists at the pinned revision. A repo-only
 pin is insufficient. Current-state claims require a readable source repository
 HEAD, including with `--reverified`. Non-goal `source_external` records and
 sources outside `vat.yaml` cannot be agent-promoted because their pinned
 evidence cannot be checked. For current-state claims, unchanged pinned evidence
-allows promotion without that flag; moved evidence requires re-reading and re-
-verification. Under every gate, non-current-state records keep their original
+allows promotion without that flag; moved evidence requires re-reading and
+re-verification. Under every gate, non-current-state records keep their original
 evidence pin even with `--reverified`; the agent gate checks the path at that
 revision without comparing the pin with HEAD. Goals behave as under `manual`;
 the [`keep-the-brain-current`
-procedure](../examples/workspace/.agents/skills/keep-the-brain-
-current/SKILL.md) excludes them, since git identity cannot distinguish people
+procedure](../examples/workspace/.agents/skills/keep-the-brain-current/SKILL.md) excludes them, since git identity cannot distinguish people
 from agents. Agent output still enters `provisional`, and a different model
 family must judge the evidence before the agent acts.
 

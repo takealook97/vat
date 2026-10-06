@@ -286,3 +286,31 @@ func TestAgentPromotionRefusesSourcesOutsideWorkspace(t *testing.T) {
 		})
 	}
 }
+
+// A historical record is checked at its pin, never against HEAD, so a missing
+// clone reached the file lookup and was reported as a file the repository did
+// not hold — sending the reader to evidence that was fine.
+func TestAgentPromotionNamesAnUnreadableRepositoryAsSuch(t *testing.T) {
+	// Arrange
+	isolateGitIdentity(t)
+	h := brainFixture(t, "payments")
+	git(t, h.path("brain"), "config", "user.name", "Fixture Author")
+	git(t, h.path("brain"), "config", "user.email", "author@example.com")
+	manifest := readFile(t, h.path("vat.yaml"))
+	writeFile(t, h.path("vat.yaml"), strings.Replace(manifest, "brain_promote: manual", "brain_promote: agent", 1))
+	h.mustRun("brain", "new", "decision", "--title", "Pinned decision", "--claim", "historical", "--owner", "payments", "--source-path", "README.md")
+	if err := os.Rename(h.path("payments"), h.path("payments-moved")); err != nil {
+		t.Fatal(err)
+	}
+
+	// Act
+	code, output := h.run("brain", "promote", "D-0001")
+
+	// Assert
+	if code != ExitFindings || !strings.Contains(output, "could not read payments") {
+		t.Fatalf("want an unreadable-repository refusal, got %d %s", code, output)
+	}
+	if strings.Contains(output, "does not hold") {
+		t.Fatalf("a missing clone was reported as a missing file: %s", output)
+	}
+}

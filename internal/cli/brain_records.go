@@ -315,6 +315,11 @@ func checkAgentSourcePath(ctx context.Context, ws *workspace.Workspace, record b
 	if !ok || record.SourceExternal {
 		return fmt.Errorf("%s: agent promotion requires evidence in a governed source repository", record.ID)
 	}
+	// A missing clone is not a missing file. Reporting it as one sends the
+	// reader to re-check evidence that is fine instead of to the repository.
+	if !gitx.IsRepository(ws.RepoPath(repo)) {
+		return fmt.Errorf("%s: vat could not read %s to confirm the evidence", record.ID, owner)
+	}
 	if _, err := gitx.FileAtRevision(ctx, ws.RepoPath(repo), revision, path); err != nil {
 		return fmt.Errorf("%s: %s does not hold %s at %s", record.ID, owner, path, shortRevision(revision))
 	}
