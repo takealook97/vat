@@ -6,6 +6,13 @@ Notable changes to `vat`. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- `vat brain review --json` drift rows carry structured `evidence`: the
+  repository, pinned revision, optional source path, and observed HEAD revision.
+  Unresolvable pins are marked with `pin_unresolvable: true`. Queue rows omit
+  evidence; explanations, human output, and record statuses are unchanged.
+
 ### Fixed
 
 - Brain query applies the observation window when deciding whether active

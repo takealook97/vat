@@ -522,6 +522,14 @@ claim becoming false, so listing it here is not demoting it; `source` in the
 `--json` output is `queue` or `drift` so a consumer can route each to the work
 it actually needs.
 
+Drift rows additionally carry an `evidence` object with `repo`,
+`pinned_revision` (the recorded pin, including any abbreviation),
+`head_revision` (the full HEAD revision observed during the check), and
+`source_path` when a file was pinned. If the pin no longer resolves,
+`pin_unresolvable: true` is included; HEAD is still captured when readable,
+or is an empty string when unavailable. Queue rows omit `evidence`.
+This is an additive JSON field; `why` and human output are unchanged.
+
 `check` ends with the commands that clear the findings needing no judgement,
 and how many of them each clears. The remedy is named on every finding line too,
 but the states these rules report accumulate — a workspace measured while

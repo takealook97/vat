@@ -245,6 +245,13 @@ its source re-read — `G-0009` above is still `active` and still citable, becau
 a revision moving is not a claim becoming false. `--drifted` narrows to those,
 and under `--json` the `source` field is `queue` or `drift`.
 
+JSON drift rows include `evidence` with `repo`, `pinned_revision`,
+`head_revision`, and an optional `source_path`, so an agent can re-read the
+source at the observed HEAD without parsing `why`. A pin that no longer
+resolves includes `pin_unresolvable: true`; HEAD remains available when
+readable, or is an empty string otherwise. Queue rows omit `evidence`.
+The recorded pin may be abbreviated; HEAD is a full revision.
+
 Drift used to be reported only by `vat lint`, whose remedy line named this
 command — which could not show it. A workspace measured while that was true ran
 46 drifted claims against a review queue of eleven, with no overlap.

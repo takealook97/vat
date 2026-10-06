@@ -1,11 +1,115 @@
 package cli
 
 import (
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 )
+
+func TestReviewJSONCarriesEvidenceForReverification(t *testing.T) {
+	for _, sourcePath := range []string{"README.md", ""} {
+		t.Run("path="+sourcePath, func(t *testing.T) {
+			h := brainFixture(t, "payments")
+			pinned := gitOutput(t, h.path("payments"), "rev-parse", "HEAD")
+			args := []string{"brain", "new", "gap", "--title", "Ordering is not retry-safe",
+				"--claim", "current-state", "--owner", "payments"}
+			if sourcePath != "" {
+				args = append(args, "--source-path", sourcePath)
+			}
+			h.mustRun(args...)
+			h.mustRun("brain", "promote", "G-0001", "--reviewer", "alex")
+			if err := os.WriteFile(filepath.Join(h.path("payments"), "README.md"), []byte("# rewritten\n"), 0o644); err != nil {
+				t.Fatal(err)
+			}
+			git(t, h.path("payments"), "add", "-A")
+			git(t, h.path("payments"), "commit", "--quiet", "-m", "rewrite notes")
+			head := gitOutput(t, h.path("payments"), "rev-parse", "HEAD")
+
+			var items []struct {
+				ID       string            `json:"id"`
+				Why      string            `json:"why"`
+				Evidence map[string]string `json:"evidence"`
+			}
+			if code := h.runJSON(&items, "brain", "review", "--drifted"); code != ExitOK {
+				t.Fatalf("review exited %d", code)
+			}
+			if len(items) != 1 || items[0].ID != "G-0001" {
+				t.Fatalf("review items = %+v", items)
+			}
+			evidence := items[0].Evidence
+			if evidence["repo"] != "payments" || evidence["pinned_revision"] != pinned || evidence["head_revision"] != head || head == pinned {
+				t.Errorf("evidence = %+v; want payments pinned %s, head %s", evidence, pinned, head)
+			}
+			path, present := evidence["source_path"]
+			if path != sourcePath || present != (sourcePath != "") {
+				t.Errorf("source_path = %q (present %v); want %q", path, present, sourcePath)
+			}
+			if items[0].Why == "" {
+				t.Error("drift explanation was lost")
+			}
+		})
+	}
+}
+
+func TestReviewJSONOmitsEvidenceForQueueItems(t *testing.T) {
+	h := brainFixture(t, "payments")
+	h.mustRun("brain", "new", "decision", "--title", "Orders own idempotency keys")
+	var items []map[string]json.RawMessage
+	if code := h.runJSON(&items, "brain", "review"); code != ExitOK {
+		t.Fatalf("review exited %d", code)
+	}
+	if len(items) != 1 {
+		t.Fatalf("review items = %+v", items)
+	}
+	if _, present := items[0]["evidence"]; present {
+		t.Errorf("queue item has evidence: %s", items[0]["evidence"])
+	}
+}
+
+func TestReviewJSONKeepsHeadWhenThePinNoLongerResolves(t *testing.T) {
+	h := brainFixture(t, "payments")
+	driftedClaim(t, h, "payments")
+	path := findRecord(t, h, "G-0001")
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	const missing = "0123456789abcdef0123456789abcdef01234567"
+	lines := strings.Split(string(data), "\n")
+	for i, line := range lines {
+		if strings.HasPrefix(line, "source_ref:") {
+			lines[i] = "source_ref: payments@" + missing + ":README.md"
+		}
+	}
+	if err := os.WriteFile(path, []byte(strings.Join(lines, "\n")), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	var items []struct {
+		Why      string `json:"why"`
+		Evidence struct {
+			Repo            string `json:"repo"`
+			PinnedRevision  string `json:"pinned_revision"`
+			SourcePath      string `json:"source_path"`
+			HeadRevision    string `json:"head_revision"`
+			PinUnresolvable bool   `json:"pin_unresolvable"`
+		} `json:"evidence"`
+	}
+	if code := h.runJSON(&items, "brain", "review", "--drifted"); code != ExitOK {
+		t.Fatalf("review exited %d", code)
+	}
+	if len(items) != 1 {
+		t.Fatalf("review items = %+v", items)
+	}
+	evidence := items[0].Evidence
+	if !evidence.PinUnresolvable || evidence.PinnedRevision != missing || evidence.HeadRevision != headOf(t, h, "payments") || evidence.Repo != "payments" || evidence.SourcePath != "README.md" {
+		t.Errorf("unresolvable evidence = %+v", evidence)
+	}
+	if !strings.Contains(items[0].Why, "no longer resolves") {
+		t.Errorf("why = %q", items[0].Why)
+	}
+}
 
 // The drift rule's fix line used to say `vat brain review`, and the queue it
 // named holds provisional, stale, and quarantined records — never an active

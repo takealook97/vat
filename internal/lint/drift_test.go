@@ -2,6 +2,7 @@ package lint_test
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -137,6 +138,27 @@ func TestAPinnedFileThatChangedIsDriftAndSaysSo(t *testing.T) {
 	}
 	if strings.Contains(finding.Message, "has moved 2 commits") {
 		t.Errorf("message = %q; it counts the repository's movement rather than the file's", finding.Message)
+	}
+	if finding.SourceDrift == nil || finding.SourceDrift.Repo != "payments" || finding.SourceDrift.PinnedRevision != base || finding.SourceDrift.SourcePath != "docs/ordering.md" || finding.SourceDrift.PinUnresolvable {
+		t.Fatalf("drift evidence = %+v", finding.SourceDrift)
+	}
+	head, err := gitx.HeadRevision(context.Background(), repo)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if finding.SourceDrift.HeadRevision != head {
+		t.Errorf("evidence head = %q; want %q", finding.SourceDrift.HeadRevision, head)
+	}
+	data, err := json.Marshal(finding)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var fields map[string]json.RawMessage
+	if err := json.Unmarshal(data, &fields); err != nil {
+		t.Fatal(err)
+	}
+	if len(fields) != 5 {
+		t.Errorf("lint finding JSON gained a field: %s", data)
 	}
 }
 

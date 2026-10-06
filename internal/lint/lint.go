@@ -45,6 +45,17 @@ type Finding struct {
 	Fix      string   `json:"fix,omitempty"`
 	// Fixable marks a finding `vat lint --fix` can repair without judgement.
 	Fixable bool `json:"fixable,omitempty"`
+	// SourceDrift shares the rule's evidence with review without changing lint JSON.
+	SourceDrift *SourceDrift `json:"-"`
+}
+
+// SourceDrift is the evidence observed when a source revision finding is made.
+type SourceDrift struct {
+	Repo            string
+	PinnedRevision  string
+	SourcePath      string
+	HeadRevision    string
+	PinUnresolvable bool
 }
 
 // Report is a whole lint run.
@@ -643,15 +654,20 @@ func checkSourceRevisions(ctx context.Context, ws *workspace.Workspace, store *b
 		if !gitx.IsRepository(dir) {
 			continue
 		}
+		head, headErr := gitx.HeadRevision(ctx, dir)
+		evidence := SourceDrift{
+			Repo: repoName, PinnedRevision: revision, SourcePath: sourcePath, HeadRevision: head,
+		}
 		if !gitx.RevisionExists(ctx, dir, revision) {
+			evidence.PinUnresolvable = true
 			findings = append(findings, Finding{
 				Rule: RuleSourceRevisionDrift, Severity: SeverityWarn, Subject: record.ID,
-				Message: fmt.Sprintf("source revision %s no longer resolves in %s", short(revision), repoName),
+				Message:     fmt.Sprintf("source revision %s no longer resolves in %s", short(revision), repoName),
+				SourceDrift: &evidence,
 			})
 			continue
 		}
-		head, err := gitx.HeadRevision(ctx, dir)
-		if err != nil || brain.SameRevision(revision, head) {
+		if headErr != nil || brain.SameRevision(revision, head) {
 			continue
 		}
 		count, err := gitx.CommitsBetween(ctx, dir, revision, head)
@@ -676,7 +692,8 @@ func checkSourceRevisions(ctx context.Context, ws *workspace.Workspace, store *b
 				Rule: RuleSourceRevisionDrift, Severity: SeverityWarn, Subject: record.ID,
 				Message: fmt.Sprintf("%s:%s changed since this was observed at %s; re-check, do not assume it broke",
 					repoName, sourcePath, short(revision)),
-				Fix: reverifyHint(record.ID, repoName+":"+sourcePath),
+				Fix:         reverifyHint(record.ID, repoName+":"+sourcePath),
+				SourceDrift: &evidence,
 			})
 			continue
 		}
@@ -684,7 +701,8 @@ func checkSourceRevisions(ctx context.Context, ws *workspace.Workspace, store *b
 			Rule: RuleSourceRevisionDrift, Severity: SeverityWarn, Subject: record.ID,
 			Message: fmt.Sprintf("%s has moved %d %s since this was observed at %s; re-check, do not assume it broke",
 				repoName, count, plural(count, "commit", "commits"), short(revision)),
-			Fix: reverifyHint(record.ID, repoName),
+			Fix:         reverifyHint(record.ID, repoName),
+			SourceDrift: &evidence,
 		})
 	}
 	return findings

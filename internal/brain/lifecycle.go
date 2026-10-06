@@ -74,22 +74,39 @@ const (
 	ReviewFromDrift ReviewSource = "drift"
 )
 
+// DriftEvidence identifies the source to re-read, without requiring this
+// package to know how the caller resolved repository revisions.
+type DriftEvidence struct {
+	Repo            string `json:"repo"`
+	PinnedRevision  string `json:"pinned_revision"`
+	SourcePath      string `json:"source_path,omitempty"`
+	HeadRevision    string `json:"head_revision"`
+	PinUnresolvable bool   `json:"pin_unresolvable,omitempty"`
+}
+
+// DriftClaim couples the existing explanation with its mechanical evidence.
+type DriftClaim struct {
+	Why      string
+	Evidence DriftEvidence
+}
+
 // ReviewItem is one entry in the prioritised re-check queue.
 type ReviewItem struct {
-	Source     ReviewSource `json:"source"`
-	ID         string       `json:"id"`
-	Path       string       `json:"path"`
-	Status     Status       `json:"status"`
-	Title      string       `json:"title"`
-	AgeDays    int          `json:"age_days"`
-	References int          `json:"references"`
-	Priority   int          `json:"priority"`
-	Overdue    bool         `json:"overdue"`
-	Why        string       `json:"why"`
+	Source     ReviewSource   `json:"source"`
+	ID         string         `json:"id"`
+	Path       string         `json:"path"`
+	Status     Status         `json:"status"`
+	Title      string         `json:"title"`
+	AgeDays    int            `json:"age_days"`
+	References int            `json:"references"`
+	Priority   int            `json:"priority"`
+	Overdue    bool           `json:"overdue"`
+	Why        string         `json:"why"`
+	Evidence   *DriftEvidence `json:"evidence,omitempty"`
 }
 
 // DriftItems builds queue entries for active claims whose evidence has moved,
-// given the reason for each by record ID.
+// given the reason and evidence for each by record ID.
 //
 // The caller supplies the reasons because answering "has this evidence moved"
 // needs git, and this package deliberately cannot see it. What belongs here is
@@ -100,11 +117,11 @@ type ReviewItem struct {
 // The record's status is not touched. A revision moving is not a claim becoming
 // false, and demoting on drift would remove an answer because somebody fixed a
 // typo in the owning repository.
-func DriftItems(store *Store, reasons map[string]string, now time.Time) []ReviewItem {
+func DriftItems(store *Store, reasons map[string]DriftClaim, now time.Time) []ReviewItem {
 	references := store.ReferenceCounts()
 	items := make([]ReviewItem, 0, len(reasons))
 	for _, record := range store.CurrentStateClaims() {
-		why, drifted := reasons[record.ID]
+		claim, drifted := reasons[record.ID]
 		if !drifted || record.Status != StatusActive {
 			continue
 		}
@@ -115,7 +132,8 @@ func DriftItems(store *Store, reasons map[string]string, now time.Time) []Review
 			ID:     record.ID, Path: record.Path, Status: record.Status, Title: record.Title,
 			AgeDays: age, References: count,
 			Priority: priorityOf(record.Status, age, count),
-			Why:      why,
+			Why:      claim.Why,
+			Evidence: &claim.Evidence,
 		})
 	}
 	return items
