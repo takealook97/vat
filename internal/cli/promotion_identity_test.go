@@ -12,9 +12,18 @@ import (
 func isolateGitIdentity(t *testing.T) {
 	t.Helper()
 	empty := filepath.Join(t.TempDir(), "gitconfig")
-	writeFile(t, empty, "")
+	// useConfigOnly stops git guessing an identity from the account, which
+	// macOS does and Linux and Windows CI do not, so every platform runs these
+	// tests under the same rule.
+	writeFile(t, empty, "[user]\n\tuseConfigOnly = true\n")
 	t.Setenv("GIT_CONFIG_GLOBAL", empty)
 	t.Setenv("GIT_CONFIG_NOSYSTEM", "1")
+	// Fixtures still commit. The environment supplies an author for those
+	// commits while leaving the git config that promotion reads empty.
+	t.Setenv("GIT_AUTHOR_NAME", "fixture")
+	t.Setenv("GIT_AUTHOR_EMAIL", "fixture@example.com")
+	t.Setenv("GIT_COMMITTER_NAME", "fixture")
+	t.Setenv("GIT_COMMITTER_EMAIL", "fixture@example.com")
 }
 
 func TestBrainRecordsUseLocalGitAuthor(t *testing.T) {
