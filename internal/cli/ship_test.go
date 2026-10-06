@@ -283,7 +283,7 @@ func TestOnlyAWaivedCloseIsReportedAsUnlanded(t *testing.T) {
 	stripLandingEvidence(t, h, "CS-0002")
 
 	// Act
-	_, output := h.run("lint")
+	_, output := h.run("lint", "--only", "changeset/closed-unlanded")
 
 	// Assert
 	if !strings.Contains(output, "CS-0001") {

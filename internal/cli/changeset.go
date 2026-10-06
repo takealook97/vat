@@ -20,7 +20,7 @@ func changesetCommand() *Command {
 	return &Command{
 		Name:    "changeset",
 		Summary: "Record the evidence for a change that spans several repositories",
-		Usage:   "vat changeset <new|add|verify|show|list|close|abandon|undo-plan>",
+		Usage:   "vat changeset <new|add|verify|show|list|close|record|abandon|undo-plan>",
 		Long: `Pay back the cost of choosing many repositories over one.
 
 Separate repositories mean a cross-cutting change is several commits with no
@@ -45,6 +45,7 @@ end-to-end outcome that proves the pieces work together.`,
 			changesetShowCommand(),
 			changesetListCommand(),
 			changesetCloseCommand(),
+			changesetRecordCommand(),
 			changesetAbandonCommand(),
 			changesetUndoPlanCommand(),
 		},

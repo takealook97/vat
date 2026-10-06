@@ -580,6 +580,36 @@ the change completes: after the change lands it can no longer be observed.
 A generated return plan **MUST** be ordered in reverse enrolment order, so no
 window exists in which a consumer expects an interface that is already gone.
 
+Only open or verified changesets **MAY** transition to closed. Closing a closed,
+abandoned, or rolled-back changeset **MUST** be refused as a usage error naming
+the status, regardless of flags, without writing.
+
+### 6.4 Knowledge produced
+
+`decisions` is an optional list of brain record identifiers linking the reasoning
+that authorised the work, set when the changeset is created. `knowledge` is a
+separate optional list of identifiers linking records the work produced, set
+by `record --knowledge` or `close --knowledge`. Appending knowledge links **MUST**
+preserve existing knowledge, remove duplicates, and leave `decisions` unchanged.
+When the workspace declares a brain, each newly linked knowledge identifier
+**MUST** resolve to an existing record; implementations **MUST** report every
+unresolved identifier before writing.
+
+`no_record_reason` is an optional string explaining why no knowledge record was
+produced. Recording knowledge **MUST** clear this reason. An attempt to record a
+no-record reason when knowledge already exists **MUST** be refused as a usage
+error naming the existing identifiers, without writing. A closed changeset with
+neither knowledge links nor a non-empty reason **SHOULD** be reported as a warning;
+authorising decision links alone do not satisfy this requirement. Knowledge
+links or a reason **MAY** be added to an open, verified, or closed changeset
+without changing its objective, acceptance, or completion evidence. An abandoned
+or rolled-back changeset **MUST NOT** accept such updates.
+
+This is an additive extension of the version 1 completion record in v0.7.0.
+Older readers reject unknown fields and refuse records carrying `knowledge` or
+`no_record_reason`. Every reader of the workspace must upgrade to v0.7.0 before
+anyone writes either field.
+
 ### 6.5 The control plane as a participant
 
 `repositories[].name` names a repository in the manifest, with one exception:

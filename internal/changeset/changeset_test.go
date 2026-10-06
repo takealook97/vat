@@ -344,3 +344,36 @@ func TestTheOpenDateVatWritesIsAccepted(t *testing.T) {
 		t.Errorf("a changeset vat just created does not validate: %v", problems)
 	}
 }
+
+func TestKnowledgeUpdatesDoNotMutateExistingLinksAndRoundTripTheReason(t *testing.T) {
+	original := changeset.New("CS-0001", "Move cancellation", reference)
+	original.Knowledge = make([]string, 1, 5)
+	original.Knowledge[0] = "D-0001"
+	updated := changeset.WithKnowledge(original, []string{"D-0001", "D-0002", "D-0002"}, "")
+	if strings.Join(updated.Knowledge, ",") != "D-0001,D-0002" {
+		t.Fatalf("decisions = %v", updated.Knowledge)
+	}
+	updated.Knowledge[0] = "D-0003"
+	if original.Knowledge[0] != "D-0001" || len(original.Knowledge) != 1 {
+		t.Fatal("original decisions mutated")
+	}
+	reasoned := changeset.WithKnowledge(changeset.New("CS-0001", "Move cancellation", reference), nil, "Mechanical rename")
+	recorded := changeset.WithKnowledge(reasoned, []string{"D-0001"}, "")
+	if recorded.NoRecordReason != "" || reasoned.NoRecordReason == "" {
+		t.Fatal("recording knowledge did not clear only the copied reason")
+	}
+	if original.NoRecordReason != "" {
+		t.Fatal("original reason mutated")
+	}
+	root := t.TempDir()
+	if err := changeset.Save(root, reasoned); err != nil {
+		t.Fatal(err)
+	}
+	loaded, err := changeset.Load(root, reasoned.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if loaded.NoRecordReason != reasoned.NoRecordReason || len(loaded.Knowledge) != 0 {
+		t.Fatalf("knowledge lost: %+v", loaded)
+	}
+}

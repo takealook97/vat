@@ -6,6 +6,38 @@ Notable changes to `vat`. The format follows
 
 ## [Unreleased]
 
+### Upgrading
+
+- Before anyone writes `knowledge` or `no_record_reason`, upgrade every reader
+  of the workspace to v0.7.0. Older vat versions reject unknown fields with
+  `field knowledge not found in type changeset.Changeset` or
+  `field no_record_reason not found in type changeset.Changeset`; commands such
+  as `lint` and `changeset show` then fail to read the records.
+- Closed changesets from before this release warn under
+  `changeset/closed-unrecorded` until their knowledge or a reason is recorded.
+  Run `vat changeset record <id> --knowledge <ids>` or
+  `vat changeset record <id> --no-record "<reason>"` once for each changeset.
+  Authorising `decisions` links alone do not satisfy the rule. These are
+  warnings; `lint` still exits 0 when there are no errors.
+
+### Added
+
+- `vat changeset record` links the knowledge a change produced with
+  `--knowledge <ids>`, including after closing, or records `--no-record` with a
+  reason. `close` accepts the same optional flags; produced links are stored in
+  `knowledge`, de-duplicated and
+  resolved against a declared brain. Authorising `decisions` remain separate.
+  Recording knowledge clears the no-record reason; `--no-record` is refused
+  once knowledge exists. `show` displays each separately.
+- `changeset/closed-unrecorded` warns when a closed changeset has neither
+  knowledge links nor a reason for producing no knowledge record.
+
+### Fixed
+
+- `vat changeset close` refuses closed, abandoned, and rolled-back changesets
+  with usage exit code 2 naming the status, even with `--force` or knowledge
+  flags, without changing the record.
+
 ## [0.6.5] - 2026-09-26
 
 ### Changed

@@ -87,7 +87,39 @@ same as the pieces working together, and that gap is exactly where
 multi-repository changes break. Closing without naming the outcome loses the
 only record of whether anyone checked.
 
+Only open or verified changesets can be closed. A closed, abandoned, or
+rolled-back changeset is refused with a usage error naming its status, even with
+`--force` or knowledge flags, and its record remains unchanged.
+
 ---
+
+## Record the knowledge produced
+
+Completion closes the implementation half of reference → implement → update.
+The update half records what the change taught the workspace, so the next agent
+can read it rather than reconstruct it.
+
+```bash
+vat changeset close CS-0001 --acceptance "cancel-then-refund passes end to end" --knowledge D-0042
+# Or, when no knowledge record was needed:
+vat changeset close CS-0001 --acceptance "cancel-then-refund passes end to end" --no-record "Mechanical rename; existing decisions still apply"
+```
+
+If the knowledge is written after closing, link it with
+`vat changeset record CS-0001 --knowledge D-0042`. This appends de-duplicated links to
+`knowledge` without rewriting the completion claim or the authorising `decisions`
+links set by `new --decision`. `record` also accepts `--no-record` to
+explain why no record was produced; it runs on open, verified, and closed
+changesets, and refuses abandoned or rolled-back work. The two flags are
+mutually exclusive and neither may be empty. A declared brain requires every
+linked identifier to exist; all unresolved identifiers are reported together.
+Recording knowledge clears a previous no-record reason. `--no-record` is refused
+with a usage error naming existing identifiers once knowledge has been recorded.
+
+Closing without either remains allowed, but `changeset/closed-unrecorded`
+warns until knowledge links or a reason are recorded. An authorising decision
+alone does not satisfy this rule. `show` displays authorising decisions, produced
+knowledge, and the no-record reason separately.
 
 ## The record
 
@@ -103,7 +135,8 @@ non_goals:
 contracts:
   - POST /orders/{id}/cancel response schema
 integration_acceptance: cancel-then-refund passes end to end
-decisions: [D-0042]
+decisions: [D-0041]
+knowledge: [D-0042]
 approved_by: alex
 
 repositories:
@@ -218,6 +251,7 @@ emit a half-plan.
 | closing while a repository has no passing checks at a known revision | evidence-free completion |
 | closing while a revision was never observed on the branch it ships from | a completion record for work still sitting on a branch |
 | a single-repository changeset | ceremony where a commit would do |
+| closed without knowledge links or `no_record_reason` | losing the knowledge the completed change produced |
 | open past `max_open_days` | repositories mid-contract-change with no closing evidence |
 
 ---

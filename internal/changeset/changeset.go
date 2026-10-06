@@ -170,7 +170,6 @@ type Changeset struct {
 	// together. Per-repository checks passing is not the same thing.
 	Acceptance   string        `yaml:"integration_acceptance,omitempty" json:"integration_acceptance,omitempty"`
 	Repositories []Participant `yaml:"repositories" json:"repositories"`
-	// Decisions links the changeset to the reasoning that authorised it.
 	// LandingWaived records that closing went ahead without landing evidence.
 	//
 	// The rule that reports the gap keys on this rather than on absent
@@ -178,10 +177,18 @@ type Changeset struct {
 	// waived, and a changeset closed by a vat that did not yet record landing
 	// at all. Keying on absence reported every historical changeset in every
 	// workspace, forever, with nothing anyone could do about it.
-	LandingWaived bool     `yaml:"landing_waived,omitempty" json:"landing_waived,omitempty"`
-	Decisions     []string `yaml:"decisions,omitempty" json:"decisions,omitempty"`
-	ApprovedBy    string   `yaml:"approved_by,omitempty" json:"approved_by,omitempty"`
-	Notes         string   `yaml:"notes,omitempty" json:"notes,omitempty"`
+	LandingWaived bool `yaml:"landing_waived,omitempty" json:"landing_waived,omitempty"`
+	// Decisions links the reasoning that authorised the work, independently
+	// of what completing it taught the workspace.
+	Decisions []string `yaml:"decisions,omitempty" json:"decisions,omitempty"`
+	// Knowledge links the records the work produced, so an authorising
+	// decision cannot stand in for the update half of the work.
+	Knowledge []string `yaml:"knowledge,omitempty" json:"knowledge,omitempty"`
+	// NoRecordReason distinguishes a deliberate absence of knowledge from
+	// forgetting the update half of the work.
+	NoRecordReason string `yaml:"no_record_reason,omitempty" json:"no_record_reason,omitempty"`
+	ApprovedBy     string `yaml:"approved_by,omitempty" json:"approved_by,omitempty"`
+	Notes          string `yaml:"notes,omitempty" json:"notes,omitempty"`
 }
 
 // Dir is the workspace directory holding changesets.
@@ -497,4 +504,27 @@ func Validate(set Changeset, requireRollbackPoint bool) []string {
 		}
 	}
 	return problems
+}
+
+// WithKnowledge returns a copy with de-duplicated knowledge links appended or
+// a reason for producing none recorded. Completion evidence is preserved.
+func WithKnowledge(set Changeset, knowledge []string, reason string) Changeset {
+	out := set
+	if len(knowledge) > 0 {
+		out.NoRecordReason = ""
+		out.Knowledge = make([]string, 0, len(set.Knowledge)+len(knowledge))
+		seen := map[string]bool{}
+		for _, ids := range [][]string{set.Knowledge, knowledge} {
+			for _, id := range ids {
+				if !seen[id] {
+					out.Knowledge = append(out.Knowledge, id)
+					seen[id] = true
+				}
+			}
+		}
+	}
+	if reason != "" && len(out.Knowledge) == 0 {
+		out.NoRecordReason = reason
+	}
+	return out
 }

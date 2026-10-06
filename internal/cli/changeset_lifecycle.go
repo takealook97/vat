@@ -39,6 +39,15 @@ func changesetShowCommand() *Command {
 			env.Printer.Printf("%s  %s\n", current.ID, current.Objective)
 			env.Printer.Printf("status: %s · opened %s · %d days\n",
 				current.Status, current.OpenedAt, current.AgeDays(env.Now))
+			if len(current.Decisions) > 0 {
+				env.Printer.Printf("decisions: %s\n", strings.Join(current.Decisions, ", "))
+			}
+			if len(current.Knowledge) > 0 {
+				env.Printer.Printf("knowledge: %s\n", strings.Join(current.Knowledge, ", "))
+			}
+			if current.NoRecordReason != "" {
+				env.Printer.Printf("no record: %s\n", current.NoRecordReason)
+			}
 			if current.Acceptance != "" {
 				env.Printer.Printf("acceptance: %s\n", current.Acceptance)
 			}
@@ -146,8 +155,10 @@ func changesetCloseCommand() *Command {
 	return &Command{
 		Name:    "close",
 		Summary: "Close a verified changeset with its integration outcome",
-		Usage:   `vat changeset close <id> --acceptance "..." [--approved-by <name>] [--force]`,
-		Long: `Close a changeset.
+		Usage:   `vat changeset close <id> --acceptance "..." [--approved-by <name>] [--force] [--knowledge <ids> | --no-record "<reason>"]`,
+		Long: `Close an open or verified changeset.
+
+Closed, abandoned, and rolled-back changesets are refused, even with --force.
 
 An acceptance statement is required, and it must describe something end to end.
 Per-repository checks passing is not the same as the pieces working together —
@@ -158,11 +169,15 @@ naming the outcome loses the only record of whether anyone checked.`,
 			acceptance := set.String("acceptance", "", "the end-to-end outcome that proves this worked (required)")
 			approvedBy := set.String("approved-by", "", "who approved the release")
 			force := set.Bool("force", false, "close despite unverified repositories")
+			knowledge := changesetKnowledgeFlags(set)
 			if err := parseFlags(set, args); err != nil {
 				return err
 			}
 			if set.NArg() != 1 {
 				return usageErrorf("expected exactly one changeset identifier")
+			}
+			if err := knowledge.validate(set, false); err != nil {
+				return err
 			}
 			if strings.TrimSpace(*acceptance) == "" {
 				return usageErrorf("--acceptance is required: what single end-to-end outcome proves this worked?")
@@ -174,6 +189,13 @@ naming the outcome loses the only record of whether anyone checked.`,
 			current, err := changeset.Load(ws.Root, set.Arg(0))
 			if err != nil {
 				return usageErrorf("%v", err)
+			}
+			if !current.Status.Open() {
+				return usageErrorf("%s is already %s; only open or verified changesets can be closed", current.ID, current.Status)
+			}
+			current, err = knowledge.apply(ws, current)
+			if err != nil {
+				return err
 			}
 			if !current.FullyVerified() && !*force {
 				for _, participant := range current.Repositories {
