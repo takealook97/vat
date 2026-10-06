@@ -222,6 +222,7 @@ func RuleNames() []string {
 		"changeset/open-too-long",
 		"changeset/invalid",
 		"changeset/closed-unlanded",
+		"changeset/closed-unrecorded",
 		"changeset/rollback-point-missing",
 	}
 }
@@ -799,6 +800,12 @@ func checkChangesets(ctx context.Context, ws *workspace.Workspace, now time.Time
 				Message: fmt.Sprintf(
 					"closed without landing evidence for %s; the gate was waived, not met",
 					strings.Join(unlanded, ", ")),
+			})
+		}
+		if set.Status == changeset.StatusClosed && len(set.Knowledge) == 0 && strings.TrimSpace(set.NoRecordReason) == "" {
+			findings = append(findings, Finding{
+				Rule: "changeset/closed-unrecorded", Severity: SeverityWarn, Subject: set.ID,
+				Message: fmt.Sprintf(`closed without knowledge links or a reason; run vat changeset record %s --knowledge <ids> or --no-record "<reason>"`, set.ID),
 			})
 		}
 		if !set.Status.Open() || policy.MaxOpenDays <= 0 {

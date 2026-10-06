@@ -265,6 +265,7 @@ The rules, and what each one prevents:
 | `brain/source-external-governed` | error | a claim declaring its source external while the workspace governs it, which would exempt a checkable claim from every check |
 | `changeset/invalid` | error | a completion record that cannot be acted on |
 | `changeset/rollback-point-missing` | error | a recorded return point the repository no longer holds, so the way back the record promises does not exist |
+| `changeset/closed-unrecorded` | warn | a closed changeset with neither knowledge links nor a reason for producing no knowledge; use `vat changeset record <id> --knowledge <ids>` or `--no-record "<reason>"` |
 | `changeset/closed-unlanded` | warn | a changeset whose closing waived the landing gate, so the waiver stays visible |
 | `changeset/open-too-long` | warn | repositories mid-contract-change with no closing evidence |
 
@@ -659,6 +660,8 @@ vat changeset verify    <id> [--timeout <duration>]
 vat changeset show      <id>
 vat changeset list      [--open]
 vat changeset close     <id> --acceptance "..." [--approved-by <name>] [--force]
+                                      [--knowledge <ids> | --no-record "<reason>"]
+vat changeset record    <id> (--knowledge <ids> | --no-record "<reason>")
 vat changeset abandon   <id> [--reason <text>]
 vat changeset undo-plan <id>
 ```
@@ -716,8 +719,30 @@ reports as changed, bounded, because otherwise the answer is usually the
 `AGENTS.md` vat rendered and nothing said so.
 
 `close` requires `--acceptance`, and it must describe something end to end.
+Only open or verified changesets may be closed. Closed, abandoned, and rolled-back
+changesets are refused with usage exit code 2 naming the status, even with
+`--force` or knowledge flags; the record is left unchanged.
+It optionally accepts `--knowledge <ids>` or `--no-record "<reason>"` to record
+what knowledge the change produced before closing.
 
-`show` prints the objective, the status, the acceptance, and the notes — which
+`record` accepts exactly one of those flags on an open, verified, or closed
+changeset. It refuses abandoned and rolled-back changesets. `--knowledge` appends
+comma-separated produced brain record identifiers to `knowledge` without
+duplicates, preserving the authorising `decisions` links from `new`; when a brain is
+declared, every identifier must resolve to an existing record, and a refusal
+lists all unresolved identifiers. `--no-record` sets a non-empty reason for
+producing no record. Recording knowledge clears that reason; `--no-record`
+is refused as a usage error naming the existing identifiers once knowledge
+exists. The flags are mutually exclusive, and an explicitly empty
+list or reason is a usage error. Refusals leave the changeset unchanged.
+Knowledge recording preserves the objective, acceptance, and completion evidence.
+
+`changeset/closed-unrecorded` warns when a closed record has neither knowledge links nor a
+reason. Authorising `decisions` alone do not satisfy it. The remedy is `vat changeset record <id> --knowledge <ids>` or
+`vat changeset record <id> --no-record "<reason>"`; warning alone exits 0.
+
+`show` prints the objective, the status, the acceptance, the authorising decision links,
+the produced knowledge links, the no-record reason, and the notes — which
 is where `abandon --reason` is kept, because why work stopped is the whole value
 of an abandoned record.
 

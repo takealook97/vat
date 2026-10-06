@@ -3,6 +3,7 @@ package lint_test
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -265,5 +266,40 @@ func writeChangeset(t *testing.T, ws *workspace.Workspace, set changeset.Changes
 func TestTheReferenceClockUsedByTheseTestsIsSet(t *testing.T) {
 	if reference.IsZero() || reference.Equal(time.Time{}) {
 		t.Fatal("the shared reference time is the zero value, so every age in this file is nonsense")
+	}
+}
+
+func TestClosedChangesetsReportMissingKnowledgeAndNameARemedy(t *testing.T) {
+	for _, tc := range []struct {
+		name      string
+		status    changeset.Status
+		decisions []string
+		knowledge []string
+		reason    string
+		want      bool
+	}{
+		{name: "closed without knowledge", status: changeset.StatusClosed, want: true},
+		{name: "authorising decision only", status: changeset.StatusClosed, decisions: []string{"D-0001"}, want: true},
+		{name: "knowledge linked", status: changeset.StatusClosed, knowledge: []string{"D-0002"}},
+		{name: "reason recorded", status: changeset.StatusClosed, reason: "Mechanical rename"},
+		{name: "blank reason", status: changeset.StatusClosed, reason: " ", want: true},
+		{name: "open", status: changeset.StatusOpen},
+		{name: "verified", status: changeset.StatusVerified},
+		{name: "abandoned", status: changeset.StatusAbandoned},
+		{name: "rolled back", status: changeset.StatusRolledBack},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			ws := fixture(t)
+			set := changeset.New("CS-0001", "Move cancellation", reference)
+			set.Status, set.Decisions, set.Knowledge, set.NoRecordReason = tc.status, tc.decisions, tc.knowledge, tc.reason
+			writeChangeset(t, ws, set)
+			finding, found := rules(run(t, ws))["changeset/closed-unrecorded"]
+			if found != tc.want {
+				t.Fatalf("finding = %v, want %v", found, tc.want)
+			}
+			if found && (finding.Severity != lint.SeverityWarn || finding.Subject != set.ID || !strings.Contains(finding.Message, "vat changeset record CS-0001 --knowledge <ids>") || !strings.Contains(finding.Message, `--no-record "<reason>"`) || finding.Fixable) {
+				t.Fatalf("bad finding: %+v", finding)
+			}
+		})
 	}
 }

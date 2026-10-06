@@ -41,7 +41,12 @@
       "description": "Records a deliberate decision that this work is complete without reaching a shipping branch, so that an unlanded record is either explained or reported.",
       "type": "boolean"
     },
-    "decisions": { "type": "array", "items": { "type": "string" } },
+    "decisions": { "description": "Reasoning that authorised the work, set at creation.", "type": "array", "items": { "type": "string" } },
+    "knowledge": { "description": "Records the work produced, appended without duplicates by record or close --knowledge.", "type": "array", "items": { "type": "string" } },
+    "no_record_reason": {
+      "description": "Why this change produced no knowledge record. Optional; a closed changeset without knowledge or a non-empty reason is reported by lint.",
+      "type": "string"
+    },
     "approved_by": { "type": "string" },
     "notes": { "type": "string" }
   },

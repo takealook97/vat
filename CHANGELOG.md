@@ -8,11 +8,24 @@ Notable changes to `vat`. The format follows
 
 ### Upgrading to 0.7.0
 
-Remove the reviewer flag from promotion scripts and configure git `user.name`
-and `user.email` in the brain repository. Rebuild projections with
-`vat brain build` after upgrade. Workspaces using the manual or agent promotion
-gate with active records lacking `reviewed_by` will see
-`brain/reviewer-unattributed` warnings (exit 0) until those records are re-promoted.
+- Configure git `user.name` and `user.email` in the brain repository and remove
+  `--reviewer` from promotion scripts.
+- Run `vat brain build` once after upgrading: existing brains report
+  `brain/generated-drift` until their projections are rebuilt.
+- Workspaces using the manual or agent promotion gate with active records
+  lacking `reviewed_by` will see `brain/reviewer-unattributed` warnings (exit 0)
+  until those records are re-promoted.
+- Before anyone writes `knowledge` or `no_record_reason`, upgrade every reader
+  of the workspace to v0.7.0. Older vat versions reject unknown fields with
+  `field knowledge not found in type changeset.Changeset` or
+  `field no_record_reason not found in type changeset.Changeset`; commands such
+  as `lint` and `changeset show` then fail to read the records.
+- Closed changesets from before this release warn under
+  `changeset/closed-unrecorded` until their knowledge or a reason is recorded.
+  Run `vat changeset record <id> --knowledge <ids>` or
+  `vat changeset record <id> --no-record "<reason>"` once for each changeset.
+  Authorising `decisions` links alone do not satisfy the rule. These are
+  warnings; `lint` still exits 0 when there are no errors.
 
 ### Changed
 
@@ -30,11 +43,19 @@ gate with active records lacking `reviewed_by` will see
 - Optional `recorded_by` stores the git author on `vat brain new`.
 - `brain/reviewer-unattributed` warns about active records without a reviewer
   under manual or agent promotion gates.
-
 - `vat brain review --json` drift rows carry structured `evidence`: the
   repository, pinned revision, optional source path, and observed HEAD revision.
   Unresolvable pins are marked with `pin_unresolvable: true`. Queue rows omit
   evidence; explanations, human output, and record statuses are unchanged.
+- `vat changeset record` links the knowledge a change produced with
+  `--knowledge <ids>`, including after closing, or records `--no-record` with a
+  reason. `close` accepts the same optional flags; produced links are stored in
+  `knowledge`, de-duplicated and resolved against a declared brain. Authorising
+  `decisions` remain separate. Recording knowledge clears the no-record reason;
+  `--no-record` is refused once knowledge exists. `show` displays each
+  separately.
+- `changeset/closed-unrecorded` warns when a closed changeset has neither
+  knowledge links nor a reason for producing no knowledge record.
 
 ### Fixed
 
@@ -46,8 +67,10 @@ gate with active records lacking `reviewed_by` will see
   adds `citable_until` on dated current-state nodes and `stale_after_days` at
   the graph level. `CURRENT.md` shows expiry dates for readers to compare with
   today. Build, lint repair, and drift checks all use the workspace policy.
-  Existing brains report `brain/generated-drift` after upgrade until
-  `vat brain build` runs. Readers never rewrite records.
+  Readers never rewrite records.
+- `vat changeset close` refuses closed, abandoned, and rolled-back changesets
+  with usage exit code 2 naming the status, even with `--force` or knowledge
+  flags, without changing the record.
 
 ## [0.6.5] - 2026-09-26
 
