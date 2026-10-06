@@ -466,19 +466,35 @@ func TestRepoNewArrivesWithAContractAlreadyInIt(t *testing.T) {
 func TestEveryCommandAStarterSkillNamesActuallyExists(t *testing.T) {
 	// Arrange
 	known := map[string]bool{}
-	walkCommands(Root(), nil, func(_ *Command, path []string) {
-		known["vat "+strings.Join(path, " ")] = true
+	walkCommands(Root(), nil, func(command *Command, path []string) {
+		known["vat "+strings.Join(path, " ")] = command.Run != nil
 	})
-	// Matched whole, never by prefix. Accepting `vat brain` for `vat brain read`
-	// is how a body naming a subcommand that does not exist passes: the parent
-	// does exist, and the wrong half is the half that was checked.
+	// Only an executable leaf may consume the remaining words as positional
+	// arguments. A parent such as `vat brain` must not excuse an unknown verb.
+	exists := func(named string) bool {
+		for {
+			if known[named] {
+				return true
+			}
+			lastSpace := strings.LastIndex(named, " ")
+			if lastSpace < 0 {
+				return false
+			}
+			named = named[:lastSpace]
+		}
+	}
+	for _, named := range []string{"vat brain read", "vat unknown", "vat changeset unknown"} {
+		if exists(named) {
+			t.Fatalf("parent hid an unknown command: %s", named)
+		}
+	}
 	invocation := regexp.MustCompile("`vat(?: [a-z][a-z-]+)+")
 
 	// Act & Assert
 	for _, skill := range harness.StarterSkills() {
 		for _, quoted := range invocation.FindAllString(skill.Body, -1) {
 			named := strings.TrimPrefix(quoted, "`")
-			if !known[named] {
+			if !exists(named) {
 				t.Errorf("starter skill %q names %q, which is not a command this binary has",
 					skill.Name, named)
 			}

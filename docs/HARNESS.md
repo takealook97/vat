@@ -245,13 +245,35 @@ none is given rather than filled with a generated one, because a placeholder
 would satisfy `harness/skill-metadata` while telling the runtime nothing, and
 that rule exists to catch exactly the skill nobody can be offered.
 
-`vat init` seeds two procedures into a new workspace, `before-cross-repo-work`
-and `consult-the-brain-first`. They describe vat's own command sequences and
+`vat init` seeds three procedures into a new workspace: `before-cross-repo-work`,
+`consult-the-brain-first`, and `keep-the-brain-current`. They describe vat's own command sequences and
 nothing else: a procedure vat writes once and never maintains would be a second
 source of truth of the kind this tool exists to remove. They are canonical files
 from the moment they land — edit them, or delete them, with no consequence.
 The cross-repository procedure follows the enforced order: verify, land the
 commits, record landing with `vat ship`, then close with end-to-end acceptance.
+
+For an existing workspace, copy the canonical
+[`keep-the-brain-current` procedure](../examples/workspace/.agents/skills/keep-the-brain-current/SKILL.md)
+into `.agents/skills/keep-the-brain-current/SKILL.md`, then run
+`vat harness render`. Only `vat init` seeds starters, and it refuses an existing
+manifest; rendering does not seed missing procedures or update edited ones.
+Compare the updated
+[`before-cross-repo-work` procedure](../examples/workspace/.agents/skills/before-cross-repo-work/SKILL.md)
+with your own before adopting its knowledge-recording step.
+
+### Triggers
+
+vat ships the procedure, not the hook. A cloned repository that runs commands
+at session end creates a supply-chain path, and runtimes differ in how they
+trigger work. A person wires the procedure into their own runtime configuration,
+for example through a Claude Code Stop hook, or as a step immediately after
+`vat changeset close`. vat generates and installs no runtime hooks.
+
+The procedure runs mechanical upkeep, reviews drift against pinned evidence
+with an independent reviewer, and links reusable knowledge to closed changesets.
+Goals remain for people to promote; the procedure commits the brain locally and
+never pushes. Its review and identity stops apply to automated triggers too.
 
 ```console
 $ vat lint

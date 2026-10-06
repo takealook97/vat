@@ -135,3 +135,36 @@ func TestCurrentIndexShowsExpiryForEveryKindAndWithholdsMissingDates(t *testing.
 		})
 	}
 }
+
+func TestPinnedNonCurrentStateRecordsDoNotAcquireFreshnessRules(t *testing.T) {
+	for _, claim := range []brain.ClaimKind{"", brain.ClaimHistorical, brain.ClaimIntent} {
+		for _, observed := range []string{"", reference.AddDate(0, 0, -120).Format("2006-01-02")} {
+			t.Run(string(claim)+"/"+observed, func(t *testing.T) {
+				root, _ := newStore(t)
+				metadata := "id: D-0001\nstatus: active\nowned_by: payments\nsource_ref: payments@abc1234:README.md"
+				if claim != "" {
+					metadata += "\nclaim_kind: " + string(claim)
+				}
+				if observed != "" {
+					metadata += "\nobserved_at: " + observed
+				}
+				writeRecord(t, root, "decisions/D-0001.md", metadata, "# Retrying orders")
+				store := reload(t, root)
+				policy := brain.CheckPolicy{StaleAfterDays: 90}
+				for _, finding := range brain.Check(store, policy, reference) {
+					if finding.Rule == "brain/claim-observed" || finding.Rule == "brain/claim-stale" {
+						t.Errorf("pin introduced freshness finding: %+v", finding)
+					}
+				}
+				hits, _ := brain.Query(store, []string{"retrying"}, brain.QueryOptions{}, policy, reference)
+				if len(hits) != 1 || !hits[0].Citable {
+					t.Fatalf("pinned enduring record is not citable: %+v", hits)
+				}
+				transitions, err := brain.Sweep(store, policy, reference, false)
+				if err != nil || len(transitions) != 0 {
+					t.Fatalf("pinned enduring record demoted: %+v, %v", transitions, err)
+				}
+			})
+		}
+	}
+}

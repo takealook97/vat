@@ -64,7 +64,8 @@ vat init [--name <name>] [--adopt] [--from-tsv <file>]
 Creates `vat.yaml` in the current directory, writes the `.gitignore` managed
 region, seeds the starter procedures, and renders the harness.
 
-The seeded skills — `before-cross-repo-work` and `consult-the-brain-first` —
+The seeded skills — `before-cross-repo-work`, `consult-the-brain-first`, and
+`keep-the-brain-current` —
 describe vat's own command sequences and nothing else, because a procedure vat
 writes once and never maintains would be a second source of truth of exactly the
 kind this tool exists to remove. A test holds every command they name to
@@ -486,17 +487,21 @@ vat brain archive   [--apply]
 vat brain adopt     <repository-name>
 ```
 
-`new --claim current-state --owner <repo>` records the owning repository's
-current revision as the claim's evidence. Records enter as `provisional`.
+`new --owner <repo>` records the owning repository's current revision as
+`source_ref` for any claim kind, including records without `--claim`.
+`--claim current-state` requires `--owner` and adds `observed_at`; historical,
+intent, and records without a claim kind gain no observation date or expiry
+from an evidence pin. Records enter as `provisional`.
 `new` writes optional `recorded_by` from git `user.name` and `user.email` in
 the brain repository as `Name <email>`; unset identity is omitted, including
 when git is unavailable.
 
-`--source-path` additionally pins the file the claim was read from, and vat
-refuses a path the repository does not hold at that revision. Pinned to a
-repository alone, the only question a later run can ask is whether the
-repository moved — which in an active one is always yes. Pinned to a file, it
-can ask whether *this* claim's evidence moved, and `brain/source-revision-drift`
+`--source-path` requires `--owner` and additionally pins the file the record
+was read from; vat refuses a path the repository does not hold at that revision.
+For current-state claims pinned to a repository alone, the only question a
+later run can ask is whether the repository moved — which in an active one is
+always yes. Pinned to a file, it can ask whether *this* claim's evidence moved,
+and `brain/source-revision-drift`
 stays silent when it did not.
 
 `query` searches a deliberately narrow surface. `--all` widens it to history,

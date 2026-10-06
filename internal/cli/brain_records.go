@@ -28,16 +28,17 @@ A record enters as provisional, never as truth. Promoting it is a separate,
 deliberate step — otherwise anything an agent wrote becomes canonical simply by
 having been written.
 
-For a claim about the present, pass --claim current-state and name the
-repository that owns the fact. vat records the current revision of that
-repository as the evidence, so the claim can later be checked against what has
-changed since.
+Pass --owner to pin evidence at that repository's current revision for any
+claim kind, including a record without --claim. Add --source-path to pin the
+file you read; it must exist at that revision and requires --owner.
+A claim about the present uses --claim current-state and requires --owner; only
+current-state claims receive observed_at and age out.
 
 When git user.name and user.email are configured in the brain repository,
 recorded_by records that author identity as Name <email>. Unset identity is
 omitted; creating a provisional record remains possible.`,
 		Examples: []string{
-			`vat brain new decision --title "Orders own their own idempotency keys"`,
+			`vat brain new decision --title "Orders own their own idempotency keys" --claim historical --owner payments --source-path docs/ORDERING.md`,
 			`vat brain new gap --title "Retries can double-submit" --claim current-state --owner payments`,
 			`vat brain new gap --title "Retries can double-submit" --claim current-state --owner payments --source-path docs/ORDERING.md`,
 		},
@@ -96,19 +97,17 @@ func runBrainNew(ctx context.Context, env *Env, args []string) error {
 		}
 		input.ClaimKind = kind
 	}
-	if input.ClaimKind == brain.ClaimCurrentState {
-		if *owner == "" {
-			return usageErrorf("a current-state claim needs --owner: which repository is canonical for this fact?")
-		}
+	if input.ClaimKind == brain.ClaimCurrentState && *owner == "" {
+		return usageErrorf("a current-state claim needs --owner: which repository is canonical for this fact?")
+	}
+	if *owner != "" {
 		reference, err := sourceReferenceFor(ctx, ws, *owner, *sourcePath)
 		if err != nil {
 			return err
 		}
 		input.SourceRef = reference
 	} else if strings.TrimSpace(*sourcePath) != "" {
-		// Only a claim about the present carries provenance. Dropping the flag
-		// silently would tell the caller they recorded evidence they did not.
-		return usageErrorf("--source-path names the evidence for a claim about the present; pass --claim current-state --owner <repo> as well")
+		return usageErrorf("--source-path needs --owner <repo> to pin the evidence at that repository's revision")
 	}
 
 	input.RecordedBy, err = gitx.AuthorIdentity(ctx, store.Root)

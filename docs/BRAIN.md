@@ -154,7 +154,15 @@ writing an unrecognised kind into a record where no check would ever look at it
 again.
 
 A statement about what happened does not decay. A statement about what is true
-right now does.
+right now does. Evidence can be pinned on any record: `vat brain new --owner`
+records a revision, and `--source-path` additionally pins a file that must exist
+at that revision. A source path requires an owner. These flags do not add an
+observation date or enable current-state expiry and source-revision drift rules
+for historical, intent, or records without a claim kind.
+
+Record a decision with `vat brain new decision --title "..." --claim historical --owner <repo> --source-path <path>`, or a reusable observation with
+`vat brain new memory --title "..." --owner <repo> --source-path <path>`.
+Both can satisfy the agent promotion gate without acquiring an expiry clock.
 
 ### Why the revision, not the branch
 
@@ -328,8 +336,9 @@ A repo-only pin is insufficient. A readable source repository HEAD is required,
 including with `--reverified`. Non-goal `source_external` records and sources
 outside `vat.yaml` cannot be agent-promoted because their HEAD is unreadable. Unchanged
 pinned evidence allows promotion without that flag; moved evidence requires
-re-reading and re-verification. Goals behave as under `manual`; the upkeep
-procedure excludes them, since git identity cannot distinguish people from
+re-reading and re-verification. Goals behave as under `manual`; the
+[`keep-the-brain-current` procedure](../examples/workspace/.agents/skills/keep-the-brain-current/SKILL.md)
+excludes them, since git identity cannot distinguish people from
 agents. Agent output still enters `provisional`, and a different model family
 must judge the evidence before the agent acts.
 

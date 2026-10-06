@@ -351,6 +351,13 @@ ignoring it. An unknown status means no rule governs the record.
 
 ### 5.4 Provenance
 
+`source_ref` **MAY** be present on any record, including historical, intent,
+and records without `claim_kind`. `vat brain new --owner <repo>` pins that
+repository's current revision for any claim kind. Optional `--source-path`
+requires `--owner` and **MUST** name a file that exists at the pinned revision.
+Evidence pinning alone **MUST NOT** add `observed_at`, apply observation expiry,
+or trigger current-state source-revision drift checks.
+
 A record with `claim_kind: current-state` asserts something is true **now**, and
 therefore decays. For such a record:
 
@@ -750,6 +757,11 @@ A seeded file is canonical and belongs to the workspace: an implementation
 **MUST NOT** rewrite one that already exists, and removing one **MUST** be
 without consequence. Anything seeded is therefore ordinary content under
 `.agents/skills/`, distinguished by nothing on disk.
+
+The starter procedures are `before-cross-repo-work`, `consult-the-brain-first`,
+and `keep-the-brain-current`. They are seeded only by `vat init`; harness
+rendering generates adapters from existing canonical procedures and does not
+install missing starters or runtime hooks.
 
 A definition **MAY** name the runtimes it targets; naming none targets every
 runtime that has an adapter of that kind. Roles and skills both have adapters

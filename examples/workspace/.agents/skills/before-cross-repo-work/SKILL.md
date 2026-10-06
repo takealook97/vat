@@ -24,12 +24,16 @@ the change began, and once it has landed that can no longer be observed.
 4. `vat changeset verify <id>`. It runs each repository's canonical checks
    and records the result against the exact revision it ran on. It refuses on a
    dirty working tree.
-5. `vat changeset close <id> --acceptance "..."`. The acceptance must
+5. Land the verified commits through the repository's normal review and merge
+   path, then run `vat ship <id>`. It judges whether those exact revisions
+   reached the branch each repository ships from; it never pushes or merges.
+6. `vat changeset close <id> --acceptance "..."`. The acceptance must
    describe something end to end; verifying proves the combination builds, not
-   that it does what it was for.
-6. `vat ship <id>` to judge whether those verified revisions actually
-   reached the branch each repository ships from. Verifying and shipping are
-   different questions.
+   that it does what it was for. Close refuses before shipping is recorded.
+   Include `--knowledge <ids>` for records already produced, or
+   `--no-record "<reason>"` when there is no reusable knowledge to record.
+   Run `keep-the-brain-current` immediately after closing; it records any
+   knowledge produced afterwards with `vat changeset record`.
 
 ## When it must stop
 

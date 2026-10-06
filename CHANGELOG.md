@@ -29,6 +29,11 @@ Notable changes to `vat`. The format follows
 
 ### Changed
 
+- `vat brain new --owner` pins source evidence for any claim kind, including
+  historical, intent, and records without `--claim`. Optional `--source-path`
+  requires an owner and a file at that revision. Only current-state claims
+  require an owner and receive observation dates; the upkeep procedure records
+  decisions as historical and memory without a claim kind so they do not expire.
 - Breaking: `vat brain promote` removes `--reviewer`. Promotion identity now
   comes from the brain repository's git author as `Name <email>`. Manual and
   agent gates refuse unset identity; auto records identity when configured.
@@ -36,6 +41,11 @@ Notable changes to `vat`. The format follows
   judgement and mechanical evidence checks. New records still enter provisional.
 
 ### Added
+
+- `vat init` seeds `keep-the-brain-current`, a runtime-neutral upkeep procedure
+  with independent evidence review and changeset knowledge recording. Existing
+  workspaces can copy the canonical example and run `vat harness render`; vat
+  installs no runtime hooks.
 
 - `policy.gates.brain_promote: agent` requires pinned source paths for every
   non-goal record and readable source HEAD for re-verification. Goals retain

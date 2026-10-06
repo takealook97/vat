@@ -203,3 +203,21 @@ func TestAnAbbreviatedPinStillNamingHeadIsNotDrift(t *testing.T) {
 		t.Errorf("a claim pinned to HEAD by an abbreviated hash was reported as drifted: %q", finding.Message)
 	}
 }
+
+func TestPinnedNonCurrentStateRecordsAreNotSourceRevisionDrift(t *testing.T) {
+	for _, claim := range []brain.ClaimKind{"", brain.ClaimHistorical, brain.ClaimIntent} {
+		t.Run(string(claim), func(t *testing.T) {
+			ws, root, repo := driftFixture(t)
+			base := commitAt(t, repo, "docs/ordering.md", "one\n")
+			commitAt(t, repo, "docs/ordering.md", "two\n")
+			metadata := "id: D-0001\nstatus: active\nowned_by: payments\nsource_ref: payments@" + base + ":docs/ordering.md"
+			if claim != "" {
+				metadata += "\nclaim_kind: " + string(claim)
+			}
+			writeBrainRecord(t, root, "decisions/D-0001-pinned.md", metadata)
+			if finding, found := rules(runOnline(t, ws))["brain/source-revision-drift"]; found {
+				t.Fatalf("historical evidence treated as current-state drift: %+v", finding)
+			}
+		})
+	}
+}

@@ -3,11 +3,35 @@ package harness_test
 import (
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"testing"
 
 	"github.com/takealook97/vat/internal/harness"
 )
+
+func TestBrainUpkeepStarterUsesOnlyVatCommands(t *testing.T) {
+	var body string
+	for _, skill := range harness.StarterSkills() {
+		if skill.Name == "keep-the-brain-current" {
+			body = skill.Body
+		}
+	}
+	if body == "" {
+		t.Fatal("brain upkeep procedure is missing")
+	}
+	// Inline command invocations must stay runtime-neutral. Metadata, flags and
+	// the referenced skill name are not executable command lines.
+	inline := regexp.MustCompile("`([^`]+)`")
+	for _, match := range inline.FindAllStringSubmatch(body, -1) {
+		if strings.Contains(match[1], " ") && !strings.HasPrefix(match[1], "vat ") {
+			t.Errorf("upkeep names a command outside vat: %q", match[1])
+		}
+	}
+	if strings.Contains(strings.ToLower(body), "git push") {
+		t.Error("upkeep must not include a push command")
+	}
+}
 
 func TestEveryStarterSkillCanBeAdvertisedAndRendered(t *testing.T) {
 	// Arrange: a seed that trips the rules vat reports on every other workspace
@@ -82,5 +106,24 @@ func TestWriteStarterSkillsNeverOverwritesWhatIsAlreadyThere(t *testing.T) {
 	}
 	if string(after) != edited {
 		t.Errorf("the edited procedure was overwritten:\n%s", after)
+	}
+}
+
+func TestBrainUpkeepPinsDecisionsAndMemoryWithoutAnExpiryClock(t *testing.T) {
+	for _, skill := range harness.StarterSkills() {
+		if skill.Name != "keep-the-brain-current" {
+			continue
+		}
+		for _, want := range []string{
+			`vat brain new decision --title "..." --claim historical --owner <repo> --source-path <path>`,
+			`vat brain new memory --title "..." --owner <repo> --source-path <path>`,
+		} {
+			if !strings.Contains(skill.Body, want) {
+				t.Errorf("upkeep missing %q", want)
+			}
+		}
+		if strings.Contains(skill.Body, "--claim current-state") {
+			t.Error("upkeep makes enduring knowledge expire")
+		}
 	}
 }
