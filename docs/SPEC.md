@@ -550,6 +550,20 @@ Drift compares against the current workspace policy, so changing the window
 requires rebuilding, while elapsed time alone does not cause drift.
 The atomic record and `.brain` marker contract remains version **1**.
 
+A graph node **MAY** also carry, each omitted when the record has no value for
+it: `claim_kind`, `date`, `promoted_via`, `source_external`, `source_url`,
+`source_quote`, and `extensions`. These are optional additions to graph schema
+version **2**, not a new version (§11). `extensions` is an object holding the
+record's extension keys (§5.6.1) — every front matter key §5.2 does not define —
+with their values: mappings with string keys, lists, strings, numbers, booleans,
+and null. A timestamp is carried as the text written in the record. A value
+outside that set is reported as a malformed record and left out; the rest of
+the record is unaffected. Fields this specification defines are carried under
+their own names and never inside `extensions`. `extensions` is display data:
+a reader **MUST NOT** derive status or citability from it, and the writer does
+not consult it for either. Object keys are written in sorted order, so the same
+records always produce the same bytes.
+
 Each node **MUST** carry `content_hash`: the record file hashed with SHA-256,
 hex-encoded, prefixed `sha256:`. The hash covers the whole file, header
 included — a status change is the edit an index must not miss, and it lives in

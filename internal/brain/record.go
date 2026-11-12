@@ -257,6 +257,12 @@ type Record struct {
 	Path  string
 	Title string
 	Body  string
+	// Extensions holds the header keys Metadata does not model, as values JSON
+	// can hold. Display data only (SPEC 5.6.1): no rule reads it.
+	Extensions map[string]any
+	// ExtensionProblems names the extension keys that could not be carried,
+	// so check can report them without dropping the rest of the record.
+	ExtensionProblems []string
 	// Archived reports that the record has been moved out of the working set.
 	// It is still loaded — the supersession chain it belongs to is checked
 	// from both ends — but it is not part of what the layer is working on.

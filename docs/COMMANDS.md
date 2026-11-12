@@ -559,6 +559,11 @@ them.
 policy. `graph.json` carries graph `schema_version: 2`, the window
 `stale_after_days`, `citable_until` on dated current-state nodes, and
 `content_hash` on every node, so an index re-reads only the records that changed.
+A node also carries, when the record has them, `claim_kind`, `date`,
+`promoted_via`, `source_external`, `source_url`, `source_quote`, and
+`extensions` — the record's undefined header keys, for display only. An
+extension value JSON cannot hold is reported by `brain check` as
+`brain/record-malformed` and left out of the graph.
 Both are projections: a hand edit is drift, and the next build overwrites it.
 `CURRENT.md` shows expiry dates and routes active current-state claims without
 readable observation dates to **Needs attention**. Compare expiry dates with

@@ -66,7 +66,7 @@ func BuildPlan(store *Store, policy CheckPolicy, now time.Time) Plan {
 		rules         []string
 	}{
 		{"syntax-malformed", "cannot be read as a record at all", false,
-			[]string{"brain/record-malformed"}},
+			[]string{ruleRecordMalformed}},
 		{"status-unknown", "carries a lifecycle status this schema does not have", false,
 			[]string{"brain/status-unknown"}},
 		{"relation-asymmetric", "names a supersession the other record does not name back", true,

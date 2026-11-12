@@ -8,6 +8,12 @@ Notable changes to `vat`. The format follows
 
 ### Added
 
+- `graph.json` nodes carry `claim_kind`, `date`, `promoted_via`,
+  `source_external`, `source_url`, `source_quote`, and `extensions` (the
+  record's undefined header keys), each omitted when absent. Graph
+  `schema_version` stays 2: these are optional fields. An extension value JSON
+  cannot hold is reported as `brain/record-malformed` and left out. Run
+  `vat brain build` after upgrading; a committed graph drifts until rebuilt.
 - Records about systems outside the workspace can carry `source_url` and
   `source_quote`, and `vat brain new` writes them with `--source-url` and
   `--source-quote`. Two `vat brain check` rules judge them without opening the

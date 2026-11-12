@@ -640,7 +640,7 @@ it and read by nothing else:
 | --- | --- |
 | `goals/`, `gaps/`, `decisions/`, `memory/` | atomic records, one fact each, with provenance in the header |
 | `CURRENT.md` and the root projections | vat's own summary layer, already written |
-| `graph.json` | every record's id, kind, **status**, `citable_until` for dated current-state claims, path, owner, `source_ref`, and a `content_hash` per record, under graph `schema_version: 2` |
+| `graph.json` | every record's id, kind, **status**, `citable_until` for dated current-state claims, path, owner, `source_ref`, and a `content_hash` per record, under graph `schema_version: 2`; when present, `claim_kind`, `date`, `promoted_via`, the external evidence fields, and `extensions` holding the record's undefined header keys |
 | `archive/`, `history/` | everything finished with, in directories of their own |
 
 Four rules make that safe to index:
@@ -821,6 +821,13 @@ live citability boolean. Query computes citability at read time. Projections are
 deterministic: time passing causes no drift or build churn, while a change to
 the workspace observation window requires rebuilding. Record content hashes do
 not change merely because evidence ages.
+
+A node also carries the record's `claim_kind` and `date`, and its extension keys
+under `extensions`, each omitted when the record has none. A reader that lists
+records from the graph alone — a repository hosting API, with no vat binary —
+gets them without re-parsing every file. They are display data: an extension
+spelled `state` or `citable_until` moves neither the node's status nor its
+expiry, and editing one drifts `graph.json` like any other change to a record.
 
 Above them, **Canonical views** links the maintained synthesis documents that
 exist — `STATUS.md`, `GOAL.md`, `ROADMAP.md` and the rest. An adopted repository
