@@ -65,14 +65,29 @@ func checkSecrets(store *Store) []Finding {
 		// The title is the body's heading and is read above. Extension keys
 		// are not in the body, and a publishing job writes its source address
 		// into one — exactly where a token in a URL would land.
+		//
+		// The key is read with its value, as `key: value`, because that is
+		// what `brain new` scans in the rendered header: "password: <value>"
+		// is an assigned secret, and the value alone is not. Scanning the
+		// value alone let check pass a record creation would have refused.
 		for _, key := range sortedExtensionKeys(record.Extensions) {
-			for _, hit := range suspectedCredentials(extensionText(record.Extensions[key])) {
-				findings = append(findings, secretFinding(record, fmt.Sprintf("the header field %s", key), hit))
+			text := key + ": " + extensionText(record.Extensions[key])
+			for _, hit := range suspectedCredentials(text) {
+				findings = append(findings, secretFinding(record, extensionWhere(key), hit))
 				break
 			}
 		}
 	}
 	return findings
+}
+
+// extensionWhere names an extension key in a finding. The key is author text
+// too, and one can be the credential itself.
+func extensionWhere(key string) string {
+	if DisplayableKey(key) {
+		return "the header field " + key
+	}
+	return "a header key"
 }
 
 // fieldSecrets scans the header fields that hold copied text. A quote pasted

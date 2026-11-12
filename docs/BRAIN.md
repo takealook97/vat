@@ -594,8 +594,10 @@ merge conflict marker in its header used to take down `check`, `query`, `sweep`,
 everything else still loads and still reports.
 
 **A record must not carry a credential.** `brain/record-secret-suspected` reads
-the body and every extension key, and names the line or the key and the kind of
-credential and never the value — a finding that repeats
+the body and every extension key together with its value, as `brain new` reads
+the header it is about to write. It names the line or the key and the kind of
+credential and never the value, and a key only when the key itself carries
+nothing shaped like a credential — a finding that repeats
 a secret has published it a second time, somewhere people paste into chat. This
 rule was the one thing the methodology asserted with nothing checking it, and it
 matters most here: a brain repository is exactly what an organisation points a
