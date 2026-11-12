@@ -178,3 +178,18 @@ func TestCreateRejectsSecretInMetadata(t *testing.T) {
 		})
 	}
 }
+
+func TestCreateRefusesUnusableExtensionKeyWithoutQuotingIt(t *testing.T) {
+	root := t.TempDir()
+	token := "xoxb-" + strings.Repeat("a", 20)
+	_, err := brain.Create(root, brain.NewRecordInput{
+		Kind: brain.KindDecision, ID: "D-0001", Title: "Example", Now: reference,
+		ExtensionFields: map[string]any{" " + token: "x"},
+	})
+	if err == nil {
+		t.Fatal("a key with surrounding space was written")
+	}
+	if strings.Contains(err.Error(), token[:7]) {
+		t.Fatalf("refusal quoted the key: %v", err)
+	}
+}

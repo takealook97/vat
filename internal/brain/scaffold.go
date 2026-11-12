@@ -419,7 +419,8 @@ func headerWithExtensions(metadata Metadata, extensions map[string]any) (any, er
 	for _, key := range sortedExtensionKeys(extensions) {
 		switch {
 		case strings.TrimSpace(key) == "" || strings.TrimSpace(key) != key:
-			problems = append(problems, fmt.Sprintf("%q is not a usable key", key))
+			// Not quoted: a key is caller text and may be a credential.
+			problems = append(problems, "a key that is empty or has surrounding space is not usable")
 			continue
 		case IsDefinedField(key):
 			problems = append(problems, fmt.Sprintf("%s is a field vat defines", key))
@@ -427,7 +428,7 @@ func headerWithExtensions(metadata Metadata, extensions map[string]any) (any, er
 		}
 		var value yaml.Node
 		if err := value.Encode(extensions[key]); err != nil {
-			return nil, fmt.Errorf("encode %s: %w", key, err)
+			return nil, fmt.Errorf("encode %s: %w", keyLabel(key), err)
 		}
 		if value.Kind == yaml.ScalarNode && value.Tag == yamlStringTag {
 			value.Style = yaml.DoubleQuotedStyle

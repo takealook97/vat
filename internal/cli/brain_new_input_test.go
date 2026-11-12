@@ -103,7 +103,7 @@ func TestBrainNewRejectsHeadingAndReservedKeys(t *testing.T) {
 		{"reviewed_by", "", []string{"--set", "reviewed_by=me"}, "reviewed_by is a field vat defines"},
 		{"empty key", "", []string{"--set", "=x"}, "has no key"},
 		{"no equals", "", []string{"--set", "project"}, "key=value"},
-		{"repeated", "", []string{"--set", "a=1", "--set", "a=2"}, "given twice"},
+		{"repeated", "", []string{"--set", "a=1", "--set", "a=2"}, "--set #2 gives a a second time"},
 		{"external and owner", "", []string{"--source-external", "--owner", "brain"}, "--source-external"},
 	}
 	for _, tc := range cases {
@@ -236,5 +236,30 @@ func TestBrainNewPointsDefinedSourceFieldsAtTheirFlags(t *testing.T) {
 		if !brain.IsDefinedField(field) {
 			t.Errorf("%s is mapped to a flag but is not a defined field", field)
 		}
+	}
+}
+
+func TestBrainNewRejectsMalformedSetWithoutEchoingIt(t *testing.T) {
+	h := brainFixture(t)
+	// Assembled at run time so no credential-shaped literal sits in the tree.
+	token := "ghp_" + strings.Repeat("A", 36)
+	for name, args := range map[string][]string{
+		"no equals":    {"--set", token},
+		"empty key":    {"--set", "=" + token},
+		"repeated key": {"--set", token + "=a", "--set", token + "=b"},
+	} {
+		t.Run(name, func(t *testing.T) {
+			full := append([]string{"brain", "new", "decision", "--title", "example"}, args...)
+			code, output := h.run(full...)
+			if code != ExitUsage {
+				t.Errorf("exit %d, want %d:\n%s", code, ExitUsage, output)
+			}
+			if strings.Contains(output, token[:7]) {
+				t.Errorf("credential echoed on refusal (exit %d)", code)
+			}
+			if !strings.Contains(output, "--set #") {
+				t.Errorf("refusal does not say which --set it means:\n%s", output)
+			}
+		})
 	}
 }

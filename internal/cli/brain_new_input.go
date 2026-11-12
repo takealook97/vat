@@ -18,6 +18,9 @@ type extensionFlag struct {
 	keys   []string
 	values map[string]string
 	errs   []string
+	// count numbers the --set flags, so a refusal can say which one it means
+	// without repeating the argument.
+	count int
 }
 
 // String reports the keys collected so far, for the flag package.
@@ -25,14 +28,22 @@ func (f *extensionFlag) String() string { return strings.Join(f.keys, ",") }
 
 // Set records one key=value pair. Problems are collected rather than returned,
 // so every bad --set is named in one run.
+//
+// A refusal never repeats the argument. `--set` is where a script passes what
+// it copied, and an argument missing its "=" is as likely to be a token as a
+// key; printing it put the token into the terminal and every log of the run.
+// The flag is named by its position, and a key only once the credential scan
+// finds nothing in it.
 func (f *extensionFlag) Set(raw string) error {
+	f.count++
+	position := fmt.Sprintf("--set #%d", f.count)
 	key, value, found := strings.Cut(raw, "=")
 	key = strings.TrimSpace(key)
 	switch {
 	case !found:
-		f.errs = append(f.errs, fmt.Sprintf("--set %q needs the form key=value", raw))
+		f.errs = append(f.errs, position+" needs the form key=value")
 	case key == "":
-		f.errs = append(f.errs, fmt.Sprintf("--set %q has no key", raw))
+		f.errs = append(f.errs, position+" has no key")
 	case brain.IsDefinedField(key):
 		// Setting status or reviewed_by here would walk round promotion.
 		f.errs = append(f.errs, definedFieldRefusal(key))
@@ -41,13 +52,20 @@ func (f *extensionFlag) Set(raw string) error {
 			f.values = map[string]string{}
 		}
 		if _, repeated := f.values[key]; repeated {
-			f.errs = append(f.errs, fmt.Sprintf("--set %s is given twice", key))
+			f.errs = append(f.errs, repeatedKeyRefusal(position, key))
 			return nil
 		}
 		f.keys = append(f.keys, key)
 		f.values[key] = value
 	}
 	return nil
+}
+
+func repeatedKeyRefusal(position, key string) string {
+	if brain.DisplayableKey(key) {
+		return fmt.Sprintf("%s gives %s a second time", position, key)
+	}
+	return position + " repeats the key of an earlier --set"
 }
 
 // definedFieldFlags names the brain new flag that writes a defined field.
