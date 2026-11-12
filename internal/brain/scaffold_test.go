@@ -193,3 +193,28 @@ func TestCreateRefusesUnusableExtensionKeyWithoutQuotingIt(t *testing.T) {
 		t.Fatalf("refusal quoted the key: %v", err)
 	}
 }
+
+func TestCreateRefusesCredentialTitleWithLegacyBody(t *testing.T) {
+	token := "xoxb-" + strings.Repeat("a", 20)
+	for name, input := range map[string]brain.NewRecordInput{
+		"legacy body":     {Body: "# Safe heading\n\nSafe prose.\n"},
+		"body no heading": {BodyWithoutHeading: "Safe prose.\n"},
+		"default body":    {},
+	} {
+		t.Run(name, func(t *testing.T) {
+			root := t.TempDir()
+			input.Kind, input.ID, input.Title, input.Now = brain.KindDecision, "D-0001", token, reference
+			relative, err := brain.Create(root, input)
+			if err == nil {
+				t.Fatalf("a credential title was accepted and written to %d-byte path", len(relative))
+			}
+			if strings.Contains(err.Error(), token[:7]) {
+				t.Fatal("the refusal quoted the title")
+			}
+			entries, _ := os.ReadDir(filepath.Join(root, "decisions"))
+			if len(entries) != 0 {
+				t.Fatalf("refusal left %d files", len(entries))
+			}
+		})
+	}
+}

@@ -304,6 +304,12 @@ func Create(root string, input NewRecordInput) (string, error) {
 	if input.Title == "" {
 		return "", fmt.Errorf("a record needs a title")
 	}
+	// The title becomes the filename. The scan of the rendered record below
+	// reads it only when the body carries the default heading; a caller's own
+	// Body need not, and a token title then reached the disk as a file name.
+	if found := suspectedCredentials(input.Title); len(found) > 0 {
+		return "", fmt.Errorf("refused: the title would carry %s; nothing was written", found[0].name)
+	}
 	if strings.TrimSpace(input.SourceURL) != "" {
 		if err := ValidateSourceURL(input.SourceURL); err != nil {
 			return "", err

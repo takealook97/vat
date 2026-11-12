@@ -513,7 +513,9 @@ flag named: `--set source_url=...` points at `--source-url`, and
 `source_ref`, and cannot be combined with `--owner`. Before anything is written,
 the whole record — title, body, every header value — is checked for the
 credential shapes `brain/record-secret-suspected` knows; a match exits `1`,
-names only the kind and line, and writes nothing. Without `--body-stdin` the
+names only the kind and line, and writes nothing. The title is checked on its
+own first, because it also becomes the file name; a match there names the kind
+and says it is the title. Without `--body-stdin` the
 default body is unchanged.
 
 `--source-path` requires `--owner` and additionally pins the file the record
