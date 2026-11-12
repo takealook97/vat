@@ -902,3 +902,96 @@ func TestTheMemoryTemplateAsksForAnObservationNotAnInstruction(t *testing.T) {
 		t.Errorf("the Lesson guidance does not say why it wants an observation:\n%s", lesson)
 	}
 }
+
+// externalExtension is what a publishing job adds to a record it writes: an
+// external declaration and keys of its own. Every lifecycle write goes through
+// Merge, and each must hand these back unchanged.
+const externalExtension = "source_external: true\nproject: demo-project\nrun_id: run-0001\n" +
+	"model_family: demo-model\norigin: chat:DEMO/0001\nchannel: demo-channel\n" +
+	"captured_at: 2026-11-01T09:00:00Z\nsource_url: https://example.com/thread/0001"
+
+func extendHeader(t *testing.T, root, relative, status string) string {
+	t.Helper()
+	path := filepath.Join(root, filepath.FromSlash(relative))
+	original, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("read: %v", err)
+	}
+	extended := strings.Replace(string(original), "status: "+status, "status: "+status+"\n"+externalExtension, 1)
+	if err := os.WriteFile(path, []byte(extended), 0o644); err != nil {
+		t.Fatalf("write: %v", err)
+	}
+	return path
+}
+
+func assertExtensionKept(t *testing.T, path, wantStatus string) {
+	t.Helper()
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("read: %v", err)
+	}
+	if !strings.Contains(string(data), "status: "+wantStatus+"\n") {
+		t.Errorf("%s is not %s:\n%s", path, wantStatus, data)
+	}
+	for _, line := range strings.Split(externalExtension, "\n") {
+		if !strings.Contains(string(data), line+"\n") {
+			t.Errorf("%s lost %q:\n%s", filepath.Base(path), line, data)
+		}
+	}
+}
+
+func TestLifecyclePreservesExternalExtensions(t *testing.T) {
+	t.Run("supersede", func(t *testing.T) {
+		root := newStore(t)
+		oldPath := extendHeader(t, root, mustCreate(t, root, NewRecordInput{
+			Kind: KindDecision, ID: "D-0001", Title: "Old", Status: StatusActive, ClaimKind: ClaimHistorical,
+		}), "active")
+		newPath := extendHeader(t, root, mustCreate(t, root, NewRecordInput{
+			Kind: KindDecision, ID: "D-0002", Title: "New", Status: StatusActive, ClaimKind: ClaimHistorical,
+		}), "active")
+		store := mustLoad(t, root)
+		if err := Supersede(root, recordByID(t, store, "D-0001"), recordByID(t, store, "D-0002"), SupersedeOptions{}); err != nil {
+			t.Fatalf("supersede: %v", err)
+		}
+		assertExtensionKept(t, oldPath, "superseded")
+		assertExtensionKept(t, newPath, "active")
+	})
+	t.Run("revoke", func(t *testing.T) {
+		root := newStore(t)
+		path := extendHeader(t, root, mustCreate(t, root, NewRecordInput{
+			Kind: KindMemory, ID: "M-0001", Title: "Withdrawn", Status: StatusActive, ClaimKind: ClaimHistorical,
+		}), "active")
+		if err := Retire(root, recordByID(t, mustLoad(t, root), "M-0001"), StatusRevoked, "wrong thread"); err != nil {
+			t.Fatalf("revoke: %v", err)
+		}
+		assertExtensionKept(t, path, "revoked")
+	})
+	t.Run("sweep", func(t *testing.T) {
+		root := newStore(t)
+		path := extendHeader(t, root, mustCreate(t, root, NewRecordInput{
+			Kind: KindGap, ID: "G-0001", Title: "Aged", Status: StatusActive, ClaimKind: ClaimCurrentState,
+			OwnedBy: "vendor", SourceRef: "vendor@3f9a1c2e8b74",
+		}), "active")
+		applied, err := Sweep(mustLoad(t, root), defaultPolicy(), longAfter, true)
+		if err != nil || len(applied) != 1 {
+			t.Fatalf("sweep: %v %+v", err, applied)
+		}
+		assertExtensionKept(t, path, "stale")
+	})
+	t.Run("agent refuses", func(t *testing.T) {
+		root := newStore(t)
+		path := extendHeader(t, root, mustCreate(t, root, NewRecordInput{
+			Kind: KindMemory, ID: "M-0001", Title: "External", ClaimKind: ClaimHistorical,
+		}), "provisional")
+		before, _ := os.ReadFile(path)
+		err := Promote(root, recordByID(t, mustLoad(t, root), "M-0001"), PromoteRequest{
+			Reviewer: "Agent <agent@example.com>", Now: observedOn, RequireReviewer: true, AgentGate: true,
+		})
+		if err == nil || !strings.Contains(err.Error(), "source_ref pinned with a path") {
+			t.Fatalf("agent accepted an external record: %v", err)
+		}
+		if after, _ := os.ReadFile(path); string(after) != string(before) {
+			t.Fatal("a refused promotion changed the record")
+		}
+	})
+}

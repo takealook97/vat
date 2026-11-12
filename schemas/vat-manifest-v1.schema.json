@@ -101,7 +101,11 @@
             "repo": { "type": "string" },
             "stale_after_days": { "type": "integer", "minimum": 0 },
             "review_sla_days": { "type": "integer", "minimum": 0 },
-            "require_promotion_gate": { "type": "boolean" }
+            "require_promotion_gate": { "type": "boolean" },
+            "require_external_evidence": {
+              "description": "Fail vat brain check for a source_external record without source_url and source_quote. Off when absent.",
+              "type": "boolean"
+            }
           }
         },
         "changeset": {

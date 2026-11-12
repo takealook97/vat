@@ -260,16 +260,26 @@ type NewRecordInput struct {
 	ClaimKind  ClaimKind
 	OwnedBy    string
 	SourceRef  string
-	Axis       string
-	Refs       []string
-	Body       string
-	Now        time.Time
+	// SourceURL and SourceQuote carry evidence for a claim about a system the
+	// workspace does not govern. A malformed address is refused here rather
+	// than written and then reported.
+	SourceURL   string
+	SourceQuote string
+	Axis        string
+	Refs        []string
+	Body        string
+	Now         time.Time
 }
 
 // Create writes a new atomic record and returns its path relative to root.
 func Create(root string, input NewRecordInput) (string, error) {
 	if input.Title == "" {
 		return "", fmt.Errorf("a record needs a title")
+	}
+	if strings.TrimSpace(input.SourceURL) != "" {
+		if err := ValidateSourceURL(input.SourceURL); err != nil {
+			return "", err
+		}
 	}
 	// Checked here rather than at the command, so no caller can write a record
 	// to a path of its own choosing.
@@ -288,15 +298,17 @@ func Create(root string, input NewRecordInput) (string, error) {
 	}
 
 	metadata := Metadata{
-		ID:         input.ID,
-		RecordedBy: input.RecordedBy,
-		Status:     status,
-		Date:       now.Format("2006-01-02"),
-		ClaimKind:  input.ClaimKind,
-		OwnedBy:    input.OwnedBy,
-		SourceRef:  input.SourceRef,
-		Axis:       input.Axis,
-		Refs:       input.Refs,
+		ID:          input.ID,
+		RecordedBy:  input.RecordedBy,
+		Status:      status,
+		Date:        now.Format("2006-01-02"),
+		ClaimKind:   input.ClaimKind,
+		OwnedBy:     input.OwnedBy,
+		SourceRef:   input.SourceRef,
+		SourceURL:   strings.TrimSpace(input.SourceURL),
+		SourceQuote: strings.TrimSpace(input.SourceQuote),
+		Axis:        input.Axis,
+		Refs:        input.Refs,
 	}
 	if input.ClaimKind == ClaimCurrentState {
 		metadata.ObservedAt = now.Format("2006-01-02")

@@ -90,6 +90,8 @@ func brainPolicy(ws *workspace.Workspace) brain.CheckPolicy {
 		StaleAfterDays: ws.Manifest.Policy.Brain.StaleAfterDays,
 		ReviewSLADays:  ws.Manifest.Policy.Brain.ReviewSLADays,
 		PromotionGate:  ws.Manifest.Policy.Gates.BrainPromote,
+
+		RequireExternalEvidence: ws.Manifest.Policy.Brain.RequireExternalEvidence,
 	}
 }
 

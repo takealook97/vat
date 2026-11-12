@@ -63,9 +63,11 @@ whoever is reading it now.
 
 They are a convention, not a schema. Nothing checks them yet, deliberately: a
 field becomes part of the record schema here only once there is a rule worth
-enforcing on it, and that is decided by use rather than in advance. A lesson
-scoped to a branch is not recorded at all — it expires before anyone re-reads
-it.
+enforcing on it, and that is decided by use rather than in advance. Until then a
+workspace that wants one in the header writes it as an extension key
+([SPEC §5.6.1](SPEC.md#561-extension-keys)): vat and the published record schema
+both accept it, preserve it, and check nothing about it. A lesson scoped to a
+branch is not recorded at all — it expires before anyone re-reads it.
 
 ---
 
@@ -132,6 +134,9 @@ refs: [O-0003, D-0031]
 | `claim_kind` | `current-state`, `historical`, or `intent` |
 | `owned_by` | the repository canonical for this fact |
 | `source_ref` | `<repo>@<revision>[:<path>]` — an exact revision, never a branch |
+| `source_external` | `true` when the source is a system this workspace does not govern |
+| `source_url` | for an external claim: the `http`/`https` address it was read from |
+| `source_quote` | for an external claim: the source's own words, copied verbatim |
 | `observed_at` | `YYYY-MM-DD`, when it was last verified against its source |
 | `revalidate_on` | what should trigger a re-check |
 | `supersedes` / `superseded_by` | the decision replacement chain |
@@ -140,6 +145,7 @@ refs: [O-0003, D-0031]
 | `reason` | required for `quarantined` and `revoked` |
 | `recorded_by` | git author (`Name <email>`) who created it, when configured |
 | `reviewed_by` | git author (`Name <email>`) who promoted it |
+| `promoted_via` | the gate the last promotion passed: `auto`, `manual`, or `agent` |
 
 ### `claim_kind` decides which rules apply
 
@@ -290,8 +296,15 @@ Analysis does not become organisational truth because it was useful. A claim
 about the present with no owner and no source revision cannot be promoted at
 all — the refusal is what makes the gate real rather than decorative.
 
-Promotion stamps the observation date and the reviewer, and there are three
-further things it will not do.
+Promotion stamps the observation date, the reviewer, and the gate it passed
+(`promoted_via`), and there are three further things it will not do.
+
+`promoted_via` exists because the reviewer cannot tell the gates apart. With an
+identity configured, `auto` writes `reviewed_by` exactly as `manual` does, and a
+brain that a person and a publishing job both promote into could not say which
+records anyone was required to look at. The field names the path, not a review:
+it is rewritten by each promotion, kept by every other transition, and absent
+on records promoted before it existed — vat does not guess it for them.
 
 **It will not re-date a claim against evidence nobody looked at.** vat reads the
 owning repository. If it is still at the revision the claim was pinned to,
@@ -510,6 +523,8 @@ knows to look for, so this table and `brain.RuleNames()` are compared by a test.
 | `brain/claim-source` | error | a current-state claim with no `source_ref`, or one that is not `<repo>@<revision>[:<path>]` |
 | `brain/claim-source-branch` | warn | evidence pinned to a branch, which keeps moving and takes the claim's meaning with it |
 | `brain/claim-stale` | warn | an active claim past the policy window; `vat brain sweep --apply` demotes it |
+| `brain/external-evidence-missing` | error | under `policy.brain.require_external_evidence`, a `source_external` record — archived ones included — with no `source_url` or no `source_quote` |
+| `brain/external-source-url` | error | a `source_url` that is not an absolute `http`/`https` address with a host, or that carries user information; the address is never opened |
 | `brain/date-unreadable` | warn | a present but invalid date no staleness rule can read; an absent optional `date` is not an error |
 | `brain/id-duplicate` | error | two records claiming the same identifier, so a reference resolves to either |
 | `brain/id-missing` | error | a record with no identifier; nothing can cite it and nothing can supersede it |
@@ -625,7 +640,7 @@ it and read by nothing else:
 | --- | --- |
 | `goals/`, `gaps/`, `decisions/`, `memory/` | atomic records, one fact each, with provenance in the header |
 | `CURRENT.md` and the root projections | vat's own summary layer, already written |
-| `graph.json` | every record's id, kind, **status**, `citable_until` for dated current-state claims, path, owner, `source_ref`, and a `content_hash` per record, under graph `schema_version: 2` |
+| `graph.json` | every record's id, kind, **status**, `citable_until` for dated current-state claims, path, owner, `source_ref`, and a `content_hash` per record, under graph `schema_version: 2`; when present, `claim_kind`, `date`, `promoted_via`, the external evidence fields, and `extensions` holding the record's undefined header keys |
 | `archive/`, `history/` | everything finished with, in directories of their own |
 
 Four rules make that safe to index:
@@ -744,6 +759,27 @@ because nothing here can re-read it for you. Setting it for a repository the
 workspace *does* govern is an error: it would exempt a checkable claim from
 every rule that makes it checkable.
 
+A claim read from something that is not a repository at all — a chat thread, a
+ticket, a vendor page — has no revision to pin. Record where it came from and
+what it said instead:
+
+```yaml
+source_external: true
+source_url: https://example.com/thread/0001
+source_quote: The cutover moves to Monday.
+```
+
+`vat brain new --source-url <url> --source-quote "..."` writes both.
+`brain/external-source-url` reports an address that is not an absolute `http`
+or `https` URL, or that carries user information — wherever it is written, and
+without opening it. Set `policy.brain.require_external_evidence: true` and
+`brain/external-evidence-missing` fails every `source_external` record lacking
+either field, including archived ones. It is off by default so records written
+before these fields existed keep passing; fill those in, or move them, before
+turning it on. Neither rule checks that the quote is really at the address, or
+that the record belongs to the project it says it does. That judgement stays
+with whoever wrote the record.
+
 ---
 
 ## Keeping the maintained views honest
@@ -785,6 +821,13 @@ live citability boolean. Query computes citability at read time. Projections are
 deterministic: time passing causes no drift or build churn, while a change to
 the workspace observation window requires rebuilding. Record content hashes do
 not change merely because evidence ages.
+
+A node also carries the record's `claim_kind` and `date`, and its extension keys
+under `extensions`, each omitted when the record has none. A reader that lists
+records from the graph alone — a repository hosting API, with no vat binary —
+gets them without re-parsing every file. They are display data: an extension
+spelled `state` or `citable_until` moves neither the node's status nor its
+expiry, and editing one drifts `graph.json` like any other change to a record.
 
 Above them, **Canonical views** links the maintained synthesis documents that
 exist — `STATUS.md`, `GOAL.md`, `ROADMAP.md` and the rest. An adopted repository

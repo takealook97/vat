@@ -25,6 +25,10 @@ const (
 // select.
 const ruleClaimSource = "brain/claim-source"
 
+// ruleRecordMalformed is reported for an unreadable file and for an extension
+// value graph.json cannot carry, and listed in two more places.
+const ruleRecordMalformed = "brain/record-malformed"
+
 // Finding is one rule violation.
 type Finding struct {
 	Rule     string   `json:"rule"`
@@ -51,6 +55,10 @@ type CheckPolicy struct {
 	// ReviewSLADays is how long a record may stay in a non-answerable state
 	// before the queue itself is reported as failing.
 	ReviewSLADays int
+	// RequireExternalEvidence reports a source_external record that lacks
+	// source_url or source_quote. Off by default, so records written before
+	// the fields existed do not start failing on upgrade.
+	RequireExternalEvidence bool
 	// Only narrows the report to rules whose name contains one of these. It is
 	// for working through one class of problem at a time; an empty list checks
 	// everything.
@@ -103,11 +111,13 @@ func RuleNames() []string {
 		"brain/claim-source-branch",
 		"brain/claim-stale",
 		"brain/date-unreadable",
+		ruleExternalEvidenceMissing,
+		ruleExternalSourceURL,
 		"brain/id-duplicate",
 		"brain/id-missing",
 		"brain/link-broken",
 		"brain/quarantine-reason",
-		"brain/record-malformed",
+		ruleRecordMalformed,
 		"brain/record-oversized",
 		"brain/record-secret-suspected",
 		"brain/ref-missing",
@@ -147,12 +157,14 @@ func Check(store *Store, policy CheckPolicy, now time.Time) []Finding {
 	}
 	findings = append(findings, checkSchema(store)...)
 	findings = append(findings, checkMalformed(store)...)
+	findings = append(findings, checkExtensionValues(store)...)
 	findings = append(findings, checkSecrets(store)...)
 	findings = append(findings, checkIdentity(store)...)
 	findings = append(findings, checkStatuses(store)...)
 	findings = append(findings, checkArchiveHygiene(store)...)
 	findings = append(findings, checkRecordSize(store)...)
 	findings = append(findings, checkProvenance(store, policy, now)...)
+	findings = append(findings, checkExternalEvidence(store, policy)...)
 	findings = append(findings, checkSupersession(store, index)...)
 	findings = append(findings, checkReferences(store, index)...)
 	findings = append(findings, checkLinks(store)...)
@@ -223,9 +235,26 @@ func checkMalformed(store *Store) []Finding {
 	findings := make([]Finding, 0, len(store.Malformed))
 	for _, broken := range store.Malformed {
 		findings = append(findings, Finding{
-			Rule: "brain/record-malformed", Severity: SeverityError, Path: broken.Path,
+			Rule: ruleRecordMalformed, Severity: SeverityError, Path: broken.Path,
 			Message: fmt.Sprintf("could not be read as a record: %s", broken.Problem),
 		})
+	}
+	return findings
+}
+
+// checkExtensionValues reports extension keys graph.json cannot carry. The
+// record itself still loads and every other rule still reaches it; only the
+// key is missing from the projection, and saying nothing would leave a reader
+// of the graph believing the record never had it.
+func checkExtensionValues(store *Store) []Finding {
+	var findings []Finding
+	for _, record := range store.Records {
+		for _, problem := range record.ExtensionProblems {
+			findings = append(findings, Finding{
+				Rule: ruleRecordMalformed, Severity: SeverityError, Path: record.Path, ID: record.ID,
+				Message: problem,
+			})
+		}
 	}
 	return findings
 }

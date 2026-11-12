@@ -5,7 +5,7 @@
   "description": "The YAML front matter of one atomic knowledge record. The record's kind comes from the directory it sits in and its title from the body's heading, so neither appears here. Normative prose is docs/SPEC.md section 5; where the two disagree, SPEC.md is the specification and this file has a bug.",
   "type": "object",
   "required": ["id", "status"],
-  "additionalProperties": false,
+  "additionalProperties": true,
   "properties": {
     "id": {
       "description": "Names the record's file, so it is bounded by what is safe to build a path from. Deliberately looser than any one numbering scheme: a workspace may name records however it likes.",
@@ -30,6 +30,15 @@
       "description": "Declares that source_ref names a system this workspace does not govern, and deliberately so. Without it the only way to stop a tool reporting an ungoverned source is to enrol that system in the manifest, which silences the report by claiming to sync, diagnose, and ship a repository nobody owns. It suppresses nothing else: the claim still expires like any other. An implementation MUST refuse it when the named repository IS governed.",
       "type": "boolean"
     },
+    "source_url": {
+      "description": "Where a claim about an external system was read, as an absolute http or https address naming a host. User information is refused, because that is where a credential sits in a URL. Nothing opens it: whether it resolves is not checked.",
+      "type": "string",
+      "pattern": "^[Hh][Tt][Tt][Pp][Ss]?://[^/@\\s]+(?:[/?#]\\S*)?$"
+    },
+    "source_quote": {
+      "description": "The source's own words, copied verbatim, so a reader can judge the claim without trusting a summary. Whether the words appear at source_url is not checked.",
+      "type": "string"
+    },
     "observed_at": { "type": "string" },
     "revalidate_on": { "type": "string" },
     "supersedes": { "type": "array", "items": { "type": "string" } },
@@ -47,7 +56,8 @@
     "reviewed_by": {
       "description": "Git author who promoted the record, as Name <email>. Required by manual and agent gates; auto may omit it when unset.",
       "type": "string"
-    }
+    },
+    "promoted_via": { "$ref": "#/$defs/promotionGate" }
   },
   "$defs": {
     "status": {
@@ -59,6 +69,11 @@
       "description": "What kind of claim this is. Only current-state decays with time: an intent does not stop being the intent because a year passed.",
       "type": "string",
       "enum": ["current-state", "historical", "intent"]
+    },
+    "promotionGate": {
+      "description": "The gate the last promotion passed. It is the path taken, not evidence that a person reviewed the record: auto may carry a reviewed_by too, when an identity was configured. Absent on records promoted before the field existed; nothing infers it for them.",
+      "type": "string",
+      "enum": ["auto", "manual", "agent"]
     }
   }
 }

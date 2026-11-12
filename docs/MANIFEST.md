@@ -194,6 +194,7 @@ which text is data.
 | `stale_after_days` | `90` | an active current-state claim is demoted once its observation is older than this |
 | `review_sla_days` | `30` | how long a claim may sit unreviewed before the queue itself is reported as failing |
 | `require_promotion_gate` | `true` | a canonical record needs an explicit promotion step |
+| `require_external_evidence` | `false` | a `source_external` record needs `source_url` and `source_quote`; omitted from the file unless set |
 
 Choosing `stale_after_days`: shorter than how fast your systems actually change,
 longer than your team can realistically re-verify. Ninety days suits most teams;

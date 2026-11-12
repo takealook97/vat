@@ -230,3 +230,204 @@ date: 2026-08-01
 		t.Error("the hash survived a rewritten body, so an index would serve the previous wording")
 	}
 }
+
+// fullNode is what a reader without the binary decodes when it lists records
+// from graph.json alone.
+type fullNode struct {
+	ID             string         `json:"id"`
+	Status         string         `json:"status"`
+	CitableUntil   string         `json:"citable_until"`
+	ClaimKind      string         `json:"claim_kind"`
+	Date           string         `json:"date"`
+	PromotedVia    string         `json:"promoted_via"`
+	SourceURL      string         `json:"source_url"`
+	SourceQuote    string         `json:"source_quote"`
+	SourceExternal bool           `json:"source_external"`
+	Extensions     map[string]any `json:"extensions"`
+}
+
+func buildFullGraph(t *testing.T, root string) (map[string]fullNode, []byte) {
+	t.Helper()
+	buildGraph(t, root)
+	content, err := os.ReadFile(filepath.Join(root, "graph.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var graph struct {
+		Nodes []fullNode `json:"nodes"`
+	}
+	if err := json.Unmarshal(content, &graph); err != nil {
+		t.Fatal(err)
+	}
+	nodes := map[string]fullNode{}
+	for _, node := range graph.Nodes {
+		nodes[node.ID] = node
+	}
+	return nodes, content
+}
+
+func TestGraphIncludesOptionalClaimDateAndExtensions(t *testing.T) {
+	// Arrange
+	root, _ := newStore(t)
+	writeRecord(t, root, "memory/2026-11/M-0001-external.md", `
+id: M-0001
+status: active
+date: 2026-11-01
+claim_kind: historical
+source_external: true
+source_url: https://example.com/thread/1
+source_quote: The cutover moves to Monday.
+promoted_via: auto
+project: demo-project
+captured_at: 2026-11-01T09:00:00Z
+attempts: 3
+`, "# External event")
+	writeRecord(t, root, "decisions/D-0001-legacy.md", `
+id: D-0001
+status: active
+`, "# A legacy record")
+
+	// Act
+	nodes, content := buildFullGraph(t, root)
+
+	// Assert
+	external := nodes["M-0001"]
+	if external.ClaimKind != "historical" || external.Date != "2026-11-01" || external.PromotedVia != "auto" ||
+		external.SourceURL != "https://example.com/thread/1" || external.SourceQuote != "The cutover moves to Monday." ||
+		!external.SourceExternal {
+		t.Errorf("defined fields missing from the node: %+v", external)
+	}
+	want := map[string]any{"project": "demo-project", "captured_at": "2026-11-01T09:00:00Z", "attempts": float64(3)}
+	if len(external.Extensions) != len(want) {
+		t.Errorf("extensions %v, want %v", external.Extensions, want)
+	}
+	for key, value := range want {
+		if external.Extensions[key] != value {
+			t.Errorf("extension %s = %#v, want %#v", key, external.Extensions[key], value)
+		}
+	}
+	for _, defined := range []string{"source_url", "promoted_via", "claim_kind", "status"} {
+		if _, mixed := external.Extensions[defined]; mixed {
+			t.Errorf("defined field %s leaked into extensions", defined)
+		}
+	}
+	legacy := nodes["D-0001"]
+	if legacy.Extensions != nil || legacy.ClaimKind != "" || legacy.Date != "" {
+		t.Errorf("a record without the fields gained them: %+v", legacy)
+	}
+	if strings.Contains(string(content), `"extensions": {}`) || strings.Contains(string(content), `"extensions": null`) {
+		t.Error("an empty extensions object was written instead of being omitted")
+	}
+}
+
+// An extension key is display-only (SPEC 5.6.1). One spelled like a lifecycle
+// field must not move the node's status or citability.
+func TestGraphExtensionsDoNotAffectCitability(t *testing.T) {
+	// Arrange
+	root, _ := newStore(t)
+	header := `
+id: G-0001
+status: active
+claim_kind: current-state
+owned_by: payments
+source_ref: payments@3f9a1c2e8b74
+observed_at: 2026-08-01
+`
+	writeRecord(t, root, "gaps/G-0001-plain.md", header, "# A claim")
+	plain, _ := buildFullGraph(t, root)
+	writeRecord(t, root, "gaps/G-0001-plain.md", header+"state: resolved\ncitable: false\ncitable_until: 2099-01-01\n", "# A claim")
+
+	// Act
+	extended, _ := buildFullGraph(t, root)
+
+	// Assert
+	before, after := plain["G-0001"], extended["G-0001"]
+	if before.Status != after.Status || before.CitableUntil != after.CitableUntil || after.CitableUntil == "" {
+		t.Fatalf("an extension key moved the lifecycle: before %+v after %+v", before, after)
+	}
+	if after.Extensions["state"] != "resolved" || after.Extensions["citable_until"] != "2099-01-01" {
+		t.Errorf("extensions not published as written: %v", after.Extensions)
+	}
+}
+
+// graph.json is committed, so two builds of the same records must be the same
+// bytes, whatever order a mapping was written in.
+func TestGraphNestedExtensionsAreDeterministic(t *testing.T) {
+	// Arrange
+	root, _ := newStore(t)
+	writeRecord(t, root, "decisions/D-0001-a.md", `
+id: D-0001
+status: active
+review:
+  zeta: [1, two, {b: 2, a: 1}]
+  alpha: {nested: true, empty: null}
+`, "# Ordered one way")
+	first, firstBytes := buildFullGraph(t, root)
+	writeRecord(t, root, "decisions/D-0001-a.md", `
+id: D-0001
+status: active
+review:
+  alpha: {empty: null, nested: true}
+  zeta: [1, two, {a: 1, b: 2}]
+`, "# Ordered one way")
+
+	// Act
+	second, secondBytes := buildFullGraph(t, root)
+	_, rebuilt := buildFullGraph(t, root)
+
+	// Assert
+	strip := func(content []byte) string {
+		var lines []string
+		for _, line := range strings.Split(string(content), "\n") {
+			if !strings.Contains(line, "content_hash") {
+				lines = append(lines, line)
+			}
+		}
+		return strings.Join(lines, "\n")
+	}
+	if strip(firstBytes) != strip(secondBytes) {
+		t.Errorf("key order changed the graph:\n%s\n---\n%s", firstBytes, secondBytes)
+	}
+	if string(secondBytes) != string(rebuilt) {
+		t.Error("rebuilding the same records changed the bytes")
+	}
+	review, _ := first["D-0001"].Extensions["review"].(map[string]any)
+	if review == nil || second["D-0001"].Extensions["review"] == nil {
+		t.Fatalf("nested extension missing: %v", first["D-0001"].Extensions)
+	}
+	alpha, _ := review["alpha"].(map[string]any)
+	if alpha["nested"] != true || alpha["empty"] != nil {
+		t.Errorf("nested values changed: %v", review)
+	}
+}
+
+// A value JSON cannot hold is reported against the record rather than dropped
+// in silence or allowed to take the record out of every other rule.
+func TestGraphReportsAnExtensionJSONCannotHold(t *testing.T) {
+	root, _ := newStore(t)
+	writeRecord(t, root, "decisions/D-0001-a.md", `
+id: D-0001
+status: active
+weights: {1: heavy}
+ratio: .nan
+note: kept
+`, "# Odd keys")
+	store, err := brain.Load(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	record := store.ByID()["D-0001"]
+	if record.Status != brain.StatusActive || record.Extensions["note"] != "kept" {
+		t.Fatalf("the record did not load with its readable extensions: %+v", record)
+	}
+	var reported []string
+	for _, finding := range brain.Check(store, brain.CheckPolicy{}, reference) {
+		if finding.Rule == "brain/record-malformed" {
+			reported = append(reported, finding.Message)
+		}
+	}
+	joined := strings.Join(reported, "\n")
+	if len(reported) != 2 || !strings.Contains(joined, "weights") || !strings.Contains(joined, "ratio") {
+		t.Fatalf("want one finding each for weights and ratio, got %q", reported)
+	}
+}

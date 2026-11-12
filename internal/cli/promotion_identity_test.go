@@ -1,12 +1,15 @@
 package cli
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"testing"
 
 	"github.com/takealook97/vat/internal/brain"
+	"github.com/takealook97/vat/internal/frontmatter"
 )
 
 func isolateGitIdentity(t *testing.T) {
@@ -312,5 +315,182 @@ func TestAgentPromotionNamesAnUnreadableRepositoryAsSuch(t *testing.T) {
 	}
 	if strings.Contains(output, "does not hold") {
 		t.Fatalf("a missing clone was reported as a missing file: %s", output)
+	}
+}
+
+// externalExtensionKeys is the shape a publishing job writes: a historical
+// claim about a system outside the workspace, carrying its own keys. Every
+// value is invented.
+var externalExtensionKeys = map[string]string{
+	"project":      "demo-project",
+	"run_id":       "run-0001",
+	"model_family": "demo-model",
+	"origin":       "chat:DEMO/0001",
+	"channel":      "demo-channel",
+	"captured_at":  "2026-11-01T09:00:00Z",
+	"source_url":   "https://example.com/thread/0001",
+}
+
+func extendExternalRecord(t *testing.T, path string) {
+	t.Helper()
+	extension := "status: provisional\nsource_external: true"
+	for _, key := range extensionKeyOrder() {
+		extension += "\n" + key + ": " + externalExtensionKeys[key]
+	}
+	content := strings.Replace(readFile(t, path), "status: provisional", extension, 1)
+	content += "\n## Quote\n\nThe original wording, kept verbatim.\n"
+	writeFile(t, path, content)
+}
+
+func extensionKeyOrder() []string {
+	keys := make([]string, 0, len(externalExtensionKeys))
+	for key := range externalExtensionKeys {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+	return keys
+}
+
+func headerFields(t *testing.T, path string) (map[string]any, string) {
+	t.Helper()
+	doc := frontmatter.Split(readFile(t, path))
+	fields, err := doc.Fields()
+	if err != nil {
+		t.Fatal(err)
+	}
+	return fields, doc.Body
+}
+
+// A publishing job promotes under the auto gate with no human identity, and
+// writes historical records about systems outside the workspace. Nothing in
+// that combination needs a change; this pins that it keeps working, and that
+// the job's own keys and quoted body survive promotion, build, and check.
+func TestAutoPromotesHistoricalExternalRecordsWithoutIdentityAndPreservesExtensions(t *testing.T) {
+	for _, tc := range []struct{ kind, id string }{{"memory", "M-0001"}, {"decision", "D-0001"}} {
+		t.Run(tc.kind, func(t *testing.T) {
+			// Arrange
+			isolateGitIdentity(t)
+			h := brainFixture(t)
+			git(t, h.path("brain"), "config", "--unset", "user.name")
+			git(t, h.path("brain"), "config", "--unset", "user.email")
+			manifest := readFile(t, h.path("vat.yaml"))
+			writeFile(t, h.path("vat.yaml"), strings.Replace(manifest, "brain_promote: manual", "brain_promote: auto", 1))
+			h.mustRun("brain", "new", tc.kind, "--title", "An external event", "--claim", "historical")
+			path := findRecord(t, h, tc.id)
+			extendExternalRecord(t, path)
+			before, beforeBody := headerFields(t, path)
+			if _, ok := before["source_ref"]; ok {
+				t.Fatalf("fixture carries a source_ref: %v", before)
+			}
+
+			// Act
+			h.mustRun("brain", "promote", tc.id)
+			h.mustRun("brain", "build")
+			h.mustRun("brain", "check")
+
+			// Assert
+			after, afterBody := headerFields(t, path)
+			if after["status"] != "active" || after["observed_at"] == nil {
+				t.Fatalf("not promoted: %v", after)
+			}
+			text := readFile(t, path)
+			for key, want := range externalExtensionKeys {
+				if fmt.Sprint(after[key]) != fmt.Sprint(before[key]) || !strings.Contains(text, "\n"+key+": "+want+"\n") {
+					t.Errorf("%s changed: %v -> %v", key, before[key], after[key])
+				}
+			}
+			if after["source_external"] != true || after["claim_kind"] != "historical" || after["promoted_via"] != "auto" {
+				t.Errorf("declared fields changed: %v", after)
+			}
+			for _, key := range []string{"reviewed_by", "recorded_by", "source_ref"} {
+				if _, ok := after[key]; ok {
+					t.Errorf("%s was invented: %v", key, after[key])
+				}
+			}
+			if afterBody != beforeBody || !strings.Contains(afterBody, "## Quote") {
+				t.Errorf("body changed:\n%s", afterBody)
+			}
+		})
+	}
+}
+
+// The agent gate asks for evidence vat can re-read, which an external record
+// cannot offer. The auto success above must not have loosened that.
+func TestAgentStillRefusesHistoricalExternalRecords(t *testing.T) {
+	isolateGitIdentity(t)
+	h := brainFixture(t)
+	manifest := readFile(t, h.path("vat.yaml"))
+	writeFile(t, h.path("vat.yaml"), strings.Replace(manifest, "brain_promote: manual", "brain_promote: agent", 1))
+	h.mustRun("brain", "new", "memory", "--title", "An external event", "--claim", "historical")
+	path := findRecord(t, h, "M-0001")
+	extendExternalRecord(t, path)
+	before := readFile(t, path)
+	code, output := h.run("brain", "promote", "M-0001")
+	if code != ExitFindings || !strings.Contains(output, "source_ref pinned with a path") {
+		t.Fatalf("agent accepted an external record: %d %s", code, output)
+	}
+	if readFile(t, path) != before {
+		t.Fatal("a refused promotion changed the record")
+	}
+}
+
+func setPromotionGate(t *testing.T, h *workspaceFixture, gate string) {
+	t.Helper()
+	manifest := readFile(t, h.path("vat.yaml"))
+	for _, from := range []string{"manual", "auto", "agent"} {
+		manifest = strings.Replace(manifest, "brain_promote: "+from, "brain_promote: "+gate, 1)
+	}
+	writeFile(t, h.path("vat.yaml"), manifest)
+}
+
+// With an identity configured, auto writes reviewed_by exactly as manual does,
+// so the record itself was the only place the gate could be told apart, and it
+// said nothing.
+func TestPromotionRecordsActualGate(t *testing.T) {
+	for _, gate := range []string{"manual", "agent", "auto"} {
+		t.Run(gate, func(t *testing.T) {
+			isolateGitIdentity(t)
+			h := brainFixture(t)
+			setPromotionGate(t, h, gate)
+			h.mustRun("brain", "new", "goal", "--title", "An intended outcome")
+			h.mustRun("brain", "promote", "O-0001")
+			store, err := brain.Load(h.path("brain"))
+			if err != nil {
+				t.Fatal(err)
+			}
+			record := store.ByID()["O-0001"]
+			if record.PromotedVia != gate || record.ReviewedBy == "" {
+				t.Fatalf("promoted_via %q reviewed_by %q, want %q and an identity", record.PromotedVia, record.ReviewedBy, gate)
+			}
+			h.mustRun("brain", "check")
+		})
+	}
+}
+
+func TestRefusedPromotionDoesNotChangeGate(t *testing.T) {
+	// Arrange
+	isolateGitIdentity(t)
+	h := brainFixture(t)
+	git(t, h.path("brain"), "config", "--unset", "user.name")
+	git(t, h.path("brain"), "config", "--unset", "user.email")
+	setPromotionGate(t, h, "auto")
+	h.mustRun("brain", "new", "decision", "--title", "First promoted by a job")
+	h.mustRun("brain", "promote", "D-0001")
+	path := findRecord(t, h, "D-0001")
+	before := readFile(t, path)
+	if !strings.Contains(before, "promoted_via: auto\n") {
+		t.Fatalf("auto promotion not recorded:\n%s", before)
+	}
+
+	// Act
+	setPromotionGate(t, h, "manual")
+	code, output := h.run("brain", "promote", "D-0001")
+
+	// Assert
+	if code != ExitFindings || !strings.Contains(output, "requires a git identity") {
+		t.Fatalf("manual accepted a missing identity: %d %s", code, output)
+	}
+	if readFile(t, path) != before {
+		t.Fatal("a refused promotion rewrote the record")
 	}
 }

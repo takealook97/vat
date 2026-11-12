@@ -154,6 +154,7 @@ repos:
 | `policy.brain.stale_after_days` | no | the window after which a current-state claim is demoted (§6) |
 | `policy.brain.review_sla_days` | no | the window a queued record is expected to be judged within |
 | `policy.brain.require_promotion_gate` | no | require an explicit promotion step (§5.6) |
+| `policy.brain.require_external_evidence` | no | require `source_url` and `source_quote` on external records (§5.5.1) |
 | `policy.changeset.max_open_days` | no | the age at which an open changeset is reported as stale (§7) |
 | `policy.changeset.require_rollback_point` | no | refuse a participant with no revision to return to |
 | `policy.gates.deploy` | no | `manual` or `auto` |
@@ -319,6 +320,9 @@ refs: [O-0001]
 | `claim_kind` | see §5.4 | `current-state`, `historical`, or `intent` |
 | `owned_by` | see §5.4 | the repository or system canonical for the fact |
 | `source_ref` | see §5.4 | `<repo>@<revision>[:<path>]` |
+| `source_external` | see §5.5.1 | the source is a system the workspace does not govern |
+| `source_url` | see §5.5.1 | the `http`/`https` address an external claim was read from |
+| `source_quote` | see §5.5.1 | the source's own words, copied verbatim |
 | `observed_at` | see §5.4 | when the claim was last verified against its source |
 | `revalidate_on` | no | what should trigger a re-check |
 | `supersedes` / `superseded_by` | see §5.5 | the replacement chain |
@@ -327,6 +331,7 @@ refs: [O-0001]
 | `reason` | see §5.3 | why a record was quarantined or revoked |
 | `recorded_by` | no | git author (`Name <email>`) who created it |
 | `reviewed_by` | no | git author (`Name <email>`) who promoted it |
+| `promoted_via` | no | the gate the last promotion passed: `auto`, `manual`, or `agent` |
 
 The filename **SHOULD** begin with the identifier. The filename is **not**
 authoritative: `id` is.
@@ -429,6 +434,14 @@ identity as optional `recorded_by`, omitting it when unset. Identity **MUST
 NOT** be supplied as free text at the command line. A git author attributes the
 action; it does not prove whether a human or an agent performed it.
 
+Promotion **SHOULD** record the gate it passed as `promoted_via` — `auto`,
+`manual`, or `agent` — replacing any earlier value, and **MUST NOT** change it
+when the promotion is refused. Every other transition **MUST** preserve it. It
+records the path a record took, not that anyone reviewed it: with an identity
+configured, `auto` writes `reviewed_by` as well. A record without the field is
+valid; an implementation **MUST NOT** infer it for records promoted before it
+existed.
+
 Re-dating a current-state claim's `observed_at` is an assertion that somebody
 re-read the source. An implementation **MUST NOT** move `observed_at` forward
 solely because the source revision has changed. Renewed source review, asserted
@@ -458,6 +471,20 @@ would exempt a checkable claim from every rule that makes it checkable — and
 still expires: nothing here can re-read it, which is the reason to be explicit
 rather than quiet.
 
+A source that is not a repository has no revision for `source_ref` to pin. Such
+a record **MAY** carry `source_url`, the address it was read from, and
+`source_quote`, the source's own words copied verbatim. When `source_url` is
+present on any record, an implementation **MUST** report it unless it is an
+absolute `http` or `https` URL naming a host and carrying no user information,
+and **MUST NOT** quote the value in that report. When
+`policy.brain.require_external_evidence` is `true`, an implementation **MUST**
+report every `source_external` record — archived records included — that lacks
+either field. Both reports **MUST** be judged from the record alone: an
+implementation **MUST NOT** open the address, and does not judge whether the
+quote appears there. Neither field changes any lifecycle judgement. Before this
+revision some writers kept `source_url` as an extension key; it is the same key,
+and a reader takes its value as this field.
+
 ### 5.6.1 Extension keys
 
 A record's front matter **MAY** carry keys this specification does not define.
@@ -472,6 +499,11 @@ samples" — and collapsing that into `status` is what the strict lifecycle
 prevents. Keep the text; keep it out of the classification. A generator that
 read `resolved` out of such a note and treated the record as terminal made
 partially resolved gaps disappear from its own index.
+
+The published record schema follows the same rule: it validates the fields this
+specification defines and lets every other key through. A record a schema
+validator rejects only because it carries an extension key is a defect in the
+schema, not in the record.
 
 An extension key is display-only by definition. A key that a workspace wants
 enforced is a rule, and a rule belongs in this specification or in that
@@ -517,6 +549,20 @@ read time; static projection readers compare the expiry date against today.
 Drift compares against the current workspace policy, so changing the window
 requires rebuilding, while elapsed time alone does not cause drift.
 The atomic record and `.brain` marker contract remains version **1**.
+
+A graph node **MAY** also carry, each omitted when the record has no value for
+it: `claim_kind`, `date`, `promoted_via`, `source_external`, `source_url`,
+`source_quote`, and `extensions`. These are optional additions to graph schema
+version **2**, not a new version (§11). `extensions` is an object holding the
+record's extension keys (§5.6.1) — every front matter key §5.2 does not define —
+with their values: mappings with string keys, lists, strings, numbers, booleans,
+and null. A timestamp is carried as the text written in the record. A value
+outside that set is reported as a malformed record and left out; the rest of
+the record is unaffected. Fields this specification defines are carried under
+their own names and never inside `extensions`. `extensions` is display data:
+a reader **MUST NOT** derive status or citability from it, and the writer does
+not consult it for either. Object keys are written in sorted order, so the same
+records always produce the same bytes.
 
 Each node **MUST** carry `content_hash`: the record file hashed with SHA-256,
 hex-encoded, prefixed `sha256:`. The hash covers the whole file, header

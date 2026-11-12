@@ -471,7 +471,8 @@ region.
 ```
 vat brain init      [directory]
 vat brain new       <goal|gap|decision|memory> --title "..." [--claim <kind>]
-                    [--owner <repo>] [--source-path <p>] [--axis <a>]
+                    [--owner <repo>] [--source-path <p>]
+                    [--source-url <url>] [--source-quote "..."] [--axis <a>]
                     [--refs <ids>] [--id <id>]
 vat brain build
 vat brain check     [--only <rule>] [--list]
@@ -503,6 +504,13 @@ later run can ask is whether the repository moved — which in an active one is
 always yes. Pinned to a file, it can ask whether *this* claim's evidence moved,
 and `brain/source-revision-drift`
 stays silent when it did not.
+
+`--source-url` and `--source-quote` record evidence for a claim read from
+something that is not a repository: the address, and the source's own words.
+`new` refuses an address that is not an absolute `http` or `https` URL with a
+host, or that carries user information, and writes nothing. Neither flag sets
+`source_external`; `brain check` reports both fields' absence only when
+`policy.brain.require_external_evidence` is set.
 
 `query` searches a deliberately narrow surface. `--all` widens it to history,
 archives, and terminal records — for auditing why something was decided, rather
@@ -551,6 +559,11 @@ them.
 policy. `graph.json` carries graph `schema_version: 2`, the window
 `stale_after_days`, `citable_until` on dated current-state nodes, and
 `content_hash` on every node, so an index re-reads only the records that changed.
+A node also carries, when the record has them, `claim_kind`, `date`,
+`promoted_via`, `source_external`, `source_url`, `source_quote`, and
+`extensions` — the record's undefined header keys, for display only. An
+extension value JSON cannot hold is reported by `brain check` as
+`brain/record-malformed` and left out of the graph.
 Both are projections: a hand edit is drift, and the next build overwrites it.
 `CURRENT.md` shows expiry dates and routes active current-state claims without
 readable observation dates to **Needs attention**. Compare expiry dates with
@@ -589,7 +602,9 @@ Non-goal `source_external` records and sources outside `vat.yaml` cannot be
 agent-promoted because their pinned evidence cannot be checked. Under every gate,
 non-current-state records retain their original pin even with `--reverified`;
 the agent gate checks the path at that pin without comparing it with HEAD.
-Goals use the manual conditions even under `agent`.
+Goals use the manual conditions even under `agent`. Each successful promotion
+writes the configured gate as `promoted_via` (`auto`, `manual`, or `agent`),
+replacing an earlier value; a refused promotion leaves the record unchanged.
 
 `supersede` leaves the replacement `provisional` when
 `policy.brain.require_promotion_gate` is set, so a new decision still crosses the

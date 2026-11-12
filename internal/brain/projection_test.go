@@ -237,3 +237,41 @@ func TestCurrentNamesNewDecisionsTheCitationRankingWouldHide(t *testing.T) {
 		t.Errorf("the recency list has %d entries, want at most 5:\n%s", newest, index)
 	}
 }
+
+// A committed graph.json that kept an old extension value would publish what
+// the record no longer says. Drift has to see it.
+func TestGraphDriftIncludesExtensions(t *testing.T) {
+	// Arrange
+	root, _ := newStore(t)
+	writeRecord(t, root, "decisions/D-0001-a.md", "id: D-0001\nstatus: active\nproject: demo-project\n", "# A decision")
+	store, err := brain.Load(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := brain.Build(store, brain.CheckPolicy{StaleAfterDays: 90}); err != nil {
+		t.Fatal(err)
+	}
+
+	// Act
+	writeRecord(t, root, "decisions/D-0001-a.md", "id: D-0001\nstatus: active\nproject: other-project\n", "# A decision")
+	store, err = brain.Load(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	drifted, err := brain.Drift(store, brain.CheckPolicy{StaleAfterDays: 90})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Assert
+	if !slices.Contains(drifted, "graph.json") {
+		t.Fatalf("an extension edit did not drift graph.json: %v", drifted)
+	}
+	graph, err := brain.RenderGraph(store, brain.CheckPolicy{StaleAfterDays: 90})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(graph), `"project": "other-project"`) {
+		t.Errorf("the rendered graph does not carry the new value:\n%s", graph)
+	}
+}

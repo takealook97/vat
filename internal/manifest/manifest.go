@@ -216,6 +216,11 @@ type BrainPolicy struct {
 	// RequirePromotionGate forbids an agent from writing a canonical record
 	// without an explicit promotion step.
 	RequirePromotionGate bool `yaml:"require_promotion_gate" json:"require_promotion_gate"`
+	// RequireExternalEvidence makes `vat brain check` fail a source_external
+	// record without source_url and source_quote. It is omitted when false so
+	// a manifest that never sets it stays readable by a vat that predates it:
+	// the manifest is a closed format, and an older reader rejects the key.
+	RequireExternalEvidence bool `yaml:"require_external_evidence,omitempty" json:"require_external_evidence,omitempty"`
 }
 
 // ChangesetPolicy bounds the multi-repository atomicity records.

@@ -6,6 +6,37 @@ Notable changes to `vat`. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- `graph.json` nodes carry `claim_kind`, `date`, `promoted_via`,
+  `source_external`, `source_url`, `source_quote`, and `extensions` (the
+  record's undefined header keys), each omitted when absent. Graph
+  `schema_version` stays 2: these are optional fields. An extension value JSON
+  cannot hold is reported as `brain/record-malformed` and left out. Run
+  `vat brain build` after upgrading; a committed graph drifts until rebuilt.
+- Records about systems outside the workspace can carry `source_url` and
+  `source_quote`, and `vat brain new` writes them with `--source-url` and
+  `--source-quote`. Two `vat brain check` rules judge them without opening the
+  address: `brain/external-source-url` (a malformed address, or one carrying
+  user information) and `brain/external-evidence-missing` (an external record
+  lacking either field, only under the new opt-in
+  `policy.brain.require_external_evidence`). A `source_url` previously kept as
+  an extension key reads as the field unchanged. An older vat rejects a
+  manifest that sets the new policy key.
+- `vat brain promote` records the gate it passed as `promoted_via` (`auto`,
+  `manual`, or `agent`). With an identity configured, `auto` wrote
+  `reviewed_by` just as `manual` did, so a record could not say which gate
+  promoted it. Records promoted earlier stay valid without the field.
+  `brain.PromoteRequest` gains `PromotionGate`; callers that leave it empty keep
+  the gate their `RequireReviewer` and `AgentGate` describe.
+
+### Fixed
+
+- The published brain record schema accepts extension keys. It rejected every
+  key `docs/SPEC.md` §5.6.1 allows, so a validator failed records vat accepted.
+  The schema keeps its URL and only widens; defined fields are checked as
+  before.
+
 ## [0.7.0] - 2026-10-06
 
 ### Upgrading to 0.7.0

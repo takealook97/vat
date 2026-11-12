@@ -214,6 +214,14 @@ type Metadata struct {
 	// like any other; nothing here can re-read it for you, which is the reason
 	// to be explicit rather than quiet.
 	SourceExternal bool `yaml:"source_external,omitempty"`
+	// SourceURL is where an external claim was read: an absolute http or https
+	// address. source_ref cannot hold it, because source_ref names a
+	// repository at a revision.
+	SourceURL string `yaml:"source_url,omitempty"`
+	// SourceQuote is the source's own words, copied verbatim, so a reader can
+	// judge the claim without trusting whoever summarised it. vat does not
+	// check that the words are really at SourceURL.
+	SourceQuote string `yaml:"source_quote,omitempty"`
 	// ObservedAt is the date the claim was last verified against its source.
 	ObservedAt string `yaml:"observed_at,omitempty"`
 	// RevalidateOn describes what should trigger a re-check.
@@ -234,6 +242,11 @@ type Metadata struct {
 	RecordedBy string `yaml:"recorded_by,omitempty"`
 	// ReviewedBy records the git author who promoted the record.
 	ReviewedBy string `yaml:"reviewed_by,omitempty"`
+	// PromotedVia names the gate the last promotion passed: auto, manual, or
+	// agent. With an identity configured, auto writes reviewed_by exactly as
+	// manual does, so without this a record could not say whether anyone was
+	// required to look at it. It is the path taken, not evidence of review.
+	PromotedVia string `yaml:"promoted_via,omitempty"`
 }
 
 // Record is one atomic fact: its metadata, its prose, and where it lives.
@@ -244,6 +257,12 @@ type Record struct {
 	Path  string
 	Title string
 	Body  string
+	// Extensions holds the header keys Metadata does not model, as values JSON
+	// can hold. Display data only (SPEC 5.6.1): no rule reads it.
+	Extensions map[string]any
+	// ExtensionProblems names the extension keys that could not be carried,
+	// so check can report them without dropping the rest of the record.
+	ExtensionProblems []string
 	// Archived reports that the record has been moved out of the working set.
 	// It is still loaded — the supersession chain it belongs to is checked
 	// from both ends — but it is not part of what the layer is working on.

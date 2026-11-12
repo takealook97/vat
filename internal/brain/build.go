@@ -474,16 +474,28 @@ const GraphSchemaVersion = 2
 
 // GraphNode is one record in the exported knowledge graph.
 type GraphNode struct {
-	CitableUntil string   `json:"citable_until,omitempty"`
-	ID           string   `json:"id"`
-	Kind         Kind     `json:"kind"`
-	Status       Status   `json:"status"`
-	Title        string   `json:"title"`
-	Path         string   `json:"path"`
-	OwnedBy      string   `json:"owned_by,omitempty"`
-	SourceRef    string   `json:"source_ref,omitempty"`
-	Observed     string   `json:"observed_at,omitempty"`
-	Refs         []string `json:"refs,omitempty"`
+	CitableUntil string    `json:"citable_until,omitempty"`
+	ID           string    `json:"id"`
+	Kind         Kind      `json:"kind"`
+	Status       Status    `json:"status"`
+	Title        string    `json:"title"`
+	Path         string    `json:"path"`
+	OwnedBy      string    `json:"owned_by,omitempty"`
+	SourceRef    string    `json:"source_ref,omitempty"`
+	Observed     string    `json:"observed_at,omitempty"`
+	Refs         []string  `json:"refs,omitempty"`
+	ClaimKind    ClaimKind `json:"claim_kind,omitempty"`
+	Date         string    `json:"date,omitempty"`
+	// The defined evidence and promotion fields are published under their own
+	// names rather than inside Extensions, so a reader never has to know which
+	// release promoted a key from convention to field.
+	PromotedVia    string `json:"promoted_via,omitempty"`
+	SourceExternal bool   `json:"source_external,omitempty"`
+	SourceURL      string `json:"source_url,omitempty"`
+	SourceQuote    string `json:"source_quote,omitempty"`
+	// Extensions carries the record's undefined header keys for display
+	// (SPEC 5.6.1). encoding/json sorts map keys, so it is deterministic.
+	Extensions map[string]any `json:"extensions,omitempty"`
 	// ContentHash is Record.ContentHash, published.
 	//
 	// Never omitted when empty: an absent field would be indistinguishable from
@@ -523,6 +535,9 @@ func RenderGraph(store *Store, policy CheckPolicy) ([]byte, error) {
 			ID: record.ID, Kind: record.Kind, Status: record.Status, CitableUntil: citableUntil(record, policy),
 			Title: record.Title, Path: record.Path, OwnedBy: record.OwnedBy,
 			SourceRef: record.SourceRef, Observed: record.ObservedAt, Refs: record.Refs,
+			ClaimKind: record.ClaimKind, Date: record.Date, PromotedVia: record.PromotedVia,
+			SourceExternal: record.SourceExternal, SourceURL: record.SourceURL, SourceQuote: record.SourceQuote,
+			Extensions:  record.Extensions,
 			ContentHash: record.ContentHash,
 		})
 		for _, ref := range record.Refs {
