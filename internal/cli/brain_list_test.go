@@ -1,10 +1,14 @@
 package cli
 
 import (
+	"bytes"
+	"context"
 	"encoding/json"
 	"os"
 	"strings"
 	"testing"
+
+	"github.com/takealook97/vat/internal/ui"
 )
 
 type listPayload struct {
@@ -164,5 +168,25 @@ func TestBrainListCarriesPromotionAndExternalEvidence(t *testing.T) {
 		if extensions, _ := record["extensions"].(map[string]any); len(extensions) != 0 {
 			t.Errorf("%s: defined fields leaked into extensions: %v", id, extensions)
 		}
+	}
+}
+
+func TestBrainListJSONKeepsRowsWhenAnExtensionCannotBeJSON(t *testing.T) {
+	h := brainFixture(t)
+	h.mustRun("brain", "new", "decision", "--title", "Valid row")
+	writeFile(t, h.path("brain/decisions/D-0002-numeric.md"),
+		"---\nid: D-0002\nstatus: provisional\ncustom: .nan\n---\n\n# Numeric\n")
+	var out, errOut bytes.Buffer
+	env := &Env{Printer: ui.NewWith(&out, &errOut, false), Now: testNow, Cwd: h.root, Root: h.root, JSON: true}
+	code := dispatch(context.Background(), env, Root(), []string{"brain", "list"}, nil)
+	var result struct {
+		Records []map[string]any `json:"records"`
+		Skipped []map[string]any `json:"skipped"`
+	}
+	if err := json.Unmarshal(out.Bytes(), &result); err != nil {
+		t.Fatalf("exit=%d stdout=%q stderr=%s: %v", code, out.String(), errOut.String(), err)
+	}
+	if code != ExitOK || len(result.Records) != 2 {
+		t.Fatalf("exit=%d records=%d, want both records listed", code, len(result.Records))
 	}
 }
