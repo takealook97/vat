@@ -918,6 +918,10 @@ secrets, which is below the threshold that justified consolidating them. The
 question after adoption is whether a layer is still earning its keep, which
 `vat metrics` measures over time, not whether to start it.
 
+The knowledge layer's threshold is exact: a decision has already been lost, 5+
+agent sessions per week, or 2+ people across 4+ repositories. Four sessions a
+week is below it.
+
 `--json` returns one object per layer with the fields `layer`, `adopt`,
 `adopted`, `threshold`, `because`, and `command`.
 

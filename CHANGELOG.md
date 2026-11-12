@@ -6,6 +6,12 @@ Notable changes to `vat`. The format follows
 
 ## [Unreleased]
 
+### Fixed
+
+- `vat fit` names the knowledge layer's real threshold, 5+ agent sessions per
+  week, instead of "agents work here weekly"; the methodology table and the FAQ
+  say the same.
+
 ## [0.7.0] - 2026-10-06
 
 ### Upgrading to 0.7.0

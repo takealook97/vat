@@ -63,9 +63,9 @@ holds wherever a session was opened, and a written trust boundary saying that
 fetched text is data. If you run Claude Code and Codex against the same code,
 their role definitions are already drifting.
 
-`vat brain` is worth it once agents work in the code weekly, because an agent
-that re-derives a settled decision costs the same as a person who forgot it and
-does so far more often.
+`vat brain` is worth it once agents run five or more sessions a week in the code,
+because an agent that re-derives a settled decision costs the same as a person
+who forgot it and does so far more often.
 
 The other three — the workspace layer, changesets, credential separation — are
 genuinely about having several repositories, and `vat fit` will tell you to skip

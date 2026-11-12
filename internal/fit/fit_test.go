@@ -231,3 +231,38 @@ func TestADeclaredSignalStillProducesItsOwnReason(t *testing.T) {
 		}
 	}
 }
+
+// The printed threshold said "agents work here weekly" while the condition is
+// five sessions a week, so a reader running agents twice a week was told the
+// layer pays when the advisor itself would say not yet.
+func TestBrainThresholdNamesFiveWeeklyAgentSessions(t *testing.T) {
+	const want = "a decision has already been lost, 5+ agent sessions per week, or 2+ people across 4+ repositories"
+	cases := []struct {
+		name     string
+		sessions int
+		adopt    bool
+	}{
+		{"four sessions is below the threshold", 4, false},
+		{"five sessions reaches it", 5, true},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			// Arrange
+			signals := fit.Signals{Repositories: 1, People: 1, AgentSessions: tc.sessions}
+
+			// Act
+			verdict, found := verdictFor(fit.Assess(signals), fit.LayerBrain)
+
+			// Assert
+			if !found {
+				t.Fatal("no verdict for the knowledge layer")
+			}
+			if verdict.Adopt != tc.adopt {
+				t.Errorf("adopt = %v at %d sessions, want %v", verdict.Adopt, tc.sessions, tc.adopt)
+			}
+			if verdict.Threshold != want {
+				t.Errorf("threshold = %q, want %q", verdict.Threshold, want)
+			}
+		})
+	}
+}

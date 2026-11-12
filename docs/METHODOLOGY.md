@@ -514,7 +514,7 @@ all of it within a month.
 | workspace | 3+ repositories worked in together |
 | harness | coding agents work in this code at all |
 | changesets | 2+ interfaces cross a repository boundary |
-| brain | a decision was already lost, agents work here weekly, or 2+ people across 4+ repositories |
+| brain | a decision has already been lost, 5+ agent sessions per week, or 2+ people across 4+ repositories |
 | credential | secrets live in 2+ places |
 
 The order matters. Adopting the knowledge layer before the workspace is stable
