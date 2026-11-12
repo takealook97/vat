@@ -6,6 +6,14 @@ Notable changes to `vat`. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- `--brain-dir <dir>` and standalone brains: `vat brain` works on a directory no
+  workspace governs, found by `--brain-dir` or by its `.brain` marker, under the
+  `policy` block the marker may now carry. A workspace's `vat.yaml` still wins
+  wherever there is one, and `vat doctor` warns with `policy-conflict` about
+  each marker value that disagrees with it.
+
 ### Fixed
 
 - `vat fit` names the knowledge layer's real threshold, 5+ agent sessions per

@@ -25,6 +25,7 @@ file does not use is not a diagnosis.
 | Flag | Effect |
 | --- | --- |
 | `--workspace <dir>` | use this workspace root instead of searching upward |
+| `--brain-dir <dir>` | use this brain directory for `vat brain`, with or without a workspace around it |
 | `--json` | machine-readable output |
 | `--quiet` | print only warnings and failures |
 | `--no-color` | disable colour (also honours `NO_COLOR`) |
@@ -193,7 +194,7 @@ secret value.
 | workspace | manifest validity, root versioning, `.gitignore` coverage |
 | repositories | presence, origin, branch, cleanliness |
 | credentials | files that look like plaintext secrets, encrypted count, age since last change, key material readable by other users |
-| brain | record counts, review queue, claims whose evidence has moved, generated-file freshness |
+| brain | record counts, review queue, claims whose evidence has moved, generated-file freshness, and `policy-conflict`: one warning per value the brain's `.brain` marker declares differently from `vat.yaml`, naming both files and that `vat.yaml` wins |
 | changesets | open and overdue work |
 | recovery | commits and stashes that exist only on this machine |
 | network | `--network` only: whether the GitHub CLI is authenticated, and the platform vat is running on |
@@ -633,6 +634,36 @@ routed there when `STATUS.md` is absent.
 Every `vat brain` command refuses a repository that has no marker, naming
 `vat brain init` and `vat brain adopt`. Without that refusal `vat brain build`
 wrote an index into a directory that is not a brain.
+
+**A brain without a workspace.** The brain a command acts on is, in order: the
+directory named by `--brain-dir`; otherwise the brain the workspace declares;
+otherwise, only when there is no `vat.yaml` above the current directory, the
+nearest directory upward holding a `.brain` marker. A `vat.yaml` that exists
+and fails to load is reported, never passed over for a marker, because that
+would run a governed brain under the wrong policy. `--brain-dir` naming the
+workspace's own brain keeps the workspace; naming any other directory makes it
+standalone.
+
+A standalone brain runs under the `policy` block of its marker (see
+[SPEC.md](SPEC.md) §5.1); a key the marker does not declare takes the default
+`promotion_gate: manual`, `stale_after_days: 90`, `review_sla_days: 30`,
+`require_promotion_gate: true`. Where a workspace governs the brain, its
+`vat.yaml` policy wins entirely, defaults included, and `vat doctor` warns about
+each marker value that disagrees. An invalid marker policy is refused with
+every bad key named.
+
+`vat --brain-dir <dir> brain init [directory]` scaffolds at `<dir>`, which is
+the write boundary in this mode: `directory` is taken relative to it and may not
+leave it, through `..` or a symbolic link. Without a workspace the marker it
+writes carries the policy block with every default spelled out. Outside a
+workspace, `vat brain init` without `--brain-dir` exits `2` and says to pass it.
+
+What needs a repository list is refused on a standalone brain, exiting `2`:
+`new --owner` and `--source-path` (so `--claim current-state` too),
+`review --drifted`, and `adopt`. `review` without `--drifted` lists the
+lifecycle queue alone. Under the `agent` gate a non-goal record is refused,
+because its evidence must be read from a governed repository; goals still
+follow the manual conditions, and the manual gate still requires a git identity.
 
 `archive` moves superseded, revoked, and resolved records into `archive/`,
 repointing the relative links inside them. Nothing is deleted and an archived

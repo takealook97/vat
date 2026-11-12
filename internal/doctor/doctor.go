@@ -516,11 +516,12 @@ func checkBrain(ws *workspace.Workspace, now time.Time, driftedClaims []string) 
 			Fix:    "vat brain init",
 		}}
 	}
+	conflicts := checkBrainPolicy(ws, root)
 	store, err := brain.Load(root)
 	if err != nil {
-		return []Finding{{
+		return append(conflicts, Finding{
 			Section: sectionBrain, Subject: subjectRecords, Status: StatusFail, Detail: err.Error(),
-		}}
+		})
 	}
 	policy := brain.CheckPolicy{
 		StaleAfterDays: ws.Manifest.Policy.Brain.StaleAfterDays,
@@ -532,9 +533,11 @@ func checkBrain(ws *workspace.Workspace, now time.Time, driftedClaims []string) 
 	if archived := len(store.Records) - working; archived > 0 {
 		detail += fmt.Sprintf(", %d archived", archived)
 	}
-	findings := []Finding{{
+	findings := make([]Finding, 0, len(conflicts)+1)
+	findings = append(findings, conflicts...)
+	findings = append(findings, Finding{
 		Section: sectionBrain, Subject: subjectRecords, Status: StatusOK, Detail: detail,
-	}}
+	})
 	// A record vat cannot parse is invisible to every other rule about it, so
 	// saying nothing here would report a clean knowledge layer that is not one.
 	if len(store.Malformed) > 0 {
@@ -770,4 +773,48 @@ func otherRemotes(ctx context.Context, dir string) []string {
 		}
 	}
 	return extra
+}
+
+// subjectPolicyConflict names a value the brain's marker and vat.yaml both set,
+// differently.
+const subjectPolicyConflict = "policy-conflict"
+
+// checkBrainPolicy reports every policy value the brain's marker declares
+// that vat.yaml contradicts. vat.yaml wins every one — the marker policy is for
+// a brain no workspace governs — but a marker saying 30 days under a manifest
+// saying 90 is a reader being told two things, and the one they read first is
+// the one in the directory they are standing in.
+//
+// Only keys the marker declares are compared. A marker without a policy block
+// is the normal case for a workspace brain and has nothing to disagree with.
+func checkBrainPolicy(ws *workspace.Workspace, root string) []Finding {
+	marker := filepath.Join(ws.Rel(root), brain.MarkerFile)
+	declared, err := brain.ReadMarkerPolicy(root)
+	if err != nil {
+		return []Finding{{
+			Section: sectionBrain, Subject: subjectPolicyConflict, Status: StatusWarn,
+			Detail: fmt.Sprintf("the policy in %s cannot be read, and vat.yaml governs this brain regardless: %v", marker, err),
+			Fix:    fmt.Sprintf("correct or remove the policy block in %s", marker),
+		}}
+	}
+	workspaceValues := map[string]any{
+		brain.PolicyPromotionGate:        ws.Manifest.Policy.Gates.BrainPromote,
+		brain.PolicyStaleAfterDays:       ws.Manifest.Policy.Brain.StaleAfterDays,
+		brain.PolicyReviewSLADays:        ws.Manifest.Policy.Brain.ReviewSLADays,
+		brain.PolicyRequirePromotionGate: ws.Manifest.Policy.Brain.RequirePromotionGate,
+	}
+	var findings []Finding
+	for _, key := range declared.Keys() {
+		want := workspaceValues[key]
+		if declared[key] == want {
+			continue
+		}
+		findings = append(findings, Finding{
+			Section: sectionBrain, Subject: subjectPolicyConflict, Status: StatusWarn,
+			Detail: fmt.Sprintf("%s: %s says %v, %s says %v; %s wins",
+				key, manifest.FileName, want, marker, declared[key], manifest.FileName),
+			Fix: fmt.Sprintf("make %s in %s match %s, or remove it", key, marker, manifest.FileName),
+		})
+	}
+	return findings
 }

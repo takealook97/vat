@@ -62,6 +62,8 @@ type Env struct {
 	Cwd string
 	// Root overrides workspace discovery.
 	Root string
+	// BrainDir names a brain directly, with or without a workspace around it.
+	BrainDir string
 	// Yes answers confirmation prompts affirmatively. It exists for CI, and
 	// deliberately does not extend to destructive repository removal.
 	Yes bool
@@ -167,6 +169,7 @@ func Execute(ctx context.Context, args []string) int {
 	noColor := global.Bool("no-color", false, "disable colour output")
 	quiet := global.Bool("quiet", false, "print only warnings and failures")
 	root := global.String("workspace", "", "workspace root (default: search upward for vat.yaml)")
+	brainDir := global.String("brain-dir", "", "brain directory (default: the workspace's, else search upward for .brain)")
 	yes := global.Bool("yes", false, "assume yes for confirmations that are not destructive")
 	showVersion := global.Bool("version", false, "print the version and exit")
 
@@ -177,6 +180,7 @@ func Execute(ctx context.Context, args []string) int {
 	}
 	env.JSON = *jsonOut
 	env.Root = *root
+	env.BrainDir = *brainDir
 	env.Yes = *yes
 	if *noColor {
 		env.Printer = env.Printer.WithColor(false)
@@ -381,6 +385,7 @@ func printHelp(printer *ui.Printer, command *Command, path []string) {
 		printer.Println()
 		printer.Println("Global flags:")
 		printer.Println("  --workspace <dir>  workspace root (default: search upward for vat.yaml)")
+		printer.Println("  --brain-dir <dir>  brain directory, with or without a workspace")
 		printer.Println("  --json             machine-readable output")
 		printer.Println("  --quiet            print only warnings and failures")
 		printer.Println("  --no-color         disable colour")

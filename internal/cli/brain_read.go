@@ -38,13 +38,14 @@ are auditing why something was decided rather than asking what is true now.`,
 			if set.NArg() == 0 {
 				return usageErrorf("expected at least one search term")
 			}
-			ws, store, err := openBrain(env)
+			bc, err := resolveBrain(env)
 			if err != nil {
 				return err
 			}
+			store := bc.Store
 			hits, matched := brain.Query(store, set.Args(), brain.QueryOptions{
 				IncludeHistory: *all, IncludeTerminal: *all, Limit: *limit,
-			}, brainPolicy(ws), env.Now)
+			}, bc.Policy, env.Now)
 			if env.JSON {
 				if hits == nil {
 					hits = []brain.Hit{}
@@ -117,19 +118,27 @@ to prevent.`,
 			if err := parseFlags(set, args); err != nil {
 				return err
 			}
-			ws, store, err := openBrain(env)
+			bc, err := resolveBrain(env)
 			if err != nil {
 				return err
 			}
+			if *driftedOnly && bc.Standalone() {
+				return refuseStandalone("--drifted")
+			}
+			store := bc.Store
 			items := []brain.ReviewItem{}
 			if !*driftedOnly {
-				items = brain.ReviewQueue(store, brainPolicy(ws), env.Now)
+				items = brain.ReviewQueue(store, bc.Policy, env.Now)
 			}
-			drifted, err := driftedClaims(ctx, ws, env.Now)
-			if err != nil {
-				return err
+			// Drift is evidence moving in a governed repository; a standalone
+			// brain has none to read, so its queue is the lifecycle alone.
+			if !bc.Standalone() {
+				drifted, err := driftedClaims(ctx, bc.Workspace, env.Now)
+				if err != nil {
+					return err
+				}
+				items = append(items, brain.DriftItems(store, drifted, env.Now)...)
 			}
-			items = append(items, brain.DriftItems(store, drifted, env.Now)...)
 			brain.SortReviewItems(items)
 			if *overdueOnly {
 				filtered := items[:0]
@@ -173,7 +182,7 @@ to prevent.`,
 				}
 			}
 			env.Printer.Hint("\n%d awaiting review, %d past the %d-day window.",
-				len(items), overdue, ws.Manifest.Policy.Brain.ReviewSLADays)
+				len(items), overdue, bc.Policy.ReviewSLADays)
 			if moved > 0 {
 				env.Printer.Hint("%d of them stayed citable: the evidence moved, which is not the claim becoming false.", moved)
 			}
@@ -201,11 +210,11 @@ that keeps the layer honest across years rather than months.`,
 			if err := parseFlags(set, args); err != nil {
 				return err
 			}
-			ws, store, err := openBrain(env)
+			bc, err := resolveBrain(env)
 			if err != nil {
 				return err
 			}
-			transitions, err := brain.Sweep(store, brainPolicy(ws), env.Now, *apply)
+			transitions, err := brain.Sweep(bc.Store, bc.Policy, env.Now, *apply)
 			if err != nil {
 				return err
 			}

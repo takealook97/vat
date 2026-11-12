@@ -28,7 +28,7 @@ func Mark(root string) (bool, error) {
 	if fsx.Exists(path) {
 		return false, nil
 	}
-	if err := fsx.WriteFileAtomic(path, []byte(markerContent()), fsx.DefaultFileMode); err != nil {
+	if err := fsx.WriteFileAtomic(path, []byte(markerContent(nil)), fsx.DefaultFileMode); err != nil {
 		return false, err
 	}
 	return true, nil
@@ -38,6 +38,14 @@ func Mark(root string) (bool, error) {
 // repository. It never overwrites a file that already exists, so running it on
 // an existing repository is safe and additive.
 func Init(root string, now time.Time) ([]string, error) {
+	return InitWithPolicy(root, now, nil)
+}
+
+// InitWithPolicy is Init for a brain no workspace governs: the marker it
+// writes carries the policy block, so the values the brain runs under are on
+// disk where a reader can see them instead of in a default nobody wrote down.
+// A nil policy writes the marker Init always wrote.
+func InitWithPolicy(root string, now time.Time, policy *MarkerPolicy) ([]string, error) {
 	var created []string
 
 	for _, kind := range Kinds() {
@@ -52,7 +60,7 @@ func Init(root string, now time.Time) ([]string, error) {
 	}
 
 	files := map[string]string{
-		MarkerFile:        markerContent(),
+		MarkerFile:        markerContent(policy),
 		"AGENTS.md":       agentsContent(),
 		"README.md":       readmeContent(),
 		"GOAL.md":         projectionStub("Goals", "goal", "What this organisation is trying to become, and how each outcome is judged."),
@@ -79,10 +87,17 @@ func Init(root string, now time.Time) ([]string, error) {
 	return created, nil
 }
 
-func markerContent() string {
-	return "# This directory is a vat brain repository.\n" +
+func markerContent(policy *MarkerPolicy) string {
+	content := "# This directory is a vat brain repository.\n" +
 		"# Generated projections: CURRENT.md, graph.json — rebuild with `vat brain build`.\n" +
 		fmt.Sprintf("schema: %d\n", SchemaVersion)
+	if policy == nil {
+		return content
+	}
+	return content +
+		"# Lifecycle policy for this brain when no workspace manifest governs it.\n" +
+		"# A workspace's vat.yaml, when there is one, wins over every value here.\n" +
+		markerPolicyBlock(*policy)
 }
 
 func readmeContent() string {

@@ -450,6 +450,21 @@ $ cat brain/.brain
 schema: 1
 ```
 
+A brain scaffolded without a workspace, with `vat --brain-dir <dir> brain init`,
+also writes the policy it runs under, because no `vat.yaml` holds it:
+
+```
+policy:
+  promotion_gate: manual
+  stale_after_days: 90
+  review_sla_days: 30
+  require_promotion_gate: true
+```
+
+Inside a workspace, `vat.yaml` wins over every one of these, and `vat doctor`
+warns about each value the marker states differently. [SPEC.md](SPEC.md) §5.1
+has the rules.
+
 Schema 1 is:
 
 | | |

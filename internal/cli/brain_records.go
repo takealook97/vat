@@ -76,10 +76,11 @@ func runBrainNew(ctx context.Context, env *Env, args []string) error {
 		return usageErrorf("--title must be one line: it becomes the record's heading")
 	}
 
-	ws, store, err := openBrain(env)
+	bc, err := resolveBrain(env)
 	if err != nil {
 		return err
 	}
+	store := bc.Store
 
 	input := brain.NewRecordInput{
 		Kind: kind, ID: *id, Title: *title, OwnedBy: *owner,
@@ -101,7 +102,10 @@ func runBrainNew(ctx context.Context, env *Env, args []string) error {
 		return usageErrorf("a current-state claim needs --owner: which repository is canonical for this fact?")
 	}
 	if *owner != "" {
-		reference, err := sourceReferenceFor(ctx, ws, *owner, *sourcePath)
+		if bc.Standalone() {
+			return refuseStandalone("--owner")
+		}
+		reference, err := sourceReferenceFor(ctx, bc.Workspace, *owner, *sourcePath)
 		if err != nil {
 			return err
 		}
@@ -173,7 +177,7 @@ func shortRevision(revision string) string {
 // "" when vat cannot tell. Not being able to see the source is a reason to ask
 // the reviewer, never a reason to assume the evidence held.
 func currentRevisionOf(ctx context.Context, ws *workspace.Workspace, owner string) string {
-	if strings.TrimSpace(owner) == "" {
+	if ws == nil || strings.TrimSpace(owner) == "" {
 		return ""
 	}
 	repo, ok := ws.Manifest.Find(owner)
@@ -244,10 +248,11 @@ reviewer checked; every record must satisfy the gate.`,
 			if len(named) == 0 && strings.TrimSpace(*owner) == "" {
 				return usageErrorf("expected at least one record identifier, or --owner <repo>")
 			}
-			ws, store, err := openBrain(env)
+			bc, err := resolveBrain(env)
 			if err != nil {
 				return err
 			}
+			ws, store, gate := bc.Workspace, bc.Store, bc.Policy.PromotionGate
 			records, err := recordsToPromote(store, named, *owner)
 			if err != nil {
 				return err
@@ -259,7 +264,7 @@ reviewer checked; every record must satisfy the gate.`,
 			refused := 0
 			for _, record := range records {
 				sourceOwner := record.OwnedBy
-				if ws.Manifest.Policy.Gates.BrainPromote == manifest.GateAgent && record.Kind != brain.KindGoal {
+				if gate == brain.GateAgent && record.Kind != brain.KindGoal {
 					if repo, _, _, ok := record.SourceParts(); ok {
 						sourceOwner = repo
 					}
@@ -269,8 +274,8 @@ reviewer checked; every record must satisfy the gate.`,
 				}
 				request := brain.PromoteRequest{
 					Reviewer: reviewer, Now: env.Now, Reverified: *reverified,
-					RequireReviewer: ws.Manifest.Policy.Gates.BrainPromote != manifest.GateAuto,
-					AgentGate:       ws.Manifest.Policy.Gates.BrainPromote == manifest.GateAgent,
+					RequireReviewer: gate != brain.GateAuto,
+					AgentGate:       gate == brain.GateAgent,
 					SourceRevision:  currentRevisionOf(ctx, ws, sourceOwner),
 				}
 				// Every record is reported, refusals included. These commands
@@ -303,8 +308,16 @@ reviewer checked; every record must satisfy the gate.`,
 // if the named file never existed there.
 func checkAgentSourcePath(ctx context.Context, ws *workspace.Workspace, record brain.Record, request brain.PromoteRequest) error {
 	if !request.AgentGate || record.Kind == brain.KindGoal || record.Status.Terminal() ||
-		strings.TrimSpace(request.Reviewer) == "" ||
-		(record.IsCurrentStateClaim() && request.SourceRevision == "") {
+		strings.TrimSpace(request.Reviewer) == "" {
+		return nil
+	}
+	// The agent gate stands on evidence read from a governed repository. A
+	// standalone brain has no repository list, so the gate cannot be met and
+	// saying so beats the brain package's generic "no source path".
+	if ws == nil {
+		return fmt.Errorf("%s: agent promotion needs evidence in a governed repository, and a standalone brain has no workspace", record.ID)
+	}
+	if record.IsCurrentStateClaim() && request.SourceRevision == "" {
 		return nil
 	}
 	owner, revision, path, ok := record.SourceParts()
@@ -378,10 +391,11 @@ made sense.`,
 			if set.NArg() != 2 {
 				return usageErrorf("expected an old identifier and a new one")
 			}
-			ws, store, err := openBrain(env)
+			bc, err := resolveBrain(env)
 			if err != nil {
 				return err
 			}
+			store := bc.Store
 			index := store.ByID()
 			previous, ok := index[set.Arg(0)]
 			if !ok {
@@ -397,7 +411,7 @@ made sense.`,
 			if previous.ID == replacement.ID {
 				return usageErrorf("%s cannot supersede itself", previous.ID)
 			}
-			gated := ws.Manifest.Policy.Brain.RequirePromotionGate
+			gated := bc.RequirePromotionGate
 			if err := brain.Supersede(store.Root, previous, replacement,
 				brain.SupersedeOptions{PromotionGated: gated}); err != nil {
 				return err

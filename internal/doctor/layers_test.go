@@ -1,6 +1,7 @@
 package doctor_test
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -300,5 +301,63 @@ func TestDoctorStillFailsAMissingRemoteTheManifestNames(t *testing.T) {
 	}
 	if finding.Status != doctor.StatusFail {
 		t.Errorf("a repository missing its declared remote did not fail: %q", finding.Detail)
+	}
+}
+
+func TestDoctorReportsBrainPolicyConflict(t *testing.T) {
+	// Arrange: two values differ and one agrees.
+	ws, root := brainFixture(t)
+	marker := fmt.Sprintf("schema: 1\npolicy:\n  stale_after_days: %d\n  promotion_gate: agent\n  review_sla_days: %d\n",
+		ws.Manifest.Policy.Brain.StaleAfterDays+7, ws.Manifest.Policy.Brain.ReviewSLADays)
+	if err := os.WriteFile(filepath.Join(root, brain.MarkerFile), []byte(marker), 0o644); err != nil {
+		t.Fatalf("write marker: %v", err)
+	}
+
+	// Act
+	report := judge(t, ws)
+
+	// Assert: every conflict at once, each naming both sides and the winner.
+	var conflicts []doctor.Finding
+	for _, finding := range report.Findings {
+		if finding.Section == "brain" && finding.Subject == "policy-conflict" {
+			conflicts = append(conflicts, finding)
+		}
+	}
+	if len(conflicts) != 2 {
+		t.Fatalf("want two conflicts, got %d: %+v", len(conflicts), conflicts)
+	}
+	for _, finding := range conflicts {
+		if finding.Status != doctor.StatusWarn || finding.Fix == "" {
+			t.Errorf("a conflict is not an actionable warning: %+v", finding)
+		}
+		for _, part := range []string{"vat.yaml", filepath.Join("knowledge", brain.MarkerFile), "vat.yaml wins"} {
+			if !strings.Contains(finding.Detail, part) {
+				t.Errorf("%q does not name %q", finding.Detail, part)
+			}
+		}
+	}
+	if !strings.Contains(conflicts[0].Detail, "promotion_gate") || !strings.Contains(conflicts[1].Detail, "stale_after_days") {
+		t.Errorf("conflicts out of order or unnamed: %+v", conflicts)
+	}
+	if _, found := findingFor(report, "brain", "records"); !found {
+		t.Error("a conflict stopped the rest of the brain section")
+	}
+}
+
+func TestDoctorIsQuietAboutAMarkerWithoutPolicy(t *testing.T) {
+	ws, _ := brainFixture(t)
+	if _, found := findingFor(judge(t, ws), "brain", "policy-conflict"); found {
+		t.Error("a marker that declares no policy was reported as conflicting")
+	}
+}
+
+func TestDoctorReportsAnUnreadableMarkerPolicy(t *testing.T) {
+	ws, root := brainFixture(t)
+	if err := os.WriteFile(filepath.Join(root, brain.MarkerFile), []byte("schema: 1\npolicy:\n  promotion_gate: sometimes\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	finding, found := findingFor(judge(t, ws), "brain", "policy-conflict")
+	if !found || finding.Status != doctor.StatusWarn || !strings.Contains(finding.Detail, "promotion_gate") {
+		t.Errorf("an unreadable marker policy went unreported: %+v", finding)
 	}
 }
