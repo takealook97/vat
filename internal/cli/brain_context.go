@@ -40,11 +40,11 @@ func (c BrainContext) Standalone() bool { return c.Workspace == nil }
 func resolveBrain(env *Env) (BrainContext, error) {
 	if env.BrainDir != "" {
 		root := explicitBrainRoot(env)
-		ws, err := workspaceAround(env, root)
+		governing, err := governingWorkspaces(env, root)
 		if err != nil {
 			return BrainContext{}, err
 		}
-		if ws != nil {
+		for _, ws := range governing {
 			if declared, ok := ws.BrainPath(); ok && sameDir(declared, root) {
 				return openWorkspaceBrain(ws)
 			}
@@ -80,8 +80,8 @@ func explicitBrainRoot(env *Env) string {
 	return filepath.Clean(root)
 }
 
-// workspaceAround returns the workspace that contains root, or nil when there
-// is none. A brain named explicitly is governed by the workspace only when it
+// governingWorkspaces returns the workspaces that contain root, possibly none.
+// A brain named explicitly is governed by the workspace only when it
 // is the brain that workspace declares; anything else would apply a policy the
 // workspace never stated for that directory.
 //
@@ -92,6 +92,40 @@ func explicitBrainRoot(env *Env) string {
 // forbid, and past a broken manifest that would otherwise stop the run. Where
 // the brain is decides who governs it; where the caller stands does not.
 // --root still names the workspace outright.
+//
+// The search runs from the path as written and again from where its symbolic
+// links lead. Walking only the lexical ancestors let a link placed anywhere
+// outside the workspace reach the declared brain with no manifest above it, so
+// the brain ran standalone under its marker's `auto` gate; a link is just
+// another spelling of the same directory, and a workspace found from either
+// spelling governs it.
+func governingWorkspaces(env *Env, root string) ([]*workspace.Workspace, error) {
+	if env.Root != "" {
+		ws, err := workspaceAround(env, root)
+		if err != nil || ws == nil {
+			return nil, err
+		}
+		return []*workspace.Workspace{ws}, nil
+	}
+	starts := []string{root}
+	if resolved := fsx.ResolveExisting(root); resolved != root {
+		starts = append(starts, resolved)
+	}
+	var found []*workspace.Workspace
+	for _, start := range starts {
+		ws, err := workspaceAround(env, start)
+		if err != nil {
+			return nil, err
+		}
+		if ws != nil {
+			found = append(found, ws)
+		}
+	}
+	return found, nil
+}
+
+// workspaceAround returns the workspace that contains root, or nil when there
+// is none.
 func workspaceAround(env *Env, root string) (*workspace.Workspace, error) {
 	var ws *workspace.Workspace
 	var err error

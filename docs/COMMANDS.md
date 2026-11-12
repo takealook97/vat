@@ -678,7 +678,8 @@ nearest directory upward holding a `.brain` marker. A `vat.yaml` that exists
 and fails to load is reported, never passed over for a marker, because that
 would run a governed brain under the wrong policy. For `--brain-dir` the
 workspace is looked for upward from the named directory, not from the current
-one, so where vat is run from cannot change who governs a brain; a `vat.yaml`
+one, and again from where its symbolic links lead, so neither where vat is run
+from nor a link placed outside the workspace can change who governs a brain; a `vat.yaml`
 found there that fails to load is reported the same way. `--brain-dir` naming
 that workspace's own brain — the same directory, however it is spelled — keeps
 the workspace; naming any other directory makes it standalone.
