@@ -19,9 +19,19 @@ express every rule the format has, and the ones it cannot are not thereby
 optional. `workspace.remote_template`, for instance, is checked here for the
 `{name}` placeholder but not for an embedded credential, which `vat` refuses.
 
+Whether a schema accepts keys it does not define follows the format. The
+manifest and completion record schemas reject them, because those formats are
+closed. The brain record schema accepts them: a record may carry extension keys
+(`docs/SPEC.md` §5.6.1), so that schema checks the fields it defines and lets
+every other key through.
+
 Each schema is versioned in its filename. A version 2 of a format arrives as a
 new file beside the old one; neither the URL nor the contents of a published
 schema change meaning after release, because manifests in the wild point at it.
+The one exception so far only widened a schema to match the document: brain
+record schema 1 shipped with `additionalProperties: false`, contradicting the
+extension keys the specification allows, and was corrected in place. Every
+record it accepted before, it still accepts.
 
 ## Validating a file
 

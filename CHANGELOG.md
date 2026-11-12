@@ -6,6 +6,13 @@ Notable changes to `vat`. The format follows
 
 ## [Unreleased]
 
+### Fixed
+
+- The published brain record schema accepts extension keys. It rejected every
+  key `docs/SPEC.md` §5.6.1 allows, so a validator failed records vat accepted.
+  The schema keeps its URL and only widens; defined fields are checked as
+  before.
+
 ## [0.7.0] - 2026-10-06
 
 ### Upgrading to 0.7.0

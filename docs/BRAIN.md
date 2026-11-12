@@ -63,9 +63,11 @@ whoever is reading it now.
 
 They are a convention, not a schema. Nothing checks them yet, deliberately: a
 field becomes part of the record schema here only once there is a rule worth
-enforcing on it, and that is decided by use rather than in advance. A lesson
-scoped to a branch is not recorded at all — it expires before anyone re-reads
-it.
+enforcing on it, and that is decided by use rather than in advance. Until then a
+workspace that wants one in the header writes it as an extension key
+([SPEC §5.6.1](SPEC.md#561-extension-keys)): vat and the published record schema
+both accept it, preserve it, and check nothing about it. A lesson scoped to a
+branch is not recorded at all — it expires before anyone re-reads it.
 
 ---
 

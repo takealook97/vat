@@ -479,3 +479,184 @@ func TestThePublishedExampleCarriesTheGraphThisBuildWrites(t *testing.T) {
 		t.Error("the published example's CURRENT.md differs from this build")
 	}
 }
+
+// schemaAnnotations carry no constraint, so the validator below may pass over
+// them. Every other keyword it does not implement fails the test: a validator
+// that silently skips a keyword reports a document valid against a schema it
+// never fully read.
+var schemaAnnotations = map[string]bool{
+	"$schema": true, "$id": true, "$defs": true, "title": true, "description": true,
+}
+
+// validateAgainstSchema checks a decoded document against the keywords this
+// project's schemas use. It exists because vat keeps one runtime dependency;
+// it is a test helper, not a validator anyone should reuse.
+func validateAgainstSchema(t *testing.T, root, node map[string]any, value any, at string) []string {
+	t.Helper()
+	if ref, ok := node["$ref"].(string); ok {
+		target := strings.TrimPrefix(ref, "#/")
+		if target == ref {
+			t.Fatalf("%s: only local $ref is supported, got %q", at, ref)
+		}
+		return validateAgainstSchema(t, root, schemaNode(t, root, strings.Split(target, "/")...), value, at)
+	}
+	var problems []string
+	keys := make([]string, 0, len(node))
+	for key := range node {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+	for _, key := range keys {
+		if schemaAnnotations[key] {
+			continue
+		}
+		switch key {
+		case "type":
+			if !schemaTypeMatches(node[key].(string), value) {
+				problems = append(problems, fmt.Sprintf("%s: want %s, got %T", at, node[key], value))
+			}
+		case "enum":
+			if !containsValue(node[key].([]any), value) {
+				problems = append(problems, fmt.Sprintf("%s: %v is not one of %v", at, value, node[key]))
+			}
+		case "required":
+			object, _ := value.(map[string]any)
+			for _, name := range node[key].([]any) {
+				if _, ok := object[name.(string)]; !ok {
+					problems = append(problems, fmt.Sprintf("%s: missing %s", at, name))
+				}
+			}
+		case "properties":
+			problems = append(problems, validateObject(t, root, node, value, at)...)
+		case "additionalProperties":
+			// Applied together with properties, so an object is walked once.
+			if _, ok := node["properties"]; !ok {
+				problems = append(problems, validateObject(t, root, node, value, at)...)
+			}
+		case "items":
+			list, _ := value.([]any)
+			for i, item := range list {
+				problems = append(problems, validateAgainstSchema(t, root, node[key].(map[string]any), item, fmt.Sprintf("%s[%d]", at, i))...)
+			}
+		case "minLength", "maxLength", "pattern":
+			// Length and pattern bounds are held against vat's own validators
+			// by the identifier tests above; these fixtures stay inside them.
+		default:
+			t.Fatalf("%s: the schema uses %q, which this validator does not implement", at, key)
+		}
+	}
+	return problems
+}
+
+// validateObject applies properties and additionalProperties to one object.
+func validateObject(t *testing.T, root, node map[string]any, value any, at string) []string {
+	t.Helper()
+	object, ok := value.(map[string]any)
+	if !ok {
+		return nil
+	}
+	properties, _ := node["properties"].(map[string]any)
+	additional, declared := node["additionalProperties"].(bool)
+	var problems []string
+	names := make([]string, 0, len(object))
+	for name := range object {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+	for _, name := range names {
+		if property, ok := properties[name].(map[string]any); ok {
+			problems = append(problems, validateAgainstSchema(t, root, property, object[name], at+"."+name)...)
+		} else if declared && !additional {
+			problems = append(problems, fmt.Sprintf("%s: %s is not allowed", at, name))
+		}
+	}
+	return problems
+}
+
+func schemaTypeMatches(want string, value any) bool {
+	switch want {
+	case "object":
+		_, ok := value.(map[string]any)
+		return ok
+	case "array":
+		_, ok := value.([]any)
+		return ok
+	case "string":
+		_, ok := value.(string)
+		return ok
+	case "boolean":
+		_, ok := value.(bool)
+		return ok
+	case "integer", "number":
+		_, ok := value.(float64)
+		return ok
+	}
+	return false
+}
+
+func containsValue(values []any, value any) bool {
+	for _, candidate := range values {
+		if candidate == value {
+			return true
+		}
+	}
+	return false
+}
+
+// frontMatterAsJSON decodes YAML the way a JSON Schema validator sees it: a
+// timestamp is a string, not a time value.
+func frontMatterAsJSON(t *testing.T, header string) any {
+	t.Helper()
+	var decoded map[string]any
+	if err := yaml.Unmarshal([]byte(header), &decoded); err != nil {
+		t.Fatal(err)
+	}
+	encoded, err := json.Marshal(decoded)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var document any
+	if err := json.Unmarshal(encoded, &document); err != nil {
+		t.Fatal(err)
+	}
+	return document
+}
+
+// docs/SPEC.md lets a record carry keys vat does not define and requires them
+// preserved. A schema that rejects them made every externally validated
+// record a publishing job wrote invalid, while vat itself accepted it.
+func TestBrainRecordSchemaAcceptsExtensionKeys(t *testing.T) {
+	// Arrange
+	schema := loadSchema(t, brainSchema)
+	base := "id: M-0001\nstatus: active\ndate: 2026-11-01\nclaim_kind: historical\n" +
+		"source_external: true\nobserved_at: 2026-11-02\nrefs: [D-0001]\n"
+	extensions := "project: demo-project\nrun_id: run-0001\nmodel_family: demo-model\n" +
+		"origin: chat:DEMO/0001\nchannel: demo-channel\ncaptured_at: 2026-11-01T09:00:00Z\n" +
+		"source_url: https://example.com/thread/0001\n"
+	cases := []struct {
+		name   string
+		header string
+		valid  bool
+	}{
+		{"defined fields", base, true},
+		{"defined fields and extension keys", base + extensions, true},
+		{"an unknown status", strings.Replace(base, "status: active", "status: approved", 1) + extensions, false},
+		{"a defined field of the wrong type", strings.Replace(base, "source_external: true", "source_external: yes-please", 1), false},
+		{"no id", strings.Replace(base, "id: M-0001\n", "", 1) + extensions, false},
+	}
+
+	for _, testCase := range cases {
+		t.Run(testCase.name, func(t *testing.T) {
+			// Act
+			problems := validateAgainstSchema(t, schema, schema, frontMatterAsJSON(t, testCase.header), "$")
+
+			// Assert
+			if testCase.valid && len(problems) > 0 {
+				t.Errorf("rejected a record the specification accepts: %v", problems)
+			}
+			if !testCase.valid && len(problems) == 0 {
+				t.Error("accepted a record whose defined fields are wrong")
+			}
+		})
+	}
+}

@@ -473,6 +473,11 @@ prevents. Keep the text; keep it out of the classification. A generator that
 read `resolved` out of such a note and treated the record as terminal made
 partially resolved gaps disappear from its own index.
 
+The published record schema follows the same rule: it validates the fields this
+specification defines and lets every other key through. A record a schema
+validator rejects only because it carries an extension key is a defect in the
+schema, not in the record.
+
 An extension key is display-only by definition. A key that a workspace wants
 enforced is a rule, and a rule belongs in this specification or in that
 workspace's own checks — not in a field every reader interprets differently.
