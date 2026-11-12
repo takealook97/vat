@@ -6,6 +6,8 @@ import (
 	"strings"
 	"time"
 
+	"gopkg.in/yaml.v3"
+
 	"github.com/takealook97/vat/internal/frontmatter"
 	"github.com/takealook97/vat/internal/fsx"
 )
@@ -28,7 +30,7 @@ func Mark(root string) (bool, error) {
 	if fsx.Exists(path) {
 		return false, nil
 	}
-	if err := fsx.WriteFileAtomic(path, []byte(markerContent()), fsx.DefaultFileMode); err != nil {
+	if err := fsx.WriteFileAtomic(path, []byte(markerContent(nil)), fsx.DefaultFileMode); err != nil {
 		return false, err
 	}
 	return true, nil
@@ -38,6 +40,14 @@ func Mark(root string) (bool, error) {
 // repository. It never overwrites a file that already exists, so running it on
 // an existing repository is safe and additive.
 func Init(root string, now time.Time) ([]string, error) {
+	return InitWithPolicy(root, now, nil)
+}
+
+// InitWithPolicy is Init for a brain no workspace governs: the marker it
+// writes carries the policy block, so the values the brain runs under are on
+// disk where a reader can see them instead of in a default nobody wrote down.
+// A nil policy writes the marker Init always wrote.
+func InitWithPolicy(root string, now time.Time, policy *MarkerPolicy) ([]string, error) {
 	var created []string
 
 	for _, kind := range Kinds() {
@@ -52,7 +62,7 @@ func Init(root string, now time.Time) ([]string, error) {
 	}
 
 	files := map[string]string{
-		MarkerFile:        markerContent(),
+		MarkerFile:        markerContent(policy),
 		"AGENTS.md":       agentsContent(),
 		"README.md":       readmeContent(),
 		"GOAL.md":         projectionStub("Goals", "goal", "What this organisation is trying to become, and how each outcome is judged."),
@@ -79,10 +89,17 @@ func Init(root string, now time.Time) ([]string, error) {
 	return created, nil
 }
 
-func markerContent() string {
-	return "# This directory is a vat brain repository.\n" +
+func markerContent(policy *MarkerPolicy) string {
+	content := "# This directory is a vat brain repository.\n" +
 		"# Generated projections: CURRENT.md, graph.json — rebuild with `vat brain build`.\n" +
 		fmt.Sprintf("schema: %d\n", SchemaVersion)
+	if policy == nil {
+		return content
+	}
+	return content +
+		"# Lifecycle policy for this brain when no workspace manifest governs it.\n" +
+		"# A workspace's vat.yaml, when there is one, wins over every value here.\n" +
+		markerPolicyBlock(*policy)
 }
 
 func readmeContent() string {
@@ -267,8 +284,19 @@ type NewRecordInput struct {
 	SourceQuote string
 	Axis        string
 	Refs        []string
-	Body        string
-	Now         time.Time
+	// Body is the whole body, heading included, and replaces the default.
+	Body string
+	// BodyWithoutHeading is a body with no H1; Create writes the heading
+	// `# <ID> — <title>` ahead of it, the same one the default body has, so a
+	// record made from piped text still carries its title.
+	BodyWithoutHeading string
+	// ExtensionFields are header keys vat does not model, written after the
+	// modelled ones. A key vat models is refused: setting status or
+	// reviewed_by this way would walk round the promotion gate.
+	ExtensionFields map[string]any
+	// SourceExternal marks evidence held outside the workspace.
+	SourceExternal bool
+	Now            time.Time
 }
 
 // Create writes a new atomic record and returns its path relative to root.
@@ -298,30 +326,43 @@ func Create(root string, input NewRecordInput) (string, error) {
 	}
 
 	metadata := Metadata{
-		ID:          input.ID,
-		RecordedBy:  input.RecordedBy,
-		Status:      status,
-		Date:        now.Format("2006-01-02"),
-		ClaimKind:   input.ClaimKind,
-		OwnedBy:     input.OwnedBy,
-		SourceRef:   input.SourceRef,
-		SourceURL:   strings.TrimSpace(input.SourceURL),
-		SourceQuote: strings.TrimSpace(input.SourceQuote),
-		Axis:        input.Axis,
-		Refs:        input.Refs,
+		ID:             input.ID,
+		RecordedBy:     input.RecordedBy,
+		Status:         status,
+		Date:           now.Format("2006-01-02"),
+		ClaimKind:      input.ClaimKind,
+		OwnedBy:        input.OwnedBy,
+		SourceRef:      input.SourceRef,
+		SourceExternal: input.SourceExternal,
+		SourceURL:      strings.TrimSpace(input.SourceURL),
+		SourceQuote:    strings.TrimSpace(input.SourceQuote),
+		Axis:           input.Axis,
+		Refs:           input.Refs,
 	}
 	if input.ClaimKind == ClaimCurrentState {
 		metadata.ObservedAt = now.Format("2006-01-02")
 		metadata.RevalidateOn = "source-revision-change"
 	}
 
-	body := input.Body
-	if strings.TrimSpace(body) == "" {
-		body = defaultBody(input.Kind, input.ID, input.Title)
-	}
-	rendered, err := frontmatter.Render(metadata, body)
+	body, err := recordBody(input)
 	if err != nil {
 		return "", err
+	}
+	header, err := headerWithExtensions(metadata, input.ExtensionFields)
+	if err != nil {
+		return "", err
+	}
+	rendered, err := frontmatter.Render(header, body)
+	if err != nil {
+		return "", err
+	}
+	// Checked on the exact bytes about to be written — title, body, every
+	// header value — and before anything is. Finding the credential with
+	// `vat brain check` afterwards is finding it in a file that may already
+	// have been committed, synchronised, and indexed.
+	if found := SuspectedCredentialNames(string(rendered)); len(found) > 0 {
+		return "", fmt.Errorf("refused: the record would carry %s; nothing was written",
+			strings.Join(found, ", "))
 	}
 
 	relative := JoinPath(input.Kind.Dir(), FileName(input.ID, input.Title))
@@ -343,6 +384,61 @@ func Create(root string, input NewRecordInput) (string, error) {
 		return "", err
 	}
 	return relative, nil
+}
+
+func recordBody(input NewRecordInput) (string, error) {
+	heading := fmt.Sprintf("# %s — %s\n\n", input.ID, input.Title)
+	if strings.TrimSpace(input.BodyWithoutHeading) != "" {
+		for _, line := range strings.Split(input.BodyWithoutHeading, "\n") {
+			// A second H1 would compete with the one written here for the
+			// record's title, and the reader takes the first.
+			if strings.HasPrefix(strings.TrimLeft(line, " "), "# ") {
+				return "", fmt.Errorf("the body may not carry an H1; vat writes %q itself", strings.TrimSpace(heading))
+			}
+		}
+		return heading + strings.TrimLeft(input.BodyWithoutHeading, "\n"), nil
+	}
+	if strings.TrimSpace(input.Body) != "" {
+		return input.Body, nil
+	}
+	return defaultBody(input.Kind, input.ID, input.Title), nil
+}
+
+// headerWithExtensions renders the modelled fields followed by the extension
+// keys in a stable order. String values are quoted, so a value that looks
+// like a date or a number stays the string it was given (SPEC §3 rule 3).
+func headerWithExtensions(metadata Metadata, extensions map[string]any) (any, error) {
+	if len(extensions) == 0 {
+		return metadata, nil
+	}
+	var node yaml.Node
+	if err := node.Encode(metadata); err != nil {
+		return nil, fmt.Errorf("encode front matter: %w", err)
+	}
+	var problems []string
+	for _, key := range sortedExtensionKeys(extensions) {
+		switch {
+		case strings.TrimSpace(key) == "" || strings.TrimSpace(key) != key:
+			problems = append(problems, fmt.Sprintf("%q is not a usable key", key))
+			continue
+		case IsDefinedField(key):
+			problems = append(problems, fmt.Sprintf("%s is a field vat defines", key))
+			continue
+		}
+		var value yaml.Node
+		if err := value.Encode(extensions[key]); err != nil {
+			return nil, fmt.Errorf("encode %s: %w", key, err)
+		}
+		if value.Kind == yaml.ScalarNode && value.Tag == "!!str" {
+			value.Style = yaml.DoubleQuotedStyle
+		}
+		node.Content = append(node.Content,
+			&yaml.Node{Kind: yaml.ScalarNode, Tag: "!!str", Value: key}, &value)
+	}
+	if len(problems) > 0 {
+		return nil, fmt.Errorf("refused extension keys: %s", strings.Join(problems, "; "))
+	}
+	return &node, nil
 }
 
 func defaultBody(kind Kind, id, title string) string {

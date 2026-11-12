@@ -61,6 +61,15 @@ func checkSecrets(store *Store) []Finding {
 		for _, hit := range suspectedCredentials(record.Body) {
 			findings = append(findings, secretFinding(record, fmt.Sprintf("line %d", hit.line), hit))
 		}
+		// The title is the body's heading and is read above. Extension keys
+		// are not in the body, and a publishing job writes its source address
+		// into one — exactly where a token in a URL would land.
+		for _, key := range sortedExtensionKeys(record.Extensions) {
+			for _, hit := range suspectedCredentials(extensionText(record.Extensions[key])) {
+				findings = append(findings, secretFinding(record, fmt.Sprintf("the header field %s", key), hit))
+				break
+			}
+		}
 	}
 	return findings
 }
@@ -95,6 +104,17 @@ func secretFinding(record Record, where string, hit credentialHit) Finding {
 			"%s carries%s %s; a record is read and indexed widely, so remove it and rotate the credential",
 			where, qualifier, hit.name),
 	}
+}
+
+// SuspectedCredentialNames returns the kinds of credential text appears to
+// carry, and never the text itself.
+func SuspectedCredentialNames(text string) []string {
+	hits := suspectedCredentials(text)
+	names := make([]string, 0, len(hits))
+	for _, hit := range hits {
+		names = append(names, fmt.Sprintf("%s (line %d)", hit.name, hit.line))
+	}
+	return names
 }
 
 type credentialHit struct {

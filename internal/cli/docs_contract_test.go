@@ -767,6 +767,35 @@ func TestEverySampleThresholdIsOneTheAdvisorPrints(t *testing.T) {
 	}
 }
 
+// The methodology's adoption table is the same sentence `vat fit` prints, and
+// the sample check above never read it, so the brain row said "agents work here
+// weekly" while the advisor counted five sessions a week.
+func TestMethodologyBrainThresholdMatchesAdvisor(t *testing.T) {
+	// Arrange
+	var want string
+	for _, verdict := range fit.Assess(fit.Signals{}) {
+		if verdict.Layer == fit.LayerBrain {
+			want = verdict.Threshold
+		}
+	}
+	if want == "" {
+		t.Fatal("the advisor printed no knowledge-layer threshold")
+	}
+	content, err := os.ReadFile("../../docs/METHODOLOGY.md")
+	if err != nil {
+		t.Fatal(err)
+	}
+	row := regexp.MustCompile(`(?m)^\| brain \| ([^|]+?) \|\s*$`).FindStringSubmatch(string(content))
+
+	// Act & Assert
+	if row == nil {
+		t.Fatal("docs/METHODOLOGY.md has no brain row in its adoption table")
+	}
+	if row[1] != want {
+		t.Errorf("docs/METHODOLOGY.md says the brain pays when %q; `vat fit` prints %q", row[1], want)
+	}
+}
+
 // A sample is what a reader types. The reference is held to the command tree in
 // both directions; every other document showing an invocation was not, so a
 // renamed or removed command could sit in the README indefinitely with nothing

@@ -7,7 +7,7 @@ Every command that prints a table also accepts `--json`.
 | Code | Meaning |
 | --- | --- |
 | `0` | ran and found nothing wrong |
-| `1` | ran correctly and found problems (errors; warnings alone exit 0) |
+| `1` | ran correctly and found problems (errors; warnings alone exit 0 unless a command's opt-in flag, such as `vat brain check --fail-on-warning`, says otherwise) |
 | `2` | the invocation itself was wrong |
 
 The distinction matters in CI: `1` means act on the findings, `2` means fix the
@@ -25,6 +25,7 @@ file does not use is not a diagnosis.
 | Flag | Effect |
 | --- | --- |
 | `--workspace <dir>` | use this workspace root instead of searching upward |
+| `--brain-dir <dir>` | use this brain directory for `vat brain`, with or without a workspace around it |
 | `--json` | machine-readable output |
 | `--quiet` | print only warnings and failures |
 | `--no-color` | disable colour (also honours `NO_COLOR`) |
@@ -193,7 +194,7 @@ secret value.
 | workspace | manifest validity, root versioning, `.gitignore` coverage |
 | repositories | presence, origin, branch, cleanliness |
 | credentials | files that look like plaintext secrets, encrypted count, age since last change, key material readable by other users |
-| brain | record counts, review queue, claims whose evidence has moved, generated-file freshness |
+| brain | record counts, review queue, claims whose evidence has moved, generated-file freshness, and `policy-conflict`: one warning per value the brain's `.brain` marker declares differently from `vat.yaml`, naming both files and that `vat.yaml` wins |
 | changesets | open and overdue work |
 | recovery | commits and stashes that exist only on this machine |
 | network | `--network` only: whether the GitHub CLI is authenticated, and the platform vat is running on |
@@ -471,12 +472,14 @@ region.
 ```
 vat brain init      [directory]
 vat brain new       <goal|gap|decision|memory> --title "..." [--claim <kind>]
-                    [--owner <repo>] [--source-path <p>]
+                    [--owner <repo>] [--source-path <p>] [--source-external]
                     [--source-url <url>] [--source-quote "..."] [--axis <a>]
                     [--refs <ids>] [--id <id>]
+                    [--body-stdin] [--set key=value]...
 vat brain build
-vat brain check     [--only <rule>] [--list]
+vat brain check     [--only <rule>] [--list] [--fail-on-warning]
 vat brain query     <terms...> [--all] [--limit n]
+vat brain list      [--status <s>] [--kind <k>] [--where key=value]... [--json]
 vat brain review    [--overdue] [--drifted] [--limit n]
 vat brain sweep     [--apply]
 vat brain promote   <id...> | --owner <repo> [--reverified]
@@ -496,6 +499,18 @@ from an evidence pin. Records enter as `provisional`.
 `new` writes optional `recorded_by` from git `user.name` and `user.email` in
 the brain repository as `Name <email>`; unset identity is omitted, including
 when git is unavailable.
+
+`new --body-stdin` reads the body from standard input and writes the heading
+`# <ID> — <title>` ahead of it, the same heading the default body has; a body
+carrying its own H1, or an empty one, exits `2`. `--set key=value` adds a header
+key vat does not define, always as a string, and may be repeated; an empty key,
+a key given twice, and a key vat defines (`status`, `reviewed_by`, …) exit `2`,
+all named in one run. `--source-external` writes `source_external: true` and no
+`source_ref`, and cannot be combined with `--owner`. Before anything is written,
+the whole record — title, body, every header value — is checked for the
+credential shapes `brain/record-secret-suspected` knows; a match exits `1`,
+names only the kind and line, and writes nothing. Without `--body-stdin` the
+default body is unchanged.
 
 `--source-path` requires `--owner` and additionally pins the file the record
 was read from; vat refuses a path the repository does not hold at that revision.
@@ -649,6 +664,36 @@ Every `vat brain` command refuses a repository that has no marker, naming
 `vat brain init` and `vat brain adopt`. Without that refusal `vat brain build`
 wrote an index into a directory that is not a brain.
 
+**A brain without a workspace.** The brain a command acts on is, in order: the
+directory named by `--brain-dir`; otherwise the brain the workspace declares;
+otherwise, only when there is no `vat.yaml` above the current directory, the
+nearest directory upward holding a `.brain` marker. A `vat.yaml` that exists
+and fails to load is reported, never passed over for a marker, because that
+would run a governed brain under the wrong policy. `--brain-dir` naming the
+workspace's own brain keeps the workspace; naming any other directory makes it
+standalone.
+
+A standalone brain runs under the `policy` block of its marker (see
+[SPEC.md](SPEC.md) §5.1); a key the marker does not declare takes the default
+`promotion_gate: manual`, `stale_after_days: 90`, `review_sla_days: 30`,
+`require_promotion_gate: true`. Where a workspace governs the brain, its
+`vat.yaml` policy wins entirely, defaults included, and `vat doctor` warns about
+each marker value that disagrees. An invalid marker policy is refused with
+every bad key named.
+
+`vat --brain-dir <dir> brain init [directory]` scaffolds at `<dir>`, which is
+the write boundary in this mode: `directory` is taken relative to it and may not
+leave it, through `..` or a symbolic link. Without a workspace the marker it
+writes carries the policy block with every default spelled out. Outside a
+workspace, `vat brain init` without `--brain-dir` exits `2` and says to pass it.
+
+What needs a repository list is refused on a standalone brain, exiting `2`:
+`new --owner` and `--source-path` (so `--claim current-state` too),
+`review --drifted`, and `adopt`. `review` without `--drifted` lists the
+lifecycle queue alone. Under the `agent` gate a non-goal record is refused,
+because its evidence must be read from a governed repository; goals still
+follow the manual conditions, and the manual gate still requires a git identity.
+
 `archive` moves superseded, revoked, and resolved records into `archive/`,
 repointing the relative links inside them. Nothing is deleted and an archived
 record is still loaded, so its supersession chain is still checked from both
@@ -661,10 +706,44 @@ refused rather than reported as a clean run, because a mistyped selector in CI
 buys a green build that checked nothing. The rules are tabulated in
 [BRAIN.md](BRAIN.md).
 
+`list` prints every record, archived ones included, ordered by `id` then
+`path`. Every filter must hold: `--status` and `--kind` match exactly, and the
+repeatable `--where key=value` matches an extension key to an exact string
+value — a key no record carries lists nothing, and a key vat defines is
+refused. An unknown status or kind, a malformed `--where`, or a positional
+argument exits `2`. Citability is judged at read time, as in `query`.
+
+`--json` prints one object, `{"records": [...], "skipped": [...]}`, both always
+arrays. Every record carries every field:
+
+| Field | Value |
+| --- | --- |
+| `path` | relative to the brain root |
+| `id`, `kind`, `status`, `claim_kind`, `title`, `date`, `observed_at` | as in the record; empty string when absent |
+| `citable` | whether the record may be cited now |
+| `citable_until` | the last citable day of a dated current-state claim, else empty |
+| `supersedes`, `superseded_by` | the replacement chain; an array and a string |
+| `extensions` | every header key vat does not define, as written; `{}` when none |
+| `source_external` | whether the evidence is declared outside the workspace |
+
+A file that cannot be read as a record is listed under `skipped` with its
+`path` and a fixed `reason` that never quotes the file. The records that could
+be read are still printed, the skipped paths are named on stderr, and the
+command exits `1`; an empty listing exits `0`.
+
+`check --fail-on-warning` exits `1` when any selected finding is a warning,
+as it already does for an error; every finding is still printed first, and the
+human report and the JSON array are unchanged. Only the rules `--only` selected
+count. `--list` ignores it and exits `0`. Without the flag a warning alone
+exits `0`. A job that revokes or supersedes records and runs check with this
+flag must also run `vat brain archive --apply`, or
+`brain/terminal-unarchived` stops it.
+
 `check` reports `brain/record-malformed` for a file it cannot read as a record
 and keeps loading the rest, and `brain/record-secret-suspected` for a record
-that appears to carry a credential. The second names the line and the kind of
-credential, never the value.
+that appears to carry a credential in its body or in a header key vat does not
+define. The second names the line or the key and the kind of credential, never
+the value.
 
 `adopt` points the workspace at an existing knowledge repository and reports
 which records do not yet meet the schema. Nothing is rewritten.
@@ -932,6 +1011,10 @@ its secrets into one credential repository reports one repository holding
 secrets, which is below the threshold that justified consolidating them. The
 question after adoption is whether a layer is still earning its keep, which
 `vat metrics` measures over time, not whether to start it.
+
+The knowledge layer's threshold is exact: a decision has already been lost, 5+
+agent sessions per week, or 2+ people across 4+ repositories. Four sessions a
+week is below it.
 
 `--json` returns one object per layer with the fields `layer`, `adopt`,
 `adopted`, `threshold`, `because`, and `command`.

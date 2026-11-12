@@ -2,21 +2,16 @@ package cli
 
 import (
 	"strings"
-
-	"github.com/takealook97/vat/internal/brain"
-	"github.com/takealook97/vat/internal/fsx"
-	"github.com/takealook97/vat/internal/workspace"
 )
 
-// The knowledge command tree and the two helpers every subcommand needs:
-// opening the brain repository the workspace adopted, and reading the
-// lifecycle clock out of its policy.
+// The knowledge command tree. Which brain a subcommand acts on, and under
+// whose policy, is resolved in brain_context.go.
 
 func brainCommand() *Command {
 	return &Command{
 		Name:    "brain",
 		Summary: "The reviewed-knowledge layer: facts with provenance and an expiry",
-		Usage: "vat brain <init|new|build|check|query|review|sweep|promote|supersede|" +
+		Usage: "vat brain <init|new|build|check|query|list|review|sweep|promote|supersede|" +
 			"quarantine|revoke|resolve|archive|adopt>",
 		Long: `Hold what the organisation believes is true, and know when it stopped
 being verified.
@@ -37,6 +32,7 @@ becoming a confident liar over a few years.`,
 			brainBuildCommand(),
 			brainCheckCommand(),
 			brainQueryCommand(),
+			brainListCommand(),
 			brainReviewCommand(),
 			brainSweepCommand(),
 			brainPromoteCommand(),
@@ -47,51 +43,6 @@ becoming a confident liar over a few years.`,
 			brainArchiveCommand(),
 			brainAdoptCommand(),
 		},
-	}
-}
-
-// openBrain resolves the brain repository the workspace has adopted.
-func openBrain(env *Env) (*workspace.Workspace, *brain.Store, error) {
-	ws, err := env.Workspace()
-	if err != nil {
-		return nil, nil, err
-	}
-	root, ok := ws.BrainPath()
-	if !ok {
-		return ws, nil, usageErrorf(
-			"this workspace has no brain repository.\n" +
-				"  Create one:  vat repo new brain --role brain\n" +
-				"  Adopt one:   vat brain adopt <directory>")
-	}
-	if !fsx.IsDir(root) {
-		return ws, nil, usageErrorf("the brain repository is not cloned; run `vat sync`")
-	}
-	// The refusal belongs here rather than in each of the ten commands that
-	// pass through. Checking only that the directory existed let `vat brain
-	// build` write an index into a repository that is not a brain — and
-	// `vat doctor`, which had advised exactly that, then reported the section
-	// healthy. A directory declared as the brain is not one until it is
-	// initialised.
-	if !brain.IsBrain(root) {
-		return ws, nil, usageErrorf(
-			"%s is declared as the knowledge repository but has no records yet.\n"+
-				"  Initialise it:  vat brain init\n"+
-				"  Adopt one:      vat brain adopt <directory>", ws.Rel(root))
-	}
-	store, err := brain.Load(root)
-	if err != nil {
-		return ws, nil, err
-	}
-	return ws, store, nil
-}
-
-func brainPolicy(ws *workspace.Workspace) brain.CheckPolicy {
-	return brain.CheckPolicy{
-		StaleAfterDays: ws.Manifest.Policy.Brain.StaleAfterDays,
-		ReviewSLADays:  ws.Manifest.Policy.Brain.ReviewSLADays,
-		PromotionGate:  ws.Manifest.Policy.Gates.BrainPromote,
-
-		RequireExternalEvidence: ws.Manifest.Policy.Brain.RequireExternalEvidence,
 	}
 }
 

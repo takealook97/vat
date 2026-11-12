@@ -76,10 +76,11 @@ func retireRun(status brain.Status, reasonRequired bool) func(context.Context, *
 		if reasonRequired && *reason == "" {
 			return usageErrorf("--reason is required: a %s record nobody explained cannot be reviewed later", status)
 		}
-		_, store, err := openBrain(env)
+		bc, err := resolveBrain(env)
 		if err != nil {
 			return err
 		}
+		store := bc.Store
 		record, ok := store.ByID()[set.Arg(0)]
 		if !ok {
 			return usageErrorf("no record with id %q", set.Arg(0))
@@ -116,10 +117,11 @@ The relative links inside a moved record are repointed so they still resolve.`,
 			if err := parseFlags(set, args); err != nil {
 				return err
 			}
-			_, store, err := openBrain(env)
+			bc, err := resolveBrain(env)
 			if err != nil {
 				return err
 			}
+			store := bc.Store
 			moves, err := brain.Archive(store, *apply)
 			if err != nil {
 				return err

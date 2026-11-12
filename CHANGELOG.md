@@ -29,6 +29,24 @@ Notable changes to `vat`. The format follows
   promoted it. Records promoted earlier stay valid without the field.
   `brain.PromoteRequest` gains `PromotionGate`; callers that leave it empty keep
   the gate their `RequireReviewer` and `AgentGate` describe.
+- `--brain-dir <dir>` and standalone brains: `vat brain` works on a directory no
+  workspace governs, found by `--brain-dir` or by its `.brain` marker, under the
+  `policy` block the marker may now carry. A workspace's `vat.yaml` still wins
+  wherever there is one, and `vat doctor` warns with `policy-conflict` about
+  each marker value that disagrees with it.
+- `vat brain new --body-stdin`, `--set key=value`, and `--source-external`: a
+  record a script produces is written complete in one atomic write, with the
+  heading added by vat, and refused before any write when its title, body, or
+  header values carry a credential shape.
+- `vat brain list [--status] [--kind] [--where key=value] [--json]`: every
+  record filtered by what it is, citability judged at read time, and unreadable
+  files listed under `skipped` while the rest still print.
+- `vat brain check --fail-on-warning`: a selected warning exits 1; the report
+  and the default exit codes are unchanged.
+
+### Changed
+
+- `brain/record-secret-suspected` also reads header keys vat does not define.
 
 ### Fixed
 
@@ -36,6 +54,9 @@ Notable changes to `vat`. The format follows
   key `docs/SPEC.md` §5.6.1 allows, so a validator failed records vat accepted.
   The schema keeps its URL and only widens; defined fields are checked as
   before.
+- `vat fit` names the knowledge layer's real threshold, 5+ agent sessions per
+  week, instead of "agents work here weekly"; the methodology table and the FAQ
+  say the same.
 
 ## [0.7.0] - 2026-10-06
 

@@ -132,7 +132,7 @@ func Assess(signals Signals) []Verdict {
 			Adopt: signals.DecisionsLost ||
 				signals.AgentSessions >= 5 ||
 				(signals.People >= 2 && signals.Repositories >= 4),
-			Threshold: "a decision has already been lost, agents work here weekly, or 2+ people across 4+ repositories",
+			Threshold: "a decision has already been lost, 5+ agent sessions per week, or 2+ people across 4+ repositories",
 			Because: because(signals.DecisionsLost ||
 				signals.AgentSessions >= 5 ||
 				(signals.People >= 2 && signals.Repositories >= 4),

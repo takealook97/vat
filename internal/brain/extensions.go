@@ -3,11 +3,11 @@ package brain
 import (
 	"fmt"
 	"math"
-	"reflect"
 	"sort"
-	"strings"
 
 	"gopkg.in/yaml.v3"
+
+	"github.com/takealook97/vat/internal/frontmatter"
 )
 
 // Extension keys, carried into graph.json.
@@ -18,19 +18,50 @@ import (
 // the graph exists to save. They are carried as display data only. Nothing
 // here reads one to decide a status, a citability, or an order.
 
-// metadataKeys is every header key Metadata models; anything else is an
-// extension. Derived from the type so a field added to Metadata cannot also
-// appear as an extension of itself.
-var metadataKeys = func() map[string]bool {
-	keys := map[string]bool{}
-	typ := reflect.TypeOf(Metadata{})
-	for i := range typ.NumField() {
-		if name := strings.Split(typ.Field(i).Tag.Get("yaml"), ",")[0]; name != "" && name != "-" {
-			keys[name] = true
-		}
+// Header keys a record carries beyond the ones vat models are also text that
+// is read and indexed as widely as the body, so the secret check reads them
+// too (SPEC 5.2).
+
+// IsDefinedField reports whether key is one of the header fields vat models.
+func IsDefinedField(key string) bool {
+	return frontmatter.Keys(Metadata{})[key]
+}
+
+// sortedExtensionKeys returns keys in a stable order, so findings and output
+// read the same way twice.
+func sortedExtensionKeys(extensions map[string]any) []string {
+	keys := make([]string, 0, len(extensions))
+	for key := range extensions {
+		keys = append(keys, key)
 	}
+	sort.Strings(keys)
 	return keys
-}()
+}
+
+// extensionText is the text of an extension value as the secret check reads
+// it: a scalar as written, a list or mapping flattened.
+func extensionText(value any) string {
+	switch typed := value.(type) {
+	case nil:
+		return ""
+	case string:
+		return typed
+	case []any:
+		text := ""
+		for _, item := range typed {
+			text += extensionText(item) + "\n"
+		}
+		return text
+	case map[string]any:
+		text := ""
+		for _, key := range sortedExtensionKeys(typed) {
+			text += key + ": " + extensionText(typed[key]) + "\n"
+		}
+		return text
+	default:
+		return fmt.Sprint(typed)
+	}
+}
 
 // readExtensions returns the header keys Metadata does not model, converted to
 // values JSON can hold, and one problem per key that could not be converted.
@@ -40,6 +71,7 @@ var metadataKeys = func() map[string]bool {
 // a time library prints for it, and the same header always yields the same
 // bytes.
 func readExtensions(header string) (map[string]any, []string) {
+	defined := frontmatter.Keys(Metadata{})
 	var document yaml.Node
 	if err := yaml.Unmarshal([]byte(header), &document); err != nil || len(document.Content) == 0 {
 		return nil, nil
@@ -56,7 +88,7 @@ func readExtensions(header string) (map[string]any, []string) {
 			problems = append(problems, fmt.Sprintf("header key %q is not a string, so graph.json cannot carry it", key.Value))
 			continue
 		}
-		if metadataKeys[key.Value] {
+		if defined[key.Value] {
 			continue
 		}
 		converted, err := jsonValue(value)

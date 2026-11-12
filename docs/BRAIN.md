@@ -147,6 +147,12 @@ refs: [O-0003, D-0031]
 | `reviewed_by` | git author (`Name <email>`) who promoted it |
 | `promoted_via` | the gate the last promotion passed: `auto`, `manual`, or `agent` |
 
+Any other key is an extension: vat keeps it, shows it, and gives it no meaning
+in the lifecycle. `vat brain new --set key=value` writes one as a string, and
+refuses a key from the table above. `--body-stdin` takes the body from a pipe
+and writes the heading itself, so a record a script produces is complete in one
+write.
+
 ### `claim_kind` decides which rules apply
 
 | Kind | Requires provenance | Decays |
@@ -463,6 +469,21 @@ $ cat brain/.brain
 schema: 1
 ```
 
+A brain scaffolded without a workspace, with `vat --brain-dir <dir> brain init`,
+also writes the policy it runs under, because no `vat.yaml` holds it:
+
+```
+policy:
+  promotion_gate: manual
+  stale_after_days: 90
+  review_sla_days: 30
+  require_promotion_gate: true
+```
+
+Inside a workspace, `vat.yaml` wins over every one of these, and `vat doctor`
+warns about each value the marker states differently. [SPEC.md](SPEC.md) §5.1
+has the rules.
+
 Schema 1 is:
 
 | | |
@@ -532,7 +553,7 @@ knows to look for, so this table and `brain.RuleNames()` are compared by a test.
 | `brain/quarantine-reason` | error | a quarantine with no stated cause, which cannot be reviewed or lifted later |
 | `brain/record-malformed` | error | a file that cannot be read as a record, and is therefore invisible to every rule above |
 | `brain/record-oversized` | warn | a record past the length limit — it holds more than one judgement, and length normalisation ranks it below the records it should have been split into |
-| `brain/record-secret-suspected` | error / warn | a line that carries a credential; error for unmistakable shapes, warning for heuristics |
+| `brain/record-secret-suspected` | error / warn | a line or an extension key that carries a credential; error for unmistakable shapes, warning for heuristics |
 | `brain/ref-missing` | error | a reference to a record that does not exist |
 | `brain/ref-withdrawn` | warn | a record citing a revoked or quarantined one as support |
 | `brain/reviewer-unattributed` | warn | an active record has no `reviewed_by` under the manual or agent promotion gate |
@@ -553,7 +574,12 @@ knows to look for, so this table and `brain.RuleNames()` are compared by a test.
 ```console
 $ vat brain check --only claim     # the provenance rules alone
 $ vat brain check --list           # every rule name
+$ vat brain check --fail-on-warning   # exit 1 on a warning too, for a job that must stop
 ```
+
+Warnings exit `0` by default, because they are judgements a person may defer.
+`--fail-on-warning` is for an automated writer that should stop instead; it
+changes the exit code and nothing it prints.
 
 ---
 
@@ -564,8 +590,9 @@ merge conflict marker in its header used to take down `check`, `query`, `sweep`,
 `build`, `doctor`, and `lint` together. Now it is `brain/record-malformed` and
 everything else still loads and still reports.
 
-**A record must not carry a credential.** `brain/record-secret-suspected` names
-the line and the kind of credential and never the value — a finding that repeats
+**A record must not carry a credential.** `brain/record-secret-suspected` reads
+the body and every extension key, and names the line or the key and the kind of
+credential and never the value — a finding that repeats
 a secret has published it a second time, somewhere people paste into chat. This
 rule was the one thing the methodology asserted with nothing checking it, and it
 matters most here: a brain repository is exactly what an organisation points a
@@ -581,6 +608,13 @@ INFO  G-0014  Retries can double-submit an order    active
       gaps/G-0014-retries-can-double-submit.md
       │ Two identical requests within the retry window create two orders.
 ```
+
+`vat brain list` is the other way in: every record, archived ones included,
+filtered by `--status`, `--kind`, and `--where key=value` on extension keys,
+read from the files as they are now rather than from `graph.json`. Citability
+is judged at read time, the same way `query` judges it. A file that cannot be
+read is listed under `skipped` and the rest still print; the command then exits
+`1`.
 
 The default surface is deliberately narrow: the root projections and the
 non-terminal records. Superseded reasoning is excluded, because an answer

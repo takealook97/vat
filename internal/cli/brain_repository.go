@@ -30,7 +30,13 @@ that already holds records.`,
 			if err := parseFlags(set, args); err != nil {
 				return err
 			}
+			if env.BrainDir != "" {
+				return initExplicitBrain(env, set.Args())
+			}
 			ws, err := env.Workspace()
+			if noWorkspace(err) && env.Root == "" {
+				return usageErrorf("not inside a workspace; name the brain's directory with --brain-dir <dir>")
+			}
 			if err != nil {
 				return err
 			}
@@ -56,16 +62,71 @@ that already holds records.`,
 			if err != nil {
 				return err
 			}
-			for _, file := range created {
-				env.Printer.Status(ui.LevelOK, file, "created")
-			}
-			if len(created) == 0 {
-				env.Printer.Status(ui.LevelOK, "brain", "already initialised")
-			}
+			reportCreated(env, created)
 			env.Printer.Hint("%s", brainNextStep(ws, root))
 			return nil
 		},
 	}
+}
+
+func reportCreated(env *Env, created []string) {
+	for _, file := range created {
+		env.Printer.Status(ui.LevelOK, file, "created")
+	}
+	if len(created) == 0 {
+		env.Printer.Status(ui.LevelOK, "brain", "already initialised")
+	}
+}
+
+// initExplicitBrain scaffolds at --brain-dir, which is the write boundary in
+// this mode the way the workspace root is in the other: an optional directory
+// argument is taken relative to it and may not leave it.
+//
+// The marker gets the policy block only when no workspace governs the
+// directory. A workspace brain's policy lives in vat.yaml, and writing a second
+// copy into the marker would only create a place for the two to disagree.
+func initExplicitBrain(env *Env, args []string) error {
+	if len(args) > 1 {
+		return usageErrorf("expected at most one directory")
+	}
+	base := explicitBrainRoot(env)
+	root := base
+	if len(args) == 1 {
+		root = filepath.Join(base, args[0])
+		// Lexically first, before anything is created, then again once the
+		// directory exists so a symbolic link cannot carry the scaffold out.
+		if rel, err := filepath.Rel(base, root); err != nil || rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
+			return usageErrorf("%s is outside --brain-dir", args[0])
+		}
+	}
+	if err := fsx.EnsureDir(base); err != nil {
+		return err
+	}
+	if root != base && !workspace.Contains(base, root) {
+		return usageErrorf("%s is outside --brain-dir", args[0])
+	}
+	ws, err := workspaceAround(env, root)
+	if err != nil {
+		return err
+	}
+	var policy *brain.MarkerPolicy
+	if ws == nil {
+		defaults := brain.DefaultMarkerPolicy()
+		policy = &defaults
+	}
+	created, err := brain.InitWithPolicy(root, env.Now, policy)
+	if err != nil {
+		return err
+	}
+	reportCreated(env, created)
+	if ws != nil {
+		if declared, ok := ws.BrainPath(); ok && sameDir(declared, root) {
+			env.Printer.Hint("\nNext: vat brain new decision --title \"...\"")
+			return nil
+		}
+	}
+	env.Printer.Hint("\nNext: vat --brain-dir %s brain new decision --title \"...\"", root)
+	return nil
 }
 
 // brainNextStep returns the hint to print once a brain layout exists at root.
@@ -116,11 +177,12 @@ func brainBuildCommand() *Command {
 			if err := parseFlags(set, args); err != nil {
 				return err
 			}
-			ws, store, err := openBrain(env)
+			bc, err := resolveBrain(env)
 			if err != nil {
 				return err
 			}
-			result, err := brain.Build(store, brainPolicy(ws))
+			store := bc.Store
+			result, err := brain.Build(store, bc.Policy)
 			if err != nil {
 				return err
 			}
@@ -143,12 +205,16 @@ func brainCheckCommand() *Command {
 	return &Command{
 		Name:    "check",
 		Summary: "Validate identifiers, provenance, supersession, and links",
-		Usage:   "vat brain check [--only <rule>] [--list]",
+		Usage:   "vat brain check [--only <rule>] [--list] [--fail-on-warning]",
 		Long: `Fail closed on everything that would make the knowledge layer untrustworthy.
 
 Every finding is reported at once rather than one per run, because these rules
 are run in a loop while cleaning up a repository. --only narrows that to one
-class of problem while you work through it; --list names every rule.`,
+class of problem while you work through it; --list names every rule.
+
+Warnings alone exit 0. --fail-on-warning makes a selected warning exit 1 as an
+error does, for a job that must stop on one; the report and the JSON are the
+same either way.`,
 		Examples: []string{
 			"vat brain check",
 			"vat brain check --only claim    # provenance rules alone",
@@ -157,6 +223,7 @@ class of problem while you work through it; --list names every rule.`,
 			set := newFlagSet("brain check")
 			only := set.String("only", "", "only rules whose name contains this")
 			list := set.Bool("list", false, "list every rule and exit")
+			failOnWarning := set.Bool("fail-on-warning", false, "exit 1 on a warning as well as an error")
 			if err := parseFlags(set, args); err != nil {
 				return err
 			}
@@ -166,11 +233,11 @@ class of problem while you work through it; --list names every rule.`,
 				}
 				return nil
 			}
-			ws, store, err := openBrain(env)
+			bc, err := resolveBrain(env)
 			if err != nil {
 				return err
 			}
-			policy := brainPolicy(ws)
+			store, policy := bc.Store, bc.Policy
 			// The same failure `vat lint --only` had: a selector matching no
 			// rule reported a clean run. The match is a substring so a family
 			// can be selected; matching nothing at all cannot be intentional.
@@ -216,7 +283,10 @@ class of problem while you work through it; --list names every rule.`,
 						pluralise(len(findings)-brain.Errors(findings), "warning", "warnings")))
 				reportBrainFixes(env, findings)
 			}
-			if brain.Errors(findings) > 0 {
+			// Only the exit code changes. A job that must stop on a warning
+			// used to parse the report for one, and a flag that also changed
+			// the report would break the job reading it.
+			if brain.Errors(findings) > 0 || (*failOnWarning && len(findings) > 0) {
 				return findingsErrorf("")
 			}
 			return nil
@@ -258,6 +328,9 @@ migrate needs and what a list of two hundred findings does not give.`,
 			}
 			name := set.Arg(0)
 			ws, err := env.Workspace()
+			if noWorkspace(err) {
+				return refuseStandalone("vat brain adopt")
+			}
 			if err != nil {
 				return err
 			}

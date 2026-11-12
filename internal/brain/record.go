@@ -258,7 +258,9 @@ type Record struct {
 	Title string
 	Body  string
 	// Extensions holds the header keys Metadata does not model, as values JSON
-	// can hold. Display data only (SPEC 5.6.1): no rule reads it.
+	// can hold. They carry no meaning to vat (SPEC 5.6.1): no rule reads one to
+	// decide a status. They are text read and indexed as widely as the body,
+	// so the secret check reads them too.
 	Extensions map[string]any
 	// ExtensionProblems names the extension keys that could not be carried,
 	// so check can report them without dropping the rest of the record.

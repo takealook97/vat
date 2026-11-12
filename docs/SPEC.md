@@ -75,7 +75,8 @@ a description of a program.
    age.
 6. An identifier used to build a path **MUST** be validated before it is joined
    to one, and an implementation **MUST** refuse to write outside the workspace
-   root. The permitted set differs by identifier, because they are joined into
+   root — or, for a brain no workspace contains, outside the brain directory it
+   was explicitly given (§5.1). The permitted set differs by identifier, because they are joined into
    different things:
 
    | Identifier | Permitted | Length | Also |
@@ -277,6 +278,28 @@ contain a line `schema: <integer>` for schema 1 and later. A marker with no
 A reader **SHOULD** also recognise a directory that has the record directories
 but no marker: brains predate the marker, and refusing to read one loses the
 records the format exists to keep.
+
+The marker is YAML and **MAY** carry comments and a `policy` mapping. The policy
+is the lifecycle a brain runs under when no workspace manifest governs it:
+
+| Key | Type | Default |
+| --- | --- | --- |
+| `promotion_gate` | `manual`, `auto`, or `agent` | `manual` |
+| `stale_after_days` | integer ≥ 1 | `90` |
+| `review_sla_days` | integer ≥ 1 | `30` |
+| `require_promotion_gate` | boolean | `true` |
+
+A key absent from the mapping takes its default. A reader **MUST** refuse a
+policy key it does not know and a value of the wrong type, rather than fall
+back to the default: a typo would otherwise disable the rule it configures.
+Where a workspace manifest governs the brain, the manifest's brain policy
+(§4) applies in full, its own defaults included, and the marker's policy is
+ignored; an implementation **SHOULD** report each marker value that differs.
+The `schema:` line is still read line by line, as above, so a marker some other
+tool wrote stays versioned even when it is not valid YAML.
+
+This revises §3 rule 6: a brain reached without a workspace has its own
+directory as the write boundary.
 
 A reader encountering a schema it does not implement — greater than its own, or
 a value it cannot parse — **MUST** report that fact and **MUST NOT** present the
@@ -504,6 +527,11 @@ The published record schema follows the same rule: it validates the fields this
 specification defines and lets every other key through. A record a schema
 validator rejects only because it carries an extension key is a defect in the
 schema, not in the record.
+
+A writer **MAY** add extension keys when it creates a record; their values are
+strings unless the writer says otherwise, quoted so a value shaped like a date
+stays one (§3 rule 3). A writer **MUST NOT** use that path to set a field this
+specification defines.
 
 An extension key is display-only by definition. A key that a workspace wants
 enforced is a rule, and a rule belongs in this specification or in that

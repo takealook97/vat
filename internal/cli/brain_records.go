@@ -21,7 +21,9 @@ func brainNewCommand() *Command {
 	return &Command{
 		Name:    "new",
 		Summary: "Create an atomic record",
-		Usage:   `vat brain new <goal|gap|decision|memory> --title "..." [--claim <kind>] [--owner <repo>] [--source-path <p>] [--source-url <url>] [--source-quote "..."] [--axis <a>] [--refs <ids>] [--id <id>]`,
+		Usage: `vat brain new <goal|gap|decision|memory> --title "..." [--claim <kind>] [--owner <repo>] [--source-path <p>] ` +
+			`[--source-external] [--source-url <url>] [--source-quote "..."] [--axis <a>] [--refs <ids>] [--id <id>] ` +
+			`[--body-stdin] [--set key=value]...`,
 		Long: `Create one record holding one fact.
 
 A record enters as provisional, never as truth. Promoting it is a separate,
@@ -41,11 +43,21 @@ the source's own words with --source-quote.
 
 When git user.name and user.email are configured in the brain repository,
 recorded_by records that author identity as Name <email>. Unset identity is
-omitted; creating a provisional record remains possible.`,
+omitted; creating a provisional record remains possible.
+
+--body-stdin reads the body from standard input, without its H1: vat writes
+"# <ID> — <title>" ahead of it, the heading the default body has. --set
+key=value adds a header key vat does not define, as a string, and may be
+repeated; a key vat defines is refused, so no flag here can set status or
+reviewed_by. --source-external marks the evidence as held outside the
+workspace. The whole record — title, body, every header value — is checked for
+credential shapes before anything is written, and a match writes nothing and
+names only the kind of credential found.`,
 		Examples: []string{
 			`vat brain new decision --title "Orders own their own idempotency keys" --claim historical --owner payments --source-path docs/ORDERING.md`,
 			`vat brain new gap --title "Retries can double-submit" --claim current-state --owner payments`,
 			`vat brain new gap --title "Retries can double-submit" --claim current-state --owner payments --source-path docs/ORDERING.md`,
+			`summarise | vat brain new memory --title "Retries need a key" --body-stdin --set project=checkout --source-external`,
 		},
 		Run: runBrainNew,
 	}
@@ -62,7 +74,14 @@ func runBrainNew(ctx context.Context, env *Env, args []string) error {
 	axis := set.String("axis", "", "grouping axis, for goals")
 	refs := set.String("refs", "", "identifiers of related records")
 	id := set.String("id", "", "explicit identifier (default: the next free one)")
+	bodyStdin := set.Bool("body-stdin", false, "read the body, without its H1, from standard input")
+	sourceExternal := set.Bool("source-external", false, "the evidence is held outside the workspace")
+	extensions := &extensionFlag{}
+	set.Var(extensions, "set", "add a header key vat does not define, as key=value (repeatable)")
 	if err := parseFlags(set, args); err != nil {
+		return err
+	}
+	if err := extensions.validate(); err != nil {
 		return err
 	}
 	if set.NArg() != 1 {
@@ -83,20 +102,36 @@ func runBrainNew(ctx context.Context, env *Env, args []string) error {
 		return usageErrorf("--title must be one line: it becomes the record's heading")
 	}
 
-	ws, store, err := openBrain(env)
+	if *sourceExternal && strings.TrimSpace(*owner) != "" {
+		return usageErrorf("--source-external and --owner say different things about where the evidence is; pass one")
+	}
+	// Every input is read and judged before the brain is opened, so a
+	// refusal never follows a partial write.
+	if strings.TrimSpace(*sourceURL) != "" {
+		if err := brain.ValidateSourceURL(*sourceURL); err != nil {
+			return usageErrorf("--source-url: %v", err)
+		}
+	}
+	body := ""
+	if *bodyStdin {
+		body, err = readBody(env)
+		if err != nil {
+			return err
+		}
+	}
+
+	bc, err := resolveBrain(env)
 	if err != nil {
 		return err
 	}
+	store := bc.Store
 
 	input := brain.NewRecordInput{
 		Kind: kind, ID: *id, Title: *title, OwnedBy: *owner,
 		SourceURL: *sourceURL, SourceQuote: *sourceQuote,
 		Axis: *axis, Refs: splitList(*refs), Now: env.Now,
-	}
-	if strings.TrimSpace(*sourceURL) != "" {
-		if err := brain.ValidateSourceURL(*sourceURL); err != nil {
-			return usageErrorf("--source-url: %v", err)
-		}
+		BodyWithoutHeading: body, ExtensionFields: extensions.fields(),
+		SourceExternal: *sourceExternal,
 	}
 	if input.ID == "" {
 		input.ID = store.NextID(kind)
@@ -114,7 +149,10 @@ func runBrainNew(ctx context.Context, env *Env, args []string) error {
 		return usageErrorf("a current-state claim needs --owner: which repository is canonical for this fact?")
 	}
 	if *owner != "" {
-		reference, err := sourceReferenceFor(ctx, ws, *owner, *sourcePath)
+		if bc.Standalone() {
+			return refuseStandalone("--owner")
+		}
+		reference, err := sourceReferenceFor(ctx, bc.Workspace, *owner, *sourcePath)
 		if err != nil {
 			return err
 		}
@@ -186,7 +224,7 @@ func shortRevision(revision string) string {
 // "" when vat cannot tell. Not being able to see the source is a reason to ask
 // the reviewer, never a reason to assume the evidence held.
 func currentRevisionOf(ctx context.Context, ws *workspace.Workspace, owner string) string {
-	if strings.TrimSpace(owner) == "" {
+	if ws == nil || strings.TrimSpace(owner) == "" {
 		return ""
 	}
 	repo, ok := ws.Manifest.Find(owner)
@@ -257,10 +295,11 @@ reviewer checked; every record must satisfy the gate.`,
 			if len(named) == 0 && strings.TrimSpace(*owner) == "" {
 				return usageErrorf("expected at least one record identifier, or --owner <repo>")
 			}
-			ws, store, err := openBrain(env)
+			bc, err := resolveBrain(env)
 			if err != nil {
 				return err
 			}
+			ws, store, gate := bc.Workspace, bc.Store, bc.Policy.PromotionGate
 			records, err := recordsToPromote(store, named, *owner)
 			if err != nil {
 				return err
@@ -272,7 +311,7 @@ reviewer checked; every record must satisfy the gate.`,
 			refused := 0
 			for _, record := range records {
 				sourceOwner := record.OwnedBy
-				if ws.Manifest.Policy.Gates.BrainPromote == manifest.GateAgent && record.Kind != brain.KindGoal {
+				if gate == brain.PromotionGateAgent && record.Kind != brain.KindGoal {
 					if repo, _, _, ok := record.SourceParts(); ok {
 						sourceOwner = repo
 					}
@@ -282,9 +321,9 @@ reviewer checked; every record must satisfy the gate.`,
 				}
 				request := brain.PromoteRequest{
 					Reviewer: reviewer, Now: env.Now, Reverified: *reverified,
-					RequireReviewer: ws.Manifest.Policy.Gates.BrainPromote != manifest.GateAuto,
-					AgentGate:       ws.Manifest.Policy.Gates.BrainPromote == manifest.GateAgent,
-					PromotionGate:   ws.Manifest.Policy.Gates.BrainPromote,
+					RequireReviewer: gate != brain.PromotionGateAuto,
+					AgentGate:       gate == brain.PromotionGateAgent,
+					PromotionGate:   gate,
 					SourceRevision:  currentRevisionOf(ctx, ws, sourceOwner),
 				}
 				// Every record is reported, refusals included. These commands
@@ -317,8 +356,16 @@ reviewer checked; every record must satisfy the gate.`,
 // if the named file never existed there.
 func checkAgentSourcePath(ctx context.Context, ws *workspace.Workspace, record brain.Record, request brain.PromoteRequest) error {
 	if !request.AgentGate || record.Kind == brain.KindGoal || record.Status.Terminal() ||
-		strings.TrimSpace(request.Reviewer) == "" ||
-		(record.IsCurrentStateClaim() && request.SourceRevision == "") {
+		strings.TrimSpace(request.Reviewer) == "" {
+		return nil
+	}
+	// The agent gate stands on evidence read from a governed repository. A
+	// standalone brain has no repository list, so the gate cannot be met and
+	// saying so beats the brain package's generic "no source path".
+	if ws == nil {
+		return fmt.Errorf("%s: agent promotion needs evidence in a governed repository, and a standalone brain has no workspace", record.ID)
+	}
+	if record.IsCurrentStateClaim() && request.SourceRevision == "" {
 		return nil
 	}
 	owner, revision, path, ok := record.SourceParts()
@@ -392,10 +439,11 @@ made sense.`,
 			if set.NArg() != 2 {
 				return usageErrorf("expected an old identifier and a new one")
 			}
-			ws, store, err := openBrain(env)
+			bc, err := resolveBrain(env)
 			if err != nil {
 				return err
 			}
+			store := bc.Store
 			index := store.ByID()
 			previous, ok := index[set.Arg(0)]
 			if !ok {
@@ -411,7 +459,7 @@ made sense.`,
 			if previous.ID == replacement.ID {
 				return usageErrorf("%s cannot supersede itself", previous.ID)
 			}
-			gated := ws.Manifest.Policy.Brain.RequirePromotionGate
+			gated := bc.RequirePromotionGate
 			if err := brain.Supersede(store.Root, previous, replacement,
 				brain.SupersedeOptions{PromotionGated: gated}); err != nil {
 				return err
