@@ -10,6 +10,7 @@ reimplementing the prose.
 | `vat-manifest-v1.schema.json` | workspace manifest, version 1 | JSON Schema 2020-12 |
 | `vat-changeset-v1.schema.json` | completion record, version 1 | JSON Schema 2020-12 |
 | `vat-brain-record-1.schema.json` | knowledge record front matter, schema 1 | JSON Schema 2020-12 |
+| `vat-brain-marker-1.schema.json` | brain marker (`.brain`), schema 1 | JSON Schema 2020-12 |
 
 ## What these are, and are not
 
@@ -23,7 +24,9 @@ Whether a schema accepts keys it does not define follows the format. The
 manifest and completion record schemas reject them, because those formats are
 closed. The brain record schema accepts them: a record may carry extension keys
 (`docs/SPEC.md` §5.6.1), so that schema checks the fields it defines and lets
-every other key through.
+every other key through. The brain marker schema rejects an unknown key inside
+`policy`, as `vat` does, and lets other top-level keys through, because the
+specification closes only the policy block.
 
 Each schema is versioned in its filename. A version 2 of a format arrives as a
 new file beside the old one; neither the URL nor the contents of a published
@@ -38,7 +41,9 @@ record it accepted before, it still accepts.
 Every manifest and completion record `vat` writes opens with a modeline, so
 editors using `yaml-language-server` validate it with no configuration. Front
 matter inside a Markdown record carries none, because no editor looks for one
-there; validate those by extracting the front matter first.
+there; validate those by extracting the front matter first. The brain marker
+carries none either, so that `vat` keeps writing it unchanged; it is plain YAML
+and validates as it is.
 
 ```yaml
 # yaml-language-server: $schema=https://raw.githubusercontent.com/takealook97/vat/main/schemas/vat-manifest-v1.schema.json
@@ -58,7 +63,8 @@ editors reject files `vat` itself wrote. `internal/cli/schema_contract_test.go`
 reads each schema and holds it against the Go types — every property against
 the struct's serialised fields in both directions, every enum against the values
 `vat` accepts, the version bound against `SchemaVersion`, the name cap against
-`ValidateRepoName`, and the modeline URL against the `$id` inside the file it
+`ValidateRepoName`, the marker's policy keys against the ones `vat` reads, and
+the modeline URL against the `$id` inside the file it
 names. A field added to the manifest and forgotten here fails the suite.
 
 That guard is structural. It does not run a JSON Schema validator, because

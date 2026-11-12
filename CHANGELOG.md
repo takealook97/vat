@@ -35,7 +35,8 @@ Notable changes to `vat`. The format follows
   wherever there is one, and `vat doctor` warns with `policy-conflict` about
   each marker value that disagrees with it. The marker policy includes
   `require_external_evidence`, so a standalone brain can require external
-  evidence too.
+  evidence too, and `schemas/vat-brain-marker-1.schema.json` describes the
+  marker and its policy block.
 - `vat brain new --body-stdin`, `--set key=value`, and `--source-external`: a
   record a script produces is written complete in one atomic write, with the
   heading added by vat, and refused before any write when its title, body, or

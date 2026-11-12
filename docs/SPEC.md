@@ -34,6 +34,7 @@ the readers that are not people:
 | workspace manifest, version 1 | [`schemas/vat-manifest-v1.schema.json`](../schemas/vat-manifest-v1.schema.json) |
 | completion record, version 1 | [`schemas/vat-changeset-v1.schema.json`](../schemas/vat-changeset-v1.schema.json) |
 | knowledge record front matter, schema 1 | [`schemas/vat-brain-record-1.schema.json`](../schemas/vat-brain-record-1.schema.json) |
+| brain marker, schema 1 | [`schemas/vat-brain-marker-1.schema.json`](../schemas/vat-brain-marker-1.schema.json) |
 
 A schema is a projection of this document, not a second source of truth. Where
 the two disagree, this document is the specification and the schema has a bug.

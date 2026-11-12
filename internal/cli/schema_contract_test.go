@@ -29,8 +29,8 @@ import (
 // they describe, field by field and value by value.
 //
 // They live beside the other contract tests rather than in each format's own
-// package because one set of helpers reads all three, and three copies of a
-// helper is how three checks stop agreeing on what they check.
+// package because one set of helpers reads every schema, and a copy of a
+// helper per format is how the checks stop agreeing on what they check.
 
 const schemaDir = "../../schemas/"
 
@@ -43,6 +43,7 @@ const (
 	manifestSchema  = "vat-manifest-v1.schema.json"
 	changesetSchema = "vat-changeset-v1.schema.json"
 	brainSchema     = "vat-brain-record-1.schema.json"
+	markerSchema    = "vat-brain-marker-1.schema.json"
 )
 
 func loadSchema(t *testing.T, name string) map[string]any {
@@ -313,6 +314,7 @@ func TestPublishedSchemasAreNamedByWhatPointsAtThem(t *testing.T) {
 		{manifestSchema, manifest.SchemaURL},
 		{changesetSchema, changeset.SchemaURL},
 		{brainSchema, ""},
+		{markerSchema, ""},
 	}
 
 	// Act & Assert
@@ -540,6 +542,10 @@ func validateAgainstSchema(t *testing.T, root, node map[string]any, value any, a
 			for i, item := range list {
 				problems = append(problems, validateAgainstSchema(t, root, node[key].(map[string]any), item, fmt.Sprintf("%s[%d]", at, i))...)
 			}
+		case "minimum":
+			if number, ok := value.(float64); ok && number < node[key].(float64) {
+				problems = append(problems, fmt.Sprintf("%s: %v is below %v", at, value, node[key]))
+			}
 		case "minLength", "maxLength", "pattern":
 			// Length and pattern bounds are held against vat's own validators
 			// by the identifier tests above; these fixtures stay inside them.
@@ -660,6 +666,71 @@ func TestBrainRecordSchemaAcceptsExtensionKeys(t *testing.T) {
 			}
 			if !testCase.valid && len(problems) == 0 {
 				t.Error("accepted a record whose defined fields are wrong")
+			}
+		})
+	}
+}
+
+// The marker's policy block is read by ReadMarkerPolicy and refused key by key.
+// A schema that lists a key vat refuses, or misses one vat reads, makes an
+// editor disagree with the tool about the one file a standalone brain is
+// governed by.
+func TestBrainMarkerSchemaDescribesThePolicyVatReads(t *testing.T) {
+	// Arrange
+	schema := loadSchema(t, markerSchema)
+	policyKeys := sortedStrings(brain.PolicyKeys()...)
+	tagged := make([]string, 0, len(policyKeys))
+	typ := reflect.TypeOf(brain.MarkerPolicy{})
+	for i := range typ.NumField() {
+		tagged = append(tagged, strings.Split(typ.Field(i).Tag.Get("json"), ",")[0])
+	}
+	sort.Strings(tagged)
+	root := t.TempDir()
+	defaults := brain.DefaultMarkerPolicy()
+	if _, err := brain.InitWithPolicy(root, testNow, &defaults); err != nil {
+		t.Fatal(err)
+	}
+	written := readFile(t, filepath.Join(root, brain.MarkerFile))
+
+	// Act & Assert: the declared keys, in both directions.
+	described := schemaPropertyNames(schemaNode(t, schema, "properties", "policy", "properties"))
+	if !reflect.DeepEqual(described, policyKeys) || !reflect.DeepEqual(tagged, policyKeys) {
+		t.Errorf("the schema describes %v, vat reads %v, MarkerPolicy carries %v", described, policyKeys, tagged)
+	}
+	if got := schemaEnum(t, schema, "properties", "policy", "properties", brain.PolicyPromotionGate); !reflect.DeepEqual(got, sortedStrings(brain.PromotionGates()...)) {
+		t.Errorf("promotion_gate: the schema allows %v", got)
+	}
+	versions, _ := schemaNode(t, schema, "properties", "schema")["enum"].([]any)
+	if len(versions) != 1 || versions[0] != float64(brain.SchemaVersion) {
+		t.Errorf("the schema pins marker schema %v, vat writes %d", versions, brain.SchemaVersion)
+	}
+
+	// Act & Assert: what vat writes, and what it refuses.
+	cases := []struct {
+		name   string
+		marker string
+		valid  bool
+	}{
+		{"the marker vat writes with a policy", written, true},
+		{"a marker without a policy", "schema: 1\n", true},
+		{"a marker that predates versioning", "# a brain\n", true},
+		{"an unknown policy key", written + "  require_everything: true\n", false},
+		{"an unknown gate", strings.Replace(written, "promotion_gate: manual", "promotion_gate: sometimes", 1), false},
+		{"zero days", strings.Replace(written, "stale_after_days: 90", "stale_after_days: 0", 1), false},
+		{"a boolean spelled as text", strings.Replace(written, "require_external_evidence: false", "require_external_evidence: \"no\"", 1), false},
+	}
+	for _, testCase := range cases {
+		t.Run(testCase.name, func(t *testing.T) {
+			var document any = map[string]any{}
+			if decoded := frontMatterAsJSON(t, testCase.marker); decoded != nil {
+				document = decoded
+			}
+			problems := validateAgainstSchema(t, schema, schema, document, "$")
+			if testCase.valid && len(problems) > 0 {
+				t.Errorf("rejected a marker vat accepts: %v", problems)
+			}
+			if !testCase.valid && len(problems) == 0 {
+				t.Error("accepted a marker vat refuses")
 			}
 		})
 	}

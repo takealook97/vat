@@ -1,0 +1,45 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/takealook97/vat/main/schemas/vat-brain-marker-1.schema.json",
+  "title": "vat brain marker, schema 1",
+  "description": "The .brain marker at the root of a brain repository. It names the brain's schema and may carry the lifecycle policy the brain runs under when no workspace manifest governs it. Normative prose is docs/SPEC.md section 5.1; where the two disagree, SPEC.md is the specification and this file has a bug. A reader reads the schema line line by line, so a marker that is not valid YAML still names its schema; this file describes only markers that are valid YAML.",
+  "type": "object",
+  "additionalProperties": true,
+  "properties": {
+    "schema": {
+      "description": "The brain's schema. A marker without it predates versioning and is read as schema 1.",
+      "type": "integer",
+      "enum": [1]
+    },
+    "policy": {
+      "description": "The lifecycle a standalone brain runs under. A key absent here takes its default. Where a workspace manifest governs the brain, the manifest's brain policy applies in full and this block is ignored. Unknown keys are refused: a typo would otherwise disable the rule it configures.",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "promotion_gate": {
+          "description": "How a provisional record becomes active. Default manual.",
+          "type": "string",
+          "enum": ["auto", "manual", "agent"]
+        },
+        "stale_after_days": {
+          "description": "When an observed current-state claim stops counting as verified. Default 90.",
+          "type": "integer",
+          "minimum": 1
+        },
+        "review_sla_days": {
+          "description": "How long a record may wait in a non-answerable state before the queue is reported as failing. Default 30.",
+          "type": "integer",
+          "minimum": 1
+        },
+        "require_promotion_gate": {
+          "description": "Whether a canonical record needs an explicit promotion step. Default true.",
+          "type": "boolean"
+        },
+        "require_external_evidence": {
+          "description": "Whether a source_external record must carry source_url and source_quote. Default false, so records written before those fields existed keep passing.",
+          "type": "boolean"
+        }
+      }
+    }
+  }
+}
