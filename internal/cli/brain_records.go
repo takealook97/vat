@@ -21,7 +21,7 @@ func brainNewCommand() *Command {
 	return &Command{
 		Name:    "new",
 		Summary: "Create an atomic record",
-		Usage:   `vat brain new <goal|gap|decision|memory> --title "..." [--claim <kind>] [--owner <repo>] [--source-path <p>] [--axis <a>] [--refs <ids>] [--id <id>]`,
+		Usage:   `vat brain new <goal|gap|decision|memory> --title "..." [--claim <kind>] [--owner <repo>] [--source-path <p>] [--source-url <url>] [--source-quote "..."] [--axis <a>] [--refs <ids>] [--id <id>]`,
 		Long: `Create one record holding one fact.
 
 A record enters as provisional, never as truth. Promoting it is a separate,
@@ -33,6 +33,11 @@ claim kind, including a record without --claim. Add --source-path to pin the
 file you read; it must exist at that revision and requires --owner.
 A claim about the present uses --claim current-state and requires --owner; only
 current-state claims receive observed_at and age out.
+
+A claim read from somewhere that is not a repository — a thread, a ticket, a
+vendor page — cannot be pinned with --owner. Record where it came from with
+--source-url (an absolute http or https address with no user information) and
+the source's own words with --source-quote.
 
 When git user.name and user.email are configured in the brain repository,
 recorded_by records that author identity as Name <email>. Unset identity is
@@ -52,6 +57,8 @@ func runBrainNew(ctx context.Context, env *Env, args []string) error {
 	claim := set.String("claim", "", "current-state|historical|intent")
 	owner := set.String("owner", "", "repository that is canonical for this fact")
 	sourcePath := set.String("source-path", "", "file in --owner the claim was read from")
+	sourceURL := set.String("source-url", "", "http or https address an external claim was read from")
+	sourceQuote := set.String("source-quote", "", "the source's own words, copied verbatim")
 	axis := set.String("axis", "", "grouping axis, for goals")
 	refs := set.String("refs", "", "identifiers of related records")
 	id := set.String("id", "", "explicit identifier (default: the next free one)")
@@ -83,7 +90,13 @@ func runBrainNew(ctx context.Context, env *Env, args []string) error {
 
 	input := brain.NewRecordInput{
 		Kind: kind, ID: *id, Title: *title, OwnedBy: *owner,
+		SourceURL: *sourceURL, SourceQuote: *sourceQuote,
 		Axis: *axis, Refs: splitList(*refs), Now: env.Now,
+	}
+	if strings.TrimSpace(*sourceURL) != "" {
+		if err := brain.ValidateSourceURL(*sourceURL); err != nil {
+			return usageErrorf("--source-url: %v", err)
+		}
 	}
 	if input.ID == "" {
 		input.ID = store.NextID(kind)

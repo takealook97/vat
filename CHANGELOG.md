@@ -8,6 +8,15 @@ Notable changes to `vat`. The format follows
 
 ### Added
 
+- Records about systems outside the workspace can carry `source_url` and
+  `source_quote`, and `vat brain new` writes them with `--source-url` and
+  `--source-quote`. Two `vat brain check` rules judge them without opening the
+  address: `brain/external-source-url` (a malformed address, or one carrying
+  user information) and `brain/external-evidence-missing` (an external record
+  lacking either field, only under the new opt-in
+  `policy.brain.require_external_evidence`). A `source_url` previously kept as
+  an extension key reads as the field unchanged. An older vat rejects a
+  manifest that sets the new policy key.
 - `vat brain promote` records the gate it passed as `promoted_via` (`auto`,
   `manual`, or `agent`). With an identity configured, `auto` wrote
   `reviewed_by` just as `manual` did, so a record could not say which gate

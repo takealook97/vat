@@ -51,6 +51,10 @@ type CheckPolicy struct {
 	// ReviewSLADays is how long a record may stay in a non-answerable state
 	// before the queue itself is reported as failing.
 	ReviewSLADays int
+	// RequireExternalEvidence reports a source_external record that lacks
+	// source_url or source_quote. Off by default, so records written before
+	// the fields existed do not start failing on upgrade.
+	RequireExternalEvidence bool
 	// Only narrows the report to rules whose name contains one of these. It is
 	// for working through one class of problem at a time; an empty list checks
 	// everything.
@@ -103,6 +107,8 @@ func RuleNames() []string {
 		"brain/claim-source-branch",
 		"brain/claim-stale",
 		"brain/date-unreadable",
+		ruleExternalEvidenceMissing,
+		ruleExternalSourceURL,
 		"brain/id-duplicate",
 		"brain/id-missing",
 		"brain/link-broken",
@@ -153,6 +159,7 @@ func Check(store *Store, policy CheckPolicy, now time.Time) []Finding {
 	findings = append(findings, checkArchiveHygiene(store)...)
 	findings = append(findings, checkRecordSize(store)...)
 	findings = append(findings, checkProvenance(store, policy, now)...)
+	findings = append(findings, checkExternalEvidence(store, policy)...)
 	findings = append(findings, checkSupersession(store, index)...)
 	findings = append(findings, checkReferences(store, index)...)
 	findings = append(findings, checkLinks(store)...)

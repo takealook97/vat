@@ -214,6 +214,14 @@ type Metadata struct {
 	// like any other; nothing here can re-read it for you, which is the reason
 	// to be explicit rather than quiet.
 	SourceExternal bool `yaml:"source_external,omitempty"`
+	// SourceURL is where an external claim was read: an absolute http or https
+	// address. source_ref cannot hold it, because source_ref names a
+	// repository at a revision.
+	SourceURL string `yaml:"source_url,omitempty"`
+	// SourceQuote is the source's own words, copied verbatim, so a reader can
+	// judge the claim without trusting whoever summarised it. vat does not
+	// check that the words are really at SourceURL.
+	SourceQuote string `yaml:"source_quote,omitempty"`
 	// ObservedAt is the date the claim was last verified against its source.
 	ObservedAt string `yaml:"observed_at,omitempty"`
 	// RevalidateOn describes what should trigger a re-check.

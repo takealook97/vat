@@ -154,6 +154,7 @@ repos:
 | `policy.brain.stale_after_days` | no | the window after which a current-state claim is demoted (§6) |
 | `policy.brain.review_sla_days` | no | the window a queued record is expected to be judged within |
 | `policy.brain.require_promotion_gate` | no | require an explicit promotion step (§5.6) |
+| `policy.brain.require_external_evidence` | no | require `source_url` and `source_quote` on external records (§5.5.1) |
 | `policy.changeset.max_open_days` | no | the age at which an open changeset is reported as stale (§7) |
 | `policy.changeset.require_rollback_point` | no | refuse a participant with no revision to return to |
 | `policy.gates.deploy` | no | `manual` or `auto` |
@@ -319,6 +320,9 @@ refs: [O-0001]
 | `claim_kind` | see §5.4 | `current-state`, `historical`, or `intent` |
 | `owned_by` | see §5.4 | the repository or system canonical for the fact |
 | `source_ref` | see §5.4 | `<repo>@<revision>[:<path>]` |
+| `source_external` | see §5.5.1 | the source is a system the workspace does not govern |
+| `source_url` | see §5.5.1 | the `http`/`https` address an external claim was read from |
+| `source_quote` | see §5.5.1 | the source's own words, copied verbatim |
 | `observed_at` | see §5.4 | when the claim was last verified against its source |
 | `revalidate_on` | no | what should trigger a re-check |
 | `supersedes` / `superseded_by` | see §5.5 | the replacement chain |
@@ -466,6 +470,20 @@ would exempt a checkable claim from every rule that makes it checkable — and
 **MUST** apply every other rule unchanged. A claim about an external system
 still expires: nothing here can re-read it, which is the reason to be explicit
 rather than quiet.
+
+A source that is not a repository has no revision for `source_ref` to pin. Such
+a record **MAY** carry `source_url`, the address it was read from, and
+`source_quote`, the source's own words copied verbatim. When `source_url` is
+present on any record, an implementation **MUST** report it unless it is an
+absolute `http` or `https` URL naming a host and carrying no user information,
+and **MUST NOT** quote the value in that report. When
+`policy.brain.require_external_evidence` is `true`, an implementation **MUST**
+report every `source_external` record — archived records included — that lacks
+either field. Both reports **MUST** be judged from the record alone: an
+implementation **MUST NOT** open the address, and does not judge whether the
+quote appears there. Neither field changes any lifecycle judgement. Before this
+revision some writers kept `source_url` as an extension key; it is the same key,
+and a reader takes its value as this field.
 
 ### 5.6.1 Extension keys
 

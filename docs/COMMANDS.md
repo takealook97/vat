@@ -471,7 +471,8 @@ region.
 ```
 vat brain init      [directory]
 vat brain new       <goal|gap|decision|memory> --title "..." [--claim <kind>]
-                    [--owner <repo>] [--source-path <p>] [--axis <a>]
+                    [--owner <repo>] [--source-path <p>]
+                    [--source-url <url>] [--source-quote "..."] [--axis <a>]
                     [--refs <ids>] [--id <id>]
 vat brain build
 vat brain check     [--only <rule>] [--list]
@@ -503,6 +504,13 @@ later run can ask is whether the repository moved — which in an active one is
 always yes. Pinned to a file, it can ask whether *this* claim's evidence moved,
 and `brain/source-revision-drift`
 stays silent when it did not.
+
+`--source-url` and `--source-quote` record evidence for a claim read from
+something that is not a repository: the address, and the source's own words.
+`new` refuses an address that is not an absolute `http` or `https` URL with a
+host, or that carries user information, and writes nothing. Neither flag sets
+`source_external`; `brain check` reports both fields' absence only when
+`policy.brain.require_external_evidence` is set.
 
 `query` searches a deliberately narrow surface. `--all` widens it to history,
 archives, and terminal records — for auditing why something was decided, rather

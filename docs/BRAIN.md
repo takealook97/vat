@@ -134,6 +134,9 @@ refs: [O-0003, D-0031]
 | `claim_kind` | `current-state`, `historical`, or `intent` |
 | `owned_by` | the repository canonical for this fact |
 | `source_ref` | `<repo>@<revision>[:<path>]` — an exact revision, never a branch |
+| `source_external` | `true` when the source is a system this workspace does not govern |
+| `source_url` | for an external claim: the `http`/`https` address it was read from |
+| `source_quote` | for an external claim: the source's own words, copied verbatim |
 | `observed_at` | `YYYY-MM-DD`, when it was last verified against its source |
 | `revalidate_on` | what should trigger a re-check |
 | `supersedes` / `superseded_by` | the decision replacement chain |
@@ -520,6 +523,8 @@ knows to look for, so this table and `brain.RuleNames()` are compared by a test.
 | `brain/claim-source` | error | a current-state claim with no `source_ref`, or one that is not `<repo>@<revision>[:<path>]` |
 | `brain/claim-source-branch` | warn | evidence pinned to a branch, which keeps moving and takes the claim's meaning with it |
 | `brain/claim-stale` | warn | an active claim past the policy window; `vat brain sweep --apply` demotes it |
+| `brain/external-evidence-missing` | error | under `policy.brain.require_external_evidence`, a `source_external` record — archived ones included — with no `source_url` or no `source_quote` |
+| `brain/external-source-url` | error | a `source_url` that is not an absolute `http`/`https` address with a host, or that carries user information; the address is never opened |
 | `brain/date-unreadable` | warn | a present but invalid date no staleness rule can read; an absent optional `date` is not an error |
 | `brain/id-duplicate` | error | two records claiming the same identifier, so a reference resolves to either |
 | `brain/id-missing` | error | a record with no identifier; nothing can cite it and nothing can supersede it |
@@ -753,6 +758,27 @@ Says it once. Nothing else is suppressed — the claim still expires on schedule
 because nothing here can re-read it for you. Setting it for a repository the
 workspace *does* govern is an error: it would exempt a checkable claim from
 every rule that makes it checkable.
+
+A claim read from something that is not a repository at all — a chat thread, a
+ticket, a vendor page — has no revision to pin. Record where it came from and
+what it said instead:
+
+```yaml
+source_external: true
+source_url: https://example.com/thread/0001
+source_quote: The cutover moves to Monday.
+```
+
+`vat brain new --source-url <url> --source-quote "..."` writes both.
+`brain/external-source-url` reports an address that is not an absolute `http`
+or `https` URL, or that carries user information — wherever it is written, and
+without opening it. Set `policy.brain.require_external_evidence: true` and
+`brain/external-evidence-missing` fails every `source_external` record lacking
+either field, including archived ones. It is off by default so records written
+before these fields existed keep passing; fill those in, or move them, before
+turning it on. Neither rule checks that the quote is really at the address, or
+that the record belongs to the project it says it does. That judgement stays
+with whoever wrote the record.
 
 ---
 

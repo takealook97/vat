@@ -57,23 +57,44 @@ var credentialPatterns = []credentialPattern{
 func checkSecrets(store *Store) []Finding {
 	var findings []Finding
 	for _, record := range store.Records {
+		findings = append(findings, fieldSecrets(record)...)
 		for _, hit := range suspectedCredentials(record.Body) {
-			severity := SeverityError
-			qualifier := ""
-			if !hit.certain {
-				severity = SeverityWarn
-				qualifier = " what looks like"
-			}
-			findings = append(findings, Finding{
-				Rule: "brain/record-secret-suspected", Severity: severity,
-				Path: record.Path, ID: record.ID,
-				Message: fmt.Sprintf(
-					"line %d carries%s %s; a record is read and indexed widely, so remove it and rotate the credential",
-					hit.line, qualifier, hit.name),
-			})
+			findings = append(findings, secretFinding(record, fmt.Sprintf("line %d", hit.line), hit))
 		}
 	}
 	return findings
+}
+
+// fieldSecrets scans the header fields that hold copied text. A quote pasted
+// from a thread is exactly where a token travels, and the body scan never
+// reads the header.
+func fieldSecrets(record Record) []Finding {
+	var findings []Finding
+	for _, field := range []struct{ name, value string }{
+		{"source_url", record.SourceURL}, {"source_quote", record.SourceQuote},
+	} {
+		for _, hit := range suspectedCredentials(field.value) {
+			findings = append(findings, secretFinding(record, field.name, hit))
+		}
+	}
+	return findings
+}
+
+// secretFinding reports where a credential appears without quoting it.
+func secretFinding(record Record, where string, hit credentialHit) Finding {
+	severity := SeverityError
+	qualifier := ""
+	if !hit.certain {
+		severity = SeverityWarn
+		qualifier = " what looks like"
+	}
+	return Finding{
+		Rule: "brain/record-secret-suspected", Severity: severity,
+		Path: record.Path, ID: record.ID,
+		Message: fmt.Sprintf(
+			"%s carries%s %s; a record is read and indexed widely, so remove it and rotate the credential",
+			where, qualifier, hit.name),
+	}
 }
 
 type credentialHit struct {
