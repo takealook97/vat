@@ -134,9 +134,9 @@ func loadRecord(root string, kind Kind, path string) (Record, error) {
 		return Record{}, fmt.Errorf("read: %w", err)
 	}
 	doc := frontmatter.Split(string(data))
-	var metadata Metadata
-	if err := doc.Decode(&metadata); err != nil {
-		return Record{}, headerProblem(err)
+	metadata, extensions, problems, err := readHeader(doc)
+	if err != nil {
+		return Record{}, err
 	}
 	relative := relTo(root, path)
 	if metadata.ID == "" {
@@ -151,7 +151,6 @@ func loadRecord(root string, kind Kind, path string) (Record, error) {
 	if title == "" {
 		title = metadata.ID
 	}
-	extensions, problems := readExtensions(doc.Raw)
 	return Record{
 		Metadata:          metadata,
 		Extensions:        extensions,

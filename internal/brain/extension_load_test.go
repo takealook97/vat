@@ -92,3 +92,24 @@ func TestMalformedExtensionNamesLineAndSafeKey(t *testing.T) {
 		t.Errorf("problem = %q, want the key and its line without the value", problem)
 	}
 }
+
+func TestLoadKeepsRecordWithNonStringHeaderKey(t *testing.T) {
+	for _, key := range []string{"true: value", "1: value", "? [a, b]\n: value", "? {a: b}\n: value"} {
+		t.Run(strings.ReplaceAll(key, "\n", " "), func(t *testing.T) {
+			root, _ := newStore(t)
+			writeRecord(t, root, "decisions/D-0001-review.md",
+				"id: D-0001\nstatus: active\n"+key+"\nnote: kept\n", "# Review")
+			store, err := brain.Load(root)
+			if err != nil {
+				t.Fatal(err)
+			}
+			record, ok := store.ByID()["D-0001"]
+			if !ok || record.Extensions["note"] != "kept" || record.Status != brain.StatusActive {
+				t.Fatalf("record dropped or misread: malformed=%+v", store.Malformed)
+			}
+			if !malformedReported(store) {
+				t.Fatal("the key that is not a string was not reported")
+			}
+		})
+	}
+}

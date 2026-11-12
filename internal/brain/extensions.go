@@ -68,6 +68,56 @@ func extensionText(value any) string {
 	}
 }
 
+// readHeader decodes a record's front matter into Metadata and its extension
+// keys, parsing the header once.
+//
+// A key that is not a plain string — `? [a, b]`, a mapping used as a key —
+// cannot name a field, and handing it to the typed decoder failed the whole
+// decode, so one odd key made the record vanish from every rule and from the
+// graph. It is reported as a malformed extension and kept away from the typed
+// decoder; the defined fields, which are all plain strings, are untouched.
+func readHeader(doc frontmatter.Document) (Metadata, map[string]any, []string, error) {
+	var metadata Metadata
+	if !doc.Present {
+		return metadata, nil, nil, nil
+	}
+	var document yaml.Node
+	if err := yaml.Unmarshal([]byte(doc.Raw), &document); err != nil {
+		return metadata, nil, nil, headerProblem(err)
+	}
+	if len(document.Content) == 0 {
+		return metadata, nil, nil, nil
+	}
+	root := document.Content[0]
+	if root.Kind != yaml.MappingNode {
+		if err := root.Decode(&metadata); err != nil {
+			return metadata, nil, nil, headerProblem(err)
+		}
+		return metadata, nil, nil, nil
+	}
+	typed := &yaml.Node{Kind: yaml.MappingNode, Tag: "!!map", Line: root.Line, Column: root.Column}
+	for i := 0; i+1 < len(root.Content); i += 2 {
+		key := root.Content[i]
+		if plainStringKey(key) || key.ShortTag() == mergeTag {
+			typed.Content = append(typed.Content, key, root.Content[i+1])
+		}
+	}
+	if err := typed.Decode(&metadata); err != nil {
+		return metadata, nil, nil, headerProblem(err)
+	}
+	extensions, problems := readExtensions(root)
+	return metadata, extensions, problems, nil
+}
+
+// mergeTag is the tag YAML gives the merge key `<<`.
+const mergeTag = "!!merge"
+
+// plainStringKey reports whether a mapping key is a string scalar, the only
+// kind a field or an extension may be named by.
+func plainStringKey(key *yaml.Node) bool {
+	return key.Kind == yaml.ScalarNode && key.ShortTag() == yamlStringTag
+}
+
 // readExtensions returns the header keys Metadata does not model, converted to
 // values JSON can hold, and one problem per key that could not be converted.
 //
@@ -75,21 +125,13 @@ func extensionText(value any) string {
 // timestamp is published as the text the author wrote instead of as whatever
 // a time library prints for it, and the same header always yields the same
 // bytes.
-func readExtensions(header string) (map[string]any, []string) {
+func readExtensions(mapping *yaml.Node) (map[string]any, []string) {
 	defined := frontmatter.Keys(Metadata{})
-	var document yaml.Node
-	if err := yaml.Unmarshal([]byte(header), &document); err != nil || len(document.Content) == 0 {
-		return nil, nil
-	}
-	mapping := document.Content[0]
-	if mapping.Kind != yaml.MappingNode {
-		return nil, nil
-	}
 	extensions := map[string]any{}
 	var problems []string
 	for i := 0; i+1 < len(mapping.Content); i += 2 {
 		key, value := mapping.Content[i], mapping.Content[i+1]
-		if key.Kind != yaml.ScalarNode || key.ShortTag() != yamlStringTag {
+		if !plainStringKey(key) {
 			problems = append(problems, fmt.Sprintf(
 				"line %d: a header key that is not a plain string cannot be carried into graph.json", headerLine(key)))
 			continue
@@ -105,7 +147,6 @@ func readExtensions(header string) (map[string]any, []string) {
 		}
 		extensions[key.Value] = converted
 	}
-	sort.Strings(problems)
 	if len(extensions) == 0 {
 		return nil, problems
 	}
@@ -156,7 +197,7 @@ func jsonValue(node *yaml.Node, active map[*yaml.Node]bool) (any, error) {
 		mapping := make(map[string]any, len(node.Content)/2)
 		for i := 0; i+1 < len(node.Content); i += 2 {
 			key := node.Content[i]
-			if key.Kind != yaml.ScalarNode || key.ShortTag() != yamlStringTag {
+			if !plainStringKey(key) {
 				return nil, fmt.Errorf("a nested key is not a plain string")
 			}
 			converted, err := jsonValue(node.Content[i+1], active)
