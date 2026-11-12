@@ -5,6 +5,7 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/takealook97/vat/internal/brain"
@@ -41,6 +42,23 @@ func TestFixReviewSymlinkCannotBypassWorkspaceGate(t *testing.T) {
 	}
 	if bc.Standalone() {
 		t.Fatal("a symbolic link to the workspace brain opened it standalone")
+	}
+}
+
+func TestFixReviewArchiveRefusalWritesNothing(t *testing.T) {
+	h := brainFixture(t)
+	writeFile(t, h.path("brain/decisions/D-0001-first.md"), "---\nid: D-0001\nstatus: revoked\n---\n\n# First\n")
+	writeFile(t, h.path("brain/gaps/G-0001-second.md"), "---\nid: G-0001\nstatus: resolved\n---\n\n# Second\n")
+	outside := t.TempDir()
+	if err := os.Symlink(outside, h.path("brain/archive/gaps")); err != nil {
+		t.Skip(err)
+	}
+	code, output := h.run("brain", "archive", "--apply")
+	if code != 1 || !strings.Contains(output, "nothing was written") {
+		t.Fatalf("exit=%d output=%s", code, output)
+	}
+	if _, err := os.Stat(h.path("brain/decisions/D-0001-first.md")); os.IsNotExist(err) {
+		t.Fatalf("refusal said nothing was written but D-0001 already moved into archive; exit=%d output=%s", code, output)
 	}
 }
 

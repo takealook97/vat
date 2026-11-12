@@ -114,3 +114,30 @@ func TestArchiveRepointsRelativeLinksSoTheyStillResolve(t *testing.T) {
 		}
 	}
 }
+
+// Destinations were checked one at a time as records moved, so a collision on
+// a later record left the earlier ones already archived behind the error.
+func TestArchiveCollisionMovesNothing(t *testing.T) {
+	root := newStore(t)
+	mustCreate(t, root, NewRecordInput{Kind: KindDecision, ID: "D-0001", Title: "First", Status: StatusRevoked})
+	mustCreate(t, root, NewRecordInput{Kind: KindDecision, ID: "D-0002", Title: "Second", Status: StatusRevoked})
+	taken := filepath.Join(root, "archive", "decisions", "D-0002-second.md")
+	if err := os.MkdirAll(filepath.Dir(taken), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(taken, []byte("occupied\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	moves, err := Archive(mustLoad(t, root), true)
+
+	if err == nil || moves != nil {
+		t.Fatalf("collision not refused: moves=%+v err=%v", moves, err)
+	}
+	if _, err := os.Stat(filepath.Join(root, "decisions", "D-0001-first.md")); err != nil {
+		t.Fatalf("D-0001 moved before the collision was refused: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(root, "archive", "decisions", "D-0001-first.md")); !os.IsNotExist(err) {
+		t.Fatal("D-0001 was written into archive/ before the refusal")
+	}
+}

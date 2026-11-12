@@ -712,7 +712,9 @@ follow the manual conditions, and the manual gate still requires a git identity.
 `archive` moves superseded, revoked, and resolved records into `archive/`,
 repointing the relative links inside them. Nothing is deleted and an archived
 record is still loaded, so its supersession chain is still checked from both
-ends; `--apply` writes the moves.
+ends; `--apply` writes the moves. Every destination is checked first — one
+already taken, or one a symbolic link carries outside the brain, exits `1` —
+so a refusal moves no record.
 
 `check --list` names every rule it can report, and `--only` narrows a run to
 one class while you work through it. `--only` matches a substring, so

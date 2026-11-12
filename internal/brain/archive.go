@@ -32,34 +32,53 @@ type ArchiveMove struct {
 // Nothing is deleted and nothing is rewritten except the relative links the
 // move itself invalidates. An archived record is still loaded, so the
 // supersession chain it belongs to is still checked from both ends.
+//
+// Every destination is checked before any record moves. Checking each one as
+// it was reached moved the records sorted ahead of a refused one and then
+// reported that nothing was written; a refusal now leaves the tree as it was.
 func Archive(store *Store, apply bool) ([]ArchiveMove, error) {
 	moves := []ArchiveMove{}
+	var pending []Record
 	for _, record := range SortRecords(store.Records) {
 		if !record.Status.Terminal() || record.Archived {
 			continue
 		}
 		destination := path.Join(archiveDir, record.Path)
-		move := ArchiveMove{ID: record.ID, Status: record.Status, From: record.Path, To: destination}
-		if apply {
-			if err := moveRecord(store.Root, record, destination); err != nil {
-				return nil, err
-			}
-			move.Applied = true
-		}
-		moves = append(moves, move)
+		moves = append(moves, ArchiveMove{ID: record.ID, Status: record.Status, From: record.Path, To: destination})
+		pending = append(pending, record)
 	}
-	return moves, nil
+	if !apply {
+		return moves, nil
+	}
+	for _, move := range moves {
+		if err := archivable(store.Root, move); err != nil {
+			return nil, err
+		}
+	}
+	applied := make([]ArchiveMove, 0, len(moves))
+	for i, move := range moves {
+		if err := moveRecord(store.Root, pending[i], move.To); err != nil {
+			return nil, err
+		}
+		move.Applied = true
+		applied = append(applied, move)
+	}
+	return applied, nil
+}
+
+// archivable refuses a move whose destination is taken or leads outside the
+// brain.
+func archivable(root string, move ArchiveMove) error {
+	target := filepath.Join(root, filepath.FromSlash(move.To))
+	if fsx.Exists(target) {
+		return fmt.Errorf("%s already exists; resolve it before archiving %s", move.To, move.ID)
+	}
+	return confined(root, target)
 }
 
 func moveRecord(root string, record Record, destination string) error {
 	source := filepath.Join(root, filepath.FromSlash(record.Path))
 	target := filepath.Join(root, filepath.FromSlash(destination))
-	if fsx.Exists(target) {
-		return fmt.Errorf("%s already exists; resolve it before archiving %s", destination, record.ID)
-	}
-	if err := confined(root, target); err != nil {
-		return err
-	}
 	if err := fsx.EnsureDir(filepath.Dir(target)); err != nil {
 		return err
 	}
@@ -79,8 +98,6 @@ func moveRecord(root string, record Record, destination string) error {
 	return nil
 }
 
-// repointLinks rewrites the relative Markdown links in a record that has moved
-// from one directory to another, so they resolve to the same files afterwards.
 func repointLinks(content, from, to string) string {
 	if from == to {
 		return content
