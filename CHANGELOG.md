@@ -13,6 +13,14 @@ Notable changes to `vat`. The format follows
   `policy` block the marker may now carry. A workspace's `vat.yaml` still wins
   wherever there is one, and `vat doctor` warns with `policy-conflict` about
   each marker value that disagrees with it.
+- `vat brain new --body-stdin`, `--set key=value`, and `--source-external`: a
+  record a script produces is written complete in one atomic write, with the
+  heading added by vat, and refused before any write when its title, body, or
+  header values carry a credential shape.
+
+### Changed
+
+- `brain/record-secret-suspected` also reads header keys vat does not define.
 
 ### Fixed
 

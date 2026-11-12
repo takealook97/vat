@@ -58,22 +58,46 @@ func checkSecrets(store *Store) []Finding {
 	var findings []Finding
 	for _, record := range store.Records {
 		for _, hit := range suspectedCredentials(record.Body) {
-			severity := SeverityError
-			qualifier := ""
-			if !hit.certain {
-				severity = SeverityWarn
-				qualifier = " what looks like"
+			findings = append(findings, secretFinding(record, fmt.Sprintf("line %d", hit.line), hit))
+		}
+		// The title is the body's heading and is read above. Extension keys
+		// are not in the body, and a publishing job writes its source address
+		// into one — exactly where a token in a URL would land.
+		for _, key := range sortedExtensionKeys(record.Extensions) {
+			for _, hit := range suspectedCredentials(extensionText(record.Extensions[key])) {
+				findings = append(findings, secretFinding(record, fmt.Sprintf("the header field %s", key), hit))
+				break
 			}
-			findings = append(findings, Finding{
-				Rule: "brain/record-secret-suspected", Severity: severity,
-				Path: record.Path, ID: record.ID,
-				Message: fmt.Sprintf(
-					"line %d carries%s %s; a record is read and indexed widely, so remove it and rotate the credential",
-					hit.line, qualifier, hit.name),
-			})
 		}
 	}
 	return findings
+}
+
+func secretFinding(record Record, where string, hit credentialHit) Finding {
+	severity := SeverityError
+	qualifier := ""
+	if !hit.certain {
+		severity = SeverityWarn
+		qualifier = " what looks like"
+	}
+	return Finding{
+		Rule: "brain/record-secret-suspected", Severity: severity,
+		Path: record.Path, ID: record.ID,
+		Message: fmt.Sprintf(
+			"%s carries%s %s; a record is read and indexed widely, so remove it and rotate the credential",
+			where, qualifier, hit.name),
+	}
+}
+
+// SuspectedCredentialNames returns the kinds of credential text appears to
+// carry, and never the text itself.
+func SuspectedCredentialNames(text string) []string {
+	hits := suspectedCredentials(text)
+	names := make([]string, 0, len(hits))
+	for _, hit := range hits {
+		names = append(names, fmt.Sprintf("%s (line %d)", hit.name, hit.line))
+	}
+	return names
 }
 
 type credentialHit struct {

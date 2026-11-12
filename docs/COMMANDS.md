@@ -472,8 +472,9 @@ region.
 ```
 vat brain init      [directory]
 vat brain new       <goal|gap|decision|memory> --title "..." [--claim <kind>]
-                    [--owner <repo>] [--source-path <p>] [--axis <a>]
-                    [--refs <ids>] [--id <id>]
+                    [--owner <repo>] [--source-path <p>] [--source-external]
+                    [--axis <a>] [--refs <ids>] [--id <id>]
+                    [--body-stdin] [--set key=value]...
 vat brain build
 vat brain check     [--only <rule>] [--list]
 vat brain query     <terms...> [--all] [--limit n]
@@ -496,6 +497,18 @@ from an evidence pin. Records enter as `provisional`.
 `new` writes optional `recorded_by` from git `user.name` and `user.email` in
 the brain repository as `Name <email>`; unset identity is omitted, including
 when git is unavailable.
+
+`new --body-stdin` reads the body from standard input and writes the heading
+`# <ID> — <title>` ahead of it, the same heading the default body has; a body
+carrying its own H1, or an empty one, exits `2`. `--set key=value` adds a header
+key vat does not define, always as a string, and may be repeated; an empty key,
+a key given twice, and a key vat defines (`status`, `reviewed_by`, …) exit `2`,
+all named in one run. `--source-external` writes `source_external: true` and no
+`source_ref`, and cannot be combined with `--owner`. Before anything is written,
+the whole record — title, body, every header value — is checked for the
+credential shapes `brain/record-secret-suspected` knows; a match exits `1`,
+names only the kind and line, and writes nothing. Without `--body-stdin` the
+default body is unchanged.
 
 `--source-path` requires `--owner` and additionally pins the file the record
 was read from; vat refuses a path the repository does not hold at that revision.
@@ -679,8 +692,9 @@ buys a green build that checked nothing. The rules are tabulated in
 
 `check` reports `brain/record-malformed` for a file it cannot read as a record
 and keeps loading the rest, and `brain/record-secret-suspected` for a record
-that appears to carry a credential. The second names the line and the kind of
-credential, never the value.
+that appears to carry a credential in its body or in a header key vat does not
+define. The second names the line or the key and the kind of credential, never
+the value.
 
 `adopt` points the workspace at an existing knowledge repository and reports
 which records do not yet meet the schema. Nothing is rewritten.

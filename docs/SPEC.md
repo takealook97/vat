@@ -496,6 +496,11 @@ prevents. Keep the text; keep it out of the classification. A generator that
 read `resolved` out of such a note and treated the record as terminal made
 partially resolved gaps disappear from its own index.
 
+A writer **MAY** add extension keys when it creates a record; their values are
+strings unless the writer says otherwise, quoted so a value shaped like a date
+stays one (§3 rule 3). A writer **MUST NOT** use that path to set a field this
+specification defines.
+
 An extension key is display-only by definition. A key that a workspace wants
 enforced is a rule, and a rule belongs in this specification or in that
 workspace's own checks — not in a field every reader interprets differently.

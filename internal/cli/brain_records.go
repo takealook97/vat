@@ -21,7 +21,8 @@ func brainNewCommand() *Command {
 	return &Command{
 		Name:    "new",
 		Summary: "Create an atomic record",
-		Usage:   `vat brain new <goal|gap|decision|memory> --title "..." [--claim <kind>] [--owner <repo>] [--source-path <p>] [--axis <a>] [--refs <ids>] [--id <id>]`,
+		Usage: `vat brain new <goal|gap|decision|memory> --title "..." [--claim <kind>] [--owner <repo>] [--source-path <p>] ` +
+			`[--source-external] [--axis <a>] [--refs <ids>] [--id <id>] [--body-stdin] [--set key=value]...`,
 		Long: `Create one record holding one fact.
 
 A record enters as provisional, never as truth. Promoting it is a separate,
@@ -36,11 +37,21 @@ current-state claims receive observed_at and age out.
 
 When git user.name and user.email are configured in the brain repository,
 recorded_by records that author identity as Name <email>. Unset identity is
-omitted; creating a provisional record remains possible.`,
+omitted; creating a provisional record remains possible.
+
+--body-stdin reads the body from standard input, without its H1: vat writes
+"# <ID> — <title>" ahead of it, the heading the default body has. --set
+key=value adds a header key vat does not define, as a string, and may be
+repeated; a key vat defines is refused, so no flag here can set status or
+reviewed_by. --source-external marks the evidence as held outside the
+workspace. The whole record — title, body, every header value — is checked for
+credential shapes before anything is written, and a match writes nothing and
+names only the kind of credential found.`,
 		Examples: []string{
 			`vat brain new decision --title "Orders own their own idempotency keys" --claim historical --owner payments --source-path docs/ORDERING.md`,
 			`vat brain new gap --title "Retries can double-submit" --claim current-state --owner payments`,
 			`vat brain new gap --title "Retries can double-submit" --claim current-state --owner payments --source-path docs/ORDERING.md`,
+			`summarise | vat brain new memory --title "Retries need a key" --body-stdin --set project=checkout --source-external`,
 		},
 		Run: runBrainNew,
 	}
@@ -55,7 +66,14 @@ func runBrainNew(ctx context.Context, env *Env, args []string) error {
 	axis := set.String("axis", "", "grouping axis, for goals")
 	refs := set.String("refs", "", "identifiers of related records")
 	id := set.String("id", "", "explicit identifier (default: the next free one)")
+	bodyStdin := set.Bool("body-stdin", false, "read the body, without its H1, from standard input")
+	sourceExternal := set.Bool("source-external", false, "the evidence is held outside the workspace")
+	extensions := &extensionFlag{}
+	set.Var(extensions, "set", "add a header key vat does not define, as key=value (repeatable)")
 	if err := parseFlags(set, args); err != nil {
+		return err
+	}
+	if err := extensions.validate(); err != nil {
 		return err
 	}
 	if set.NArg() != 1 {
@@ -76,6 +94,19 @@ func runBrainNew(ctx context.Context, env *Env, args []string) error {
 		return usageErrorf("--title must be one line: it becomes the record's heading")
 	}
 
+	if *sourceExternal && strings.TrimSpace(*owner) != "" {
+		return usageErrorf("--source-external and --owner say different things about where the evidence is; pass one")
+	}
+	// Every input is read and judged before the brain is opened, so a
+	// refusal never follows a partial write.
+	body := ""
+	if *bodyStdin {
+		body, err = readBody(env)
+		if err != nil {
+			return err
+		}
+	}
+
 	bc, err := resolveBrain(env)
 	if err != nil {
 		return err
@@ -85,6 +116,8 @@ func runBrainNew(ctx context.Context, env *Env, args []string) error {
 	input := brain.NewRecordInput{
 		Kind: kind, ID: *id, Title: *title, OwnedBy: *owner,
 		Axis: *axis, Refs: splitList(*refs), Now: env.Now,
+		BodyWithoutHeading: body, ExtensionFields: extensions.fields(),
+		SourceExternal: *sourceExternal,
 	}
 	if input.ID == "" {
 		input.ID = store.NextID(kind)

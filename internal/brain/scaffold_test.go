@@ -3,6 +3,7 @@ package brain_test
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/takealook97/vat/internal/brain"
@@ -72,5 +73,108 @@ func TestMarkIsANoOpOnADirectoryThatIsAlreadyABrain(t *testing.T) {
 	after, err := os.ReadFile(filepath.Join(root, brain.MarkerFile))
 	if err != nil || string(after) != string(before) {
 		t.Errorf("the existing marker was rewritten: %v", err)
+	}
+}
+
+func TestCreatePreservesExtensionsAndWritesHeading(t *testing.T) {
+	// Arrange
+	root := t.TempDir()
+	if _, err := brain.Init(root, reference); err != nil {
+		t.Fatalf("init: %v", err)
+	}
+
+	// Act
+	path, err := brain.Create(root, brain.NewRecordInput{
+		Kind: brain.KindDecision, ID: "D-0001", Title: "Orders own their keys",
+		BodyWithoutHeading: "## Decision\n\nOrders own their keys.\n",
+		ExtensionFields:    map[string]any{"project": "checkout", "observed_on": "2026-01-02"},
+		SourceExternal:     true,
+		Now:                reference,
+	})
+	if err != nil {
+		t.Fatalf("create: %v", err)
+	}
+
+	// Assert
+	content, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(path)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	text := string(content)
+	if !strings.Contains(text, "\n# D-0001 — Orders own their keys\n\n## Decision\n") {
+		t.Errorf("the heading was not written once ahead of the body:\n%s", text)
+	}
+	if strings.Count(text, "\n# ") != 1 {
+		t.Errorf("want exactly one H1:\n%s", text)
+	}
+	store, err := brain.Load(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	record := store.ByID()["D-0001"]
+	if record.Title != "Orders own their keys" || !record.SourceExternal || record.SourceRef != "" {
+		t.Errorf("record read back wrong: %+v", record)
+	}
+	if record.Extensions["project"] != "checkout" || record.Extensions["observed_on"] != "2026-01-02" {
+		t.Errorf("extensions not preserved as strings: %#v", record.Extensions)
+	}
+	if findings := brain.Check(store, brain.CheckPolicy{StaleAfterDays: 90, ReviewSLADays: 30}, reference); brain.Errors(findings) > 0 {
+		t.Errorf("a created record fails check: %+v", findings)
+	}
+}
+
+func TestCreateRejectsHeadingDefinedKeysAndEmptyKeys(t *testing.T) {
+	cases := map[string]brain.NewRecordInput{
+		"heading in body": {BodyWithoutHeading: "# Another title\n\ntext\n"},
+		"defined key":     {ExtensionFields: map[string]any{"status": "active"}},
+		"empty key":       {ExtensionFields: map[string]any{" ": "x"}},
+	}
+	for name, input := range cases {
+		t.Run(name, func(t *testing.T) {
+			root := t.TempDir()
+			input.Kind, input.ID, input.Title, input.Now = brain.KindDecision, "D-0001", "A title", reference
+			if _, err := brain.Create(root, input); err == nil {
+				t.Fatal("accepted")
+			}
+			if entries, _ := os.ReadDir(filepath.Join(root, "decisions")); len(entries) != 0 {
+				t.Errorf("wrote %d files before refusing", len(entries))
+			}
+		})
+	}
+}
+
+func TestCreateRejectsSecretInMetadata(t *testing.T) {
+	token := "AKIA" + strings.Repeat("Q", 16)
+	cases := map[string]brain.NewRecordInput{
+		"title":     {Title: "Collector key " + token},
+		"body":      {BodyWithoutHeading: "the key is " + token + "\n"},
+		"extension": {ExtensionFields: map[string]any{"source_url": "https://user:" + strings.Repeat("p", 8) + "@example.com/x"}},
+	}
+	for name, input := range cases {
+		t.Run(name, func(t *testing.T) {
+			// Arrange
+			root := t.TempDir()
+			input.Kind, input.ID, input.Now = brain.KindDecision, "D-0001", reference
+			if input.Title == "" {
+				input.Title = "A title"
+			}
+
+			// Act
+			_, err := brain.Create(root, input)
+
+			// Assert
+			if err == nil {
+				t.Fatal("a record carrying a credential was written")
+			}
+			if strings.Contains(err.Error(), token) || strings.Contains(err.Error(), strings.Repeat("p", 8)) {
+				t.Errorf("the refusal quotes the secret: %v", err)
+			}
+			if _, statErr := os.Stat(filepath.Join(root, "decisions")); statErr == nil {
+				entries, _ := os.ReadDir(filepath.Join(root, "decisions"))
+				if len(entries) != 0 {
+					t.Error("a file was written before the refusal")
+				}
+			}
+		})
 	}
 }

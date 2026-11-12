@@ -141,6 +141,12 @@ refs: [O-0003, D-0031]
 | `recorded_by` | git author (`Name <email>`) who created it, when configured |
 | `reviewed_by` | git author (`Name <email>`) who promoted it |
 
+Any other key is an extension: vat keeps it, shows it, and gives it no meaning
+in the lifecycle. `vat brain new --set key=value` writes one as a string, and
+refuses a key from the table above. `--body-stdin` takes the body from a pipe
+and writes the heading itself, so a record a script produces is complete in one
+write.
+
 ### `claim_kind` decides which rules apply
 
 | Kind | Requires provenance | Decays |
@@ -532,7 +538,7 @@ knows to look for, so this table and `brain.RuleNames()` are compared by a test.
 | `brain/quarantine-reason` | error | a quarantine with no stated cause, which cannot be reviewed or lifted later |
 | `brain/record-malformed` | error | a file that cannot be read as a record, and is therefore invisible to every rule above |
 | `brain/record-oversized` | warn | a record past the length limit — it holds more than one judgement, and length normalisation ranks it below the records it should have been split into |
-| `brain/record-secret-suspected` | error / warn | a line that carries a credential; error for unmistakable shapes, warning for heuristics |
+| `brain/record-secret-suspected` | error / warn | a line or an extension key that carries a credential; error for unmistakable shapes, warning for heuristics |
 | `brain/ref-missing` | error | a reference to a record that does not exist |
 | `brain/ref-withdrawn` | warn | a record citing a revoked or quarantined one as support |
 | `brain/reviewer-unattributed` | warn | an active record has no `reviewed_by` under the manual or agent promotion gate |
@@ -564,8 +570,9 @@ merge conflict marker in its header used to take down `check`, `query`, `sweep`,
 `build`, `doctor`, and `lint` together. Now it is `brain/record-malformed` and
 everything else still loads and still reports.
 
-**A record must not carry a credential.** `brain/record-secret-suspected` names
-the line and the kind of credential and never the value — a finding that repeats
+**A record must not carry a credential.** `brain/record-secret-suspected` reads
+the body and every extension key, and names the line or the key and the kind of
+credential and never the value — a finding that repeats
 a secret has published it a second time, somewhere people paste into chat. This
 rule was the one thing the methodology asserted with nothing checking it, and it
 matters most here: a brain repository is exactly what an organisation points a

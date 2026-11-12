@@ -11,6 +11,7 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"io"
 	"os"
 	"sort"
 	"strings"
@@ -64,6 +65,9 @@ type Env struct {
 	Root string
 	// BrainDir names a brain directly, with or without a workspace around it.
 	BrainDir string
+	// Stdin is what a command that reads piped input reads, injected so a
+	// test can supply it. Nil means the process's standard input.
+	Stdin io.Reader
 	// Yes answers confirmation prompts affirmatively. It exists for CI, and
 	// deliberately does not extend to destructive repository removal.
 	Yes bool
@@ -95,6 +99,13 @@ func (e *Env) open() (*workspace.Workspace, error) {
 		return workspace.OpenAt(e.Root)
 	}
 	return workspace.Open(e.Cwd)
+}
+
+func (e *Env) stdin() io.Reader {
+	if e.Stdin != nil {
+		return e.Stdin
+	}
+	return os.Stdin
 }
 
 func (e *Env) version() string {

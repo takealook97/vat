@@ -244,6 +244,10 @@ type Record struct {
 	Path  string
 	Title string
 	Body  string
+	// Extensions holds the header keys Metadata does not model, as read. They
+	// carry no meaning to vat, but they are text that is read and indexed as
+	// widely as the body, so the secret check reads them too.
+	Extensions map[string]any
 	// Archived reports that the record has been moved out of the working set.
 	// It is still loaded — the supersession chain it belongs to is checked
 	// from both ends — but it is not part of what the layer is working on.

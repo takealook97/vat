@@ -151,12 +151,17 @@ func loadRecord(root string, kind Kind, path string) (Record, error) {
 	if title == "" {
 		title = metadata.ID
 	}
+	extensions, err := extensionFields(doc)
+	if err != nil {
+		return Record{}, err
+	}
 	return Record{
 		Metadata:    metadata,
 		Kind:        kind,
 		Path:        relative,
 		Title:       cleanTitle(title, metadata.ID),
 		Body:        doc.Body,
+		Extensions:  extensions,
 		Archived:    strings.HasPrefix(relative, archiveDir+"/"),
 		ContentHash: contentHash(data),
 	}, nil

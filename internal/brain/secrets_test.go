@@ -1,6 +1,8 @@
 package brain
 
 import (
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -12,12 +14,12 @@ import (
 // index at, so a pasted token becomes a searchable token.
 func TestCheckReportsASecretPastedIntoARecord(t *testing.T) {
 	// Arrange
+	// Create refuses this content, so the file is written the way a person
+	// pasting into an editor would write it.
 	root := newStore(t)
-	mustCreate(t, root, NewRecordInput{
-		Kind: KindMemory, ID: "M-0001", Title: "Deploy notes",
-		Body: "# M-0001 — Deploy notes\n\nThe collector reads AKIA" + strings.Repeat("Q", 16) +
-			" from the environment.\n",
-	})
+	writeRecordFile(t, root, "memory/M-0001-deploy-notes.md",
+		"---\nid: M-0001\nstatus: provisional\n---\n\n# M-0001 — Deploy notes\n\nThe collector reads AKIA"+
+			strings.Repeat("Q", 16)+" from the environment.\n")
 
 	// Act
 	findings := Check(mustLoad(t, root), CheckPolicy{}, observedOn)
@@ -42,6 +44,42 @@ func TestCheckReportsASecretPastedIntoARecord(t *testing.T) {
 	if !strings.Contains(found.Message, "line 3") {
 		t.Errorf("the finding does not say where to look: %q", found.Message)
 	}
+}
+
+func writeRecordFile(t *testing.T, root, relative, content string) {
+	t.Helper()
+	path := filepath.Join(root, filepath.FromSlash(relative))
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// A publishing job writes the source address into an extension key, which is
+// exactly where credentials inside a URL land, and the body check never read
+// the header.
+func TestCheckReportsASecretInAnExtensionField(t *testing.T) {
+	// Arrange
+	root := newStore(t)
+	writeRecordFile(t, root, "decisions/D-0001-x.md",
+		"---\nid: D-0001\nstatus: provisional\nsource_url: https://bot:"+strings.Repeat("k", 9)+
+			"@example.com/x\n---\n\n# D-0001 — x\n")
+
+	// Act
+	findings := Check(mustLoad(t, root), CheckPolicy{}, observedOn)
+
+	// Assert
+	for _, finding := range findings {
+		if finding.Rule == "brain/record-secret-suspected" {
+			if !strings.Contains(finding.Message, "source_url") || strings.Contains(finding.Message, strings.Repeat("k", 9)) {
+				t.Errorf("finding %q should name the field and not the value", finding.Message)
+			}
+			return
+		}
+	}
+	t.Fatalf("a credential in an extension field was not reported: %+v", findings)
 }
 
 func TestCheckLeavesOrdinaryProseAlone(t *testing.T) {

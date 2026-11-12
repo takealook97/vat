@@ -6,6 +6,8 @@ import (
 	"strings"
 	"time"
 
+	"gopkg.in/yaml.v3"
+
 	"github.com/takealook97/vat/internal/frontmatter"
 	"github.com/takealook97/vat/internal/fsx"
 )
@@ -277,8 +279,19 @@ type NewRecordInput struct {
 	SourceRef  string
 	Axis       string
 	Refs       []string
-	Body       string
-	Now        time.Time
+	// Body is the whole body, heading included, and replaces the default.
+	Body string
+	// BodyWithoutHeading is a body with no H1; Create writes the heading
+	// `# <ID> — <title>` ahead of it, the same one the default body has, so a
+	// record made from piped text still carries its title.
+	BodyWithoutHeading string
+	// ExtensionFields are header keys vat does not model, written after the
+	// modelled ones. A key vat models is refused: setting status or
+	// reviewed_by this way would walk round the promotion gate.
+	ExtensionFields map[string]any
+	// SourceExternal marks evidence held outside the workspace.
+	SourceExternal bool
+	Now            time.Time
 }
 
 // Create writes a new atomic record and returns its path relative to root.
@@ -303,28 +316,41 @@ func Create(root string, input NewRecordInput) (string, error) {
 	}
 
 	metadata := Metadata{
-		ID:         input.ID,
-		RecordedBy: input.RecordedBy,
-		Status:     status,
-		Date:       now.Format("2006-01-02"),
-		ClaimKind:  input.ClaimKind,
-		OwnedBy:    input.OwnedBy,
-		SourceRef:  input.SourceRef,
-		Axis:       input.Axis,
-		Refs:       input.Refs,
+		ID:             input.ID,
+		RecordedBy:     input.RecordedBy,
+		Status:         status,
+		Date:           now.Format("2006-01-02"),
+		ClaimKind:      input.ClaimKind,
+		OwnedBy:        input.OwnedBy,
+		SourceRef:      input.SourceRef,
+		SourceExternal: input.SourceExternal,
+		Axis:           input.Axis,
+		Refs:           input.Refs,
 	}
 	if input.ClaimKind == ClaimCurrentState {
 		metadata.ObservedAt = now.Format("2006-01-02")
 		metadata.RevalidateOn = "source-revision-change"
 	}
 
-	body := input.Body
-	if strings.TrimSpace(body) == "" {
-		body = defaultBody(input.Kind, input.ID, input.Title)
-	}
-	rendered, err := frontmatter.Render(metadata, body)
+	body, err := recordBody(input)
 	if err != nil {
 		return "", err
+	}
+	header, err := headerWithExtensions(metadata, input.ExtensionFields)
+	if err != nil {
+		return "", err
+	}
+	rendered, err := frontmatter.Render(header, body)
+	if err != nil {
+		return "", err
+	}
+	// Checked on the exact bytes about to be written — title, body, every
+	// header value — and before anything is. Finding the credential with
+	// `vat brain check` afterwards is finding it in a file that may already
+	// have been committed, synchronised, and indexed.
+	if found := SuspectedCredentialNames(string(rendered)); len(found) > 0 {
+		return "", fmt.Errorf("refused: the record would carry %s; nothing was written",
+			strings.Join(found, ", "))
 	}
 
 	relative := JoinPath(input.Kind.Dir(), FileName(input.ID, input.Title))
@@ -346,6 +372,61 @@ func Create(root string, input NewRecordInput) (string, error) {
 		return "", err
 	}
 	return relative, nil
+}
+
+func recordBody(input NewRecordInput) (string, error) {
+	heading := fmt.Sprintf("# %s — %s\n\n", input.ID, input.Title)
+	if strings.TrimSpace(input.BodyWithoutHeading) != "" {
+		for _, line := range strings.Split(input.BodyWithoutHeading, "\n") {
+			// A second H1 would compete with the one written here for the
+			// record's title, and the reader takes the first.
+			if strings.HasPrefix(strings.TrimLeft(line, " "), "# ") {
+				return "", fmt.Errorf("the body may not carry an H1; vat writes %q itself", strings.TrimSpace(heading))
+			}
+		}
+		return heading + strings.TrimLeft(input.BodyWithoutHeading, "\n"), nil
+	}
+	if strings.TrimSpace(input.Body) != "" {
+		return input.Body, nil
+	}
+	return defaultBody(input.Kind, input.ID, input.Title), nil
+}
+
+// headerWithExtensions renders the modelled fields followed by the extension
+// keys in a stable order. String values are quoted, so a value that looks
+// like a date or a number stays the string it was given (SPEC §3 rule 3).
+func headerWithExtensions(metadata Metadata, extensions map[string]any) (any, error) {
+	if len(extensions) == 0 {
+		return metadata, nil
+	}
+	var node yaml.Node
+	if err := node.Encode(metadata); err != nil {
+		return nil, fmt.Errorf("encode front matter: %w", err)
+	}
+	var problems []string
+	for _, key := range sortedExtensionKeys(extensions) {
+		switch {
+		case strings.TrimSpace(key) == "" || strings.TrimSpace(key) != key:
+			problems = append(problems, fmt.Sprintf("%q is not a usable key", key))
+			continue
+		case IsDefinedField(key):
+			problems = append(problems, fmt.Sprintf("%s is a field vat defines", key))
+			continue
+		}
+		var value yaml.Node
+		if err := value.Encode(extensions[key]); err != nil {
+			return nil, fmt.Errorf("encode %s: %w", key, err)
+		}
+		if value.Kind == yaml.ScalarNode && value.Tag == "!!str" {
+			value.Style = yaml.DoubleQuotedStyle
+		}
+		node.Content = append(node.Content,
+			&yaml.Node{Kind: yaml.ScalarNode, Tag: "!!str", Value: key}, &value)
+	}
+	if len(problems) > 0 {
+		return nil, fmt.Errorf("refused extension keys: %s", strings.Join(problems, "; "))
+	}
+	return &node, nil
 }
 
 func defaultBody(kind Kind, id, title string) string {

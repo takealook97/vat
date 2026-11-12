@@ -230,6 +230,12 @@ func mergeMapping(original, updated *yaml.Node, modelled map[string]bool) *yaml.
 	return &merged
 }
 
+// Keys returns the header keys a type declares, so a caller can tell a field
+// the type models from an extension key somebody else added.
+func Keys(metadata any) map[string]bool {
+	return modelledKeys(metadata)
+}
+
 // modelledKeys returns the header keys a type declares, which is what lets a
 // merge tell a field the caller cleared from a field it has never heard of.
 func modelledKeys(metadata any) map[string]bool {
