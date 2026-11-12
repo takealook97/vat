@@ -122,3 +122,47 @@ func TestBrainListRefusesBadFilters(t *testing.T) {
 		}
 	}
 }
+
+// promoted_via, source_url, and source_quote are fields, not extensions, so a
+// reader looking for them in extensions finds nothing. Like every other field
+// in the listing they are always present, empty when the record has none.
+func TestBrainListCarriesPromotionAndExternalEvidence(t *testing.T) {
+	// Arrange
+	isolateGitIdentity(t)
+	h := brainFixture(t)
+	setPromotionGate(t, h, "auto")
+	h.mustRun("brain", "new", "memory", "--title", "Vendor cutover", "--claim", "historical",
+		"--source-external", "--source-url", "https://example.com/notes/1", "--source-quote", "Moves to Monday.")
+	h.mustRun("brain", "new", "memory", "--title", "Plain note")
+	h.mustRun("brain", "promote", "M-0001")
+
+	// Act
+	code, stdout, stderr := h.runSplit("brain", "list")
+
+	// Assert
+	if code != ExitOK {
+		t.Fatalf("exit %d:\n%s", code, stderr)
+	}
+	var payload struct {
+		Records []map[string]any `json:"records"`
+	}
+	if err := json.Unmarshal([]byte(stdout), &payload); err != nil || len(payload.Records) != 2 {
+		t.Fatalf("listing: %v\n%s", err, stdout)
+	}
+	want := map[string][3]string{
+		"M-0001": {"auto", "https://example.com/notes/1", "Moves to Monday."},
+		"M-0002": {"", "", ""},
+	}
+	for _, record := range payload.Records {
+		id, _ := record["id"].(string)
+		for i, key := range []string{"promoted_via", "source_url", "source_quote"} {
+			value, present := record[key]
+			if !present || value != want[id][i] {
+				t.Errorf("%s %s = %#v (present %t), want %q", id, key, value, present, want[id][i])
+			}
+		}
+		if extensions, _ := record["extensions"].(map[string]any); len(extensions) != 0 {
+			t.Errorf("%s: defined fields leaked into extensions: %v", id, extensions)
+		}
+	}
+}

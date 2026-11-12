@@ -38,6 +38,9 @@ type ListEntry struct {
 	SupersededBy   string         `json:"superseded_by"`
 	Extensions     map[string]any `json:"extensions"`
 	SourceExternal bool           `json:"source_external"`
+	SourceURL      string         `json:"source_url"`
+	SourceQuote    string         `json:"source_quote"`
+	PromotedVia    string         `json:"promoted_via"`
 }
 
 // ListSkipped is a file that could not be read as a record. The reason is
@@ -112,5 +115,7 @@ func listEntry(record Record, policy CheckPolicy, now time.Time) ListEntry {
 		Citable:    Citable(record, policy, now), CitableUntil: citableUntil(record, policy),
 		Supersedes: supersedes, SupersededBy: record.SupersededBy,
 		Extensions: extensions, SourceExternal: record.SourceExternal,
+		SourceURL: record.SourceURL, SourceQuote: record.SourceQuote,
+		PromotedVia: record.PromotedVia,
 	}
 }

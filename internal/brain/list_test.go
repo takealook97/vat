@@ -128,7 +128,8 @@ func TestEmptyListJSONUsesArrays(t *testing.T) {
 		keys = append(keys, key)
 	}
 	want := []string{"citable", "citable_until", "claim_kind", "date", "extensions", "id", "kind", "observed_at",
-		"path", "source_external", "status", "superseded_by", "supersedes", "title"}
+		"path", "promoted_via", "source_external", "source_quote", "source_url", "status", "superseded_by",
+		"supersedes", "title"}
 	if !sameSet(keys, want) {
 		t.Errorf("fields = %v, want %v", keys, want)
 	}

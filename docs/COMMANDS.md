@@ -728,6 +728,8 @@ arrays. Every record carries every field:
 | `supersedes`, `superseded_by` | the replacement chain; an array and a string |
 | `extensions` | every header key vat does not define, as written; `{}` when none |
 | `source_external` | whether the evidence is declared outside the workspace |
+| `source_url`, `source_quote` | the external evidence fields; empty string when absent |
+| `promoted_via` | the gate that promoted the record (`auto`, `manual`, `agent`); empty when it was never promoted or was promoted before the field existed |
 
 A file that cannot be read as a record is listed under `skipped` with its
 `path` and a fixed `reason` that never quotes the file. The records that could

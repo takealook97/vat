@@ -44,7 +44,8 @@ Notable changes to `vat`. The format follows
   `--source-url` and `--source-quote`.
 - `vat brain list [--status] [--kind] [--where key=value] [--json]`: every
   record filtered by what it is, citability judged at read time, and unreadable
-  files listed under `skipped` while the rest still print.
+  files listed under `skipped` while the rest still print. Each record carries
+  `promoted_via`, `source_url`, and `source_quote` as fields, empty when absent.
 - `vat brain check --fail-on-warning`: a selected warning exits 1; the report
   and the default exit codes are unchanged.
 
