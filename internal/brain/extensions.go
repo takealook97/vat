@@ -95,7 +95,7 @@ func readExtensions(header string) (map[string]any, []string) {
 		if defined[key.Value] {
 			continue
 		}
-		converted, err := jsonValue(value)
+		converted, err := jsonValue(value, map[*yaml.Node]bool{})
 		if err != nil {
 			problems = append(problems, fmt.Sprintf("extension key %s cannot be carried into graph.json: %v", key.Value, err))
 			continue
@@ -111,14 +111,24 @@ func readExtensions(header string) (map[string]any, []string) {
 
 // jsonValue converts a YAML node into a string-keyed mapping, a list, or a
 // plain value, refusing anything JSON cannot represent.
-func jsonValue(node *yaml.Node) (any, error) {
+//
+// active holds the anchors being expanded on the current path. An alias that
+// names one of them refers to itself, and following it would recurse until the
+// stack ran out: one record with `extra: &loop [*loop]` took down every
+// command that loads the brain.
+func jsonValue(node *yaml.Node, active map[*yaml.Node]bool) (any, error) {
 	switch node.Kind {
 	case yaml.AliasNode:
-		return jsonValue(node.Alias)
+		if active[node.Alias] {
+			return nil, fmt.Errorf("it refers to itself through an alias")
+		}
+		active[node.Alias] = true
+		defer delete(active, node.Alias)
+		return jsonValue(node.Alias, active)
 	case yaml.SequenceNode:
 		list := make([]any, 0, len(node.Content))
 		for _, item := range node.Content {
-			converted, err := jsonValue(item)
+			converted, err := jsonValue(item, active)
 			if err != nil {
 				return nil, err
 			}
@@ -132,7 +142,7 @@ func jsonValue(node *yaml.Node) (any, error) {
 			if key.Kind != yaml.ScalarNode || key.ShortTag() != yamlStringTag {
 				return nil, fmt.Errorf("mapping key %q is not a string", key.Value)
 			}
-			converted, err := jsonValue(node.Content[i+1])
+			converted, err := jsonValue(node.Content[i+1], active)
 			if err != nil {
 				return nil, err
 			}
