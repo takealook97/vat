@@ -589,7 +589,9 @@ Non-goal `source_external` records and sources outside `vat.yaml` cannot be
 agent-promoted because their pinned evidence cannot be checked. Under every gate,
 non-current-state records retain their original pin even with `--reverified`;
 the agent gate checks the path at that pin without comparing it with HEAD.
-Goals use the manual conditions even under `agent`.
+Goals use the manual conditions even under `agent`. Each successful promotion
+writes the configured gate as `promoted_via` (`auto`, `manual`, or `agent`),
+replacing an earlier value; a refused promotion leaves the record unchanged.
 
 `supersede` leaves the replacement `provisional` when
 `policy.brain.require_promotion_gate` is set, so a new decision still crosses the

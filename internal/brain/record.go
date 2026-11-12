@@ -234,6 +234,11 @@ type Metadata struct {
 	RecordedBy string `yaml:"recorded_by,omitempty"`
 	// ReviewedBy records the git author who promoted the record.
 	ReviewedBy string `yaml:"reviewed_by,omitempty"`
+	// PromotedVia names the gate the last promotion passed: auto, manual, or
+	// agent. With an identity configured, auto writes reviewed_by exactly as
+	// manual does, so without this a record could not say whether anyone was
+	// required to look at it. It is the path taken, not evidence of review.
+	PromotedVia string `yaml:"promoted_via,omitempty"`
 }
 
 // Record is one atomic fact: its metadata, its prose, and where it lives.

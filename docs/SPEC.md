@@ -327,6 +327,7 @@ refs: [O-0001]
 | `reason` | see §5.3 | why a record was quarantined or revoked |
 | `recorded_by` | no | git author (`Name <email>`) who created it |
 | `reviewed_by` | no | git author (`Name <email>`) who promoted it |
+| `promoted_via` | no | the gate the last promotion passed: `auto`, `manual`, or `agent` |
 
 The filename **SHOULD** begin with the identifier. The filename is **not**
 authoritative: `id` is.
@@ -428,6 +429,14 @@ promotion to the earlier reviewer. `brain new` **SHOULD** record the same
 identity as optional `recorded_by`, omitting it when unset. Identity **MUST
 NOT** be supplied as free text at the command line. A git author attributes the
 action; it does not prove whether a human or an agent performed it.
+
+Promotion **SHOULD** record the gate it passed as `promoted_via` — `auto`,
+`manual`, or `agent` — replacing any earlier value, and **MUST NOT** change it
+when the promotion is refused. Every other transition **MUST** preserve it. It
+records the path a record took, not that anyone reviewed it: with an identity
+configured, `auto` writes `reviewed_by` as well. A record without the field is
+valid; an implementation **MUST NOT** infer it for records promoted before it
+existed.
 
 Re-dating a current-state claim's `observed_at` is an assertion that somebody
 re-read the source. An implementation **MUST NOT** move `observed_at` forward

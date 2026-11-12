@@ -399,7 +399,7 @@ func TestAutoPromotesHistoricalExternalRecordsWithoutIdentityAndPreservesExtensi
 					t.Errorf("%s changed: %v -> %v", key, before[key], after[key])
 				}
 			}
-			if after["source_external"] != true || after["claim_kind"] != "historical" {
+			if after["source_external"] != true || after["claim_kind"] != "historical" || after["promoted_via"] != "auto" {
 				t.Errorf("declared fields changed: %v", after)
 			}
 			for _, key := range []string{"reviewed_by", "recorded_by", "source_ref"} {
@@ -431,5 +431,66 @@ func TestAgentStillRefusesHistoricalExternalRecords(t *testing.T) {
 	}
 	if readFile(t, path) != before {
 		t.Fatal("a refused promotion changed the record")
+	}
+}
+
+func setPromotionGate(t *testing.T, h *workspaceFixture, gate string) {
+	t.Helper()
+	manifest := readFile(t, h.path("vat.yaml"))
+	for _, from := range []string{"manual", "auto", "agent"} {
+		manifest = strings.Replace(manifest, "brain_promote: "+from, "brain_promote: "+gate, 1)
+	}
+	writeFile(t, h.path("vat.yaml"), manifest)
+}
+
+// With an identity configured, auto writes reviewed_by exactly as manual does,
+// so the record itself was the only place the gate could be told apart, and it
+// said nothing.
+func TestPromotionRecordsActualGate(t *testing.T) {
+	for _, gate := range []string{"manual", "agent", "auto"} {
+		t.Run(gate, func(t *testing.T) {
+			isolateGitIdentity(t)
+			h := brainFixture(t)
+			setPromotionGate(t, h, gate)
+			h.mustRun("brain", "new", "goal", "--title", "An intended outcome")
+			h.mustRun("brain", "promote", "O-0001")
+			store, err := brain.Load(h.path("brain"))
+			if err != nil {
+				t.Fatal(err)
+			}
+			record := store.ByID()["O-0001"]
+			if record.PromotedVia != gate || record.ReviewedBy == "" {
+				t.Fatalf("promoted_via %q reviewed_by %q, want %q and an identity", record.PromotedVia, record.ReviewedBy, gate)
+			}
+			h.mustRun("brain", "check")
+		})
+	}
+}
+
+func TestRefusedPromotionDoesNotChangeGate(t *testing.T) {
+	// Arrange
+	isolateGitIdentity(t)
+	h := brainFixture(t)
+	git(t, h.path("brain"), "config", "--unset", "user.name")
+	git(t, h.path("brain"), "config", "--unset", "user.email")
+	setPromotionGate(t, h, "auto")
+	h.mustRun("brain", "new", "decision", "--title", "First promoted by a job")
+	h.mustRun("brain", "promote", "D-0001")
+	path := findRecord(t, h, "D-0001")
+	before := readFile(t, path)
+	if !strings.Contains(before, "promoted_via: auto\n") {
+		t.Fatalf("auto promotion not recorded:\n%s", before)
+	}
+
+	// Act
+	setPromotionGate(t, h, "manual")
+	code, output := h.run("brain", "promote", "D-0001")
+
+	// Assert
+	if code != ExitFindings || !strings.Contains(output, "requires a git identity") {
+		t.Fatalf("manual accepted a missing identity: %d %s", code, output)
+	}
+	if readFile(t, path) != before {
+		t.Fatal("a refused promotion rewrote the record")
 	}
 }

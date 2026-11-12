@@ -271,6 +271,7 @@ reviewer checked; every record must satisfy the gate.`,
 					Reviewer: reviewer, Now: env.Now, Reverified: *reverified,
 					RequireReviewer: ws.Manifest.Policy.Gates.BrainPromote != manifest.GateAuto,
 					AgentGate:       ws.Manifest.Policy.Gates.BrainPromote == manifest.GateAgent,
+					PromotionGate:   ws.Manifest.Policy.Gates.BrainPromote,
 					SourceRevision:  currentRevisionOf(ctx, ws, sourceOwner),
 				}
 				// Every record is reported, refusals included. These commands

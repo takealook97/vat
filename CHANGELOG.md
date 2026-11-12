@@ -6,6 +6,15 @@ Notable changes to `vat`. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- `vat brain promote` records the gate it passed as `promoted_via` (`auto`,
+  `manual`, or `agent`). With an identity configured, `auto` wrote
+  `reviewed_by` just as `manual` did, so a record could not say which gate
+  promoted it. Records promoted earlier stay valid without the field.
+  `brain.PromoteRequest` gains `PromotionGate`; callers that leave it empty keep
+  the gate their `RequireReviewer` and `AgentGate` describe.
+
 ### Fixed
 
 - The published brain record schema accepts extension keys. It rejected every

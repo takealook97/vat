@@ -279,6 +279,12 @@ type PromoteRequest struct {
 	RequireReviewer bool
 	// AgentGate requires mechanically checkable evidence for non-goal records.
 	AgentGate bool
+	// PromotionGate names the gate in force — auto, manual, or agent — and is
+	// what the record's promoted_via says afterwards. Empty derives it from
+	// RequireReviewer and AgentGate, so a caller written before it existed
+	// keeps the refusals it had. A named gate brings its own requirements and
+	// is refused when it is weaker than the booleans the caller also set.
+	PromotionGate string
 	// SourceRevision is the revision the owning repository is at right now,
 	// when the caller could read it. Empty means it could not be checked.
 	SourceRevision string
@@ -304,6 +310,10 @@ func Promote(root string, record Record, request PromoteRequest) error {
 	if record.Status.Terminal() {
 		return fmt.Errorf("%s is %s; record a new claim rather than reviving this one",
 			record.ID, record.Status)
+	}
+	request, err := resolvePromotionGate(record, request)
+	if err != nil {
+		return err
 	}
 	if (request.RequireReviewer || request.AgentGate) && strings.TrimSpace(request.Reviewer) == "" {
 		return fmt.Errorf("%s: promotion requires a git identity; set git user.name/user.email in the brain repository", record.ID)
@@ -340,11 +350,62 @@ func Promote(root string, record Record, request PromoteRequest) error {
 	metadata.Status = StatusActive
 	metadata.ObservedAt = request.Now.Format("2006-01-02")
 	metadata.ReviewedBy = request.Reviewer
+	metadata.PromotedVia = request.PromotionGate
 	rendered, err := doc.Merge(metadata)
 	if err != nil {
 		return fmt.Errorf("%s: %w", record.Path, err)
 	}
 	return fsx.WriteFileAtomic(path, rendered, fsx.DefaultFileMode)
+}
+
+// Promotion gates, as promoted_via records them. They mirror the manifest's
+// gate names without importing it: this package stays usable without a
+// workspace.
+const (
+	PromotionGateAuto   = "auto"
+	PromotionGateManual = "manual"
+	PromotionGateAgent  = "agent"
+)
+
+// PromotionGates lists the values promoted_via may hold.
+func PromotionGates() []string {
+	return []string{PromotionGateAuto, PromotionGateManual, PromotionGateAgent}
+}
+
+// resolvePromotionGate settles which gate a promotion is under and returns the
+// request with that gate's requirements switched on.
+//
+// A named gate that is weaker than the booleans is refused rather than
+// reconciled: recording "auto" on a promotion the caller also asked to be
+// attributed would describe a gate nobody configured.
+func resolvePromotionGate(record Record, request PromoteRequest) (PromoteRequest, error) {
+	derived := PromotionGateAuto
+	switch {
+	case request.AgentGate:
+		derived = PromotionGateAgent
+	case request.RequireReviewer:
+		derived = PromotionGateManual
+	}
+	gate := strings.TrimSpace(request.PromotionGate)
+	if gate != "" && gate != derived && (request.AgentGate || gate == PromotionGateAuto && request.RequireReviewer) {
+		return request, fmt.Errorf("%s: promotion gate %s does not match the requirements the caller set (%s)",
+			record.ID, gate, derived)
+	}
+	switch gate {
+	case "":
+		gate = derived
+	case PromotionGateAgent:
+		request.AgentGate = true
+		request.RequireReviewer = true
+	case PromotionGateManual:
+		request.RequireReviewer = true
+	case PromotionGateAuto:
+	default:
+		return request, fmt.Errorf("%s: %q is not a promotion gate; use %s",
+			record.ID, gate, strings.Join(PromotionGates(), ", "))
+	}
+	request.PromotionGate = gate
+	return request, nil
 }
 
 // confirmEvidence decides whether the observation date may move, and returns

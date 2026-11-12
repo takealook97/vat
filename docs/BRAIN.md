@@ -142,6 +142,7 @@ refs: [O-0003, D-0031]
 | `reason` | required for `quarantined` and `revoked` |
 | `recorded_by` | git author (`Name <email>`) who created it, when configured |
 | `reviewed_by` | git author (`Name <email>`) who promoted it |
+| `promoted_via` | the gate the last promotion passed: `auto`, `manual`, or `agent` |
 
 ### `claim_kind` decides which rules apply
 
@@ -292,8 +293,15 @@ Analysis does not become organisational truth because it was useful. A claim
 about the present with no owner and no source revision cannot be promoted at
 all — the refusal is what makes the gate real rather than decorative.
 
-Promotion stamps the observation date and the reviewer, and there are three
-further things it will not do.
+Promotion stamps the observation date, the reviewer, and the gate it passed
+(`promoted_via`), and there are three further things it will not do.
+
+`promoted_via` exists because the reviewer cannot tell the gates apart. With an
+identity configured, `auto` writes `reviewed_by` exactly as `manual` does, and a
+brain that a person and a publishing job both promote into could not say which
+records anyone was required to look at. The field names the path, not a review:
+it is rewritten by each promotion, kept by every other transition, and absent
+on records promoted before it existed — vat does not guess it for them.
 
 **It will not re-date a claim against evidence nobody looked at.** vat reads the
 owning repository. If it is still at the revision the claim was pinned to,

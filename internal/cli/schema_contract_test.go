@@ -193,6 +193,8 @@ func TestPublishedSchemaEnumsMatchTheValuesVatAccepts(t *testing.T) {
 		{brainSchema, "claim kinds", []string{"$defs", "claimKind"},
 			sortedStrings(string(brain.ClaimCurrentState), string(brain.ClaimHistorical),
 				string(brain.ClaimIntent))},
+		{brainSchema, "promotion gates", []string{"$defs", "promotionGate"},
+			sortedStrings(brain.PromotionGates()...)},
 	}
 
 	// Act & Assert
@@ -643,6 +645,8 @@ func TestBrainRecordSchemaAcceptsExtensionKeys(t *testing.T) {
 		{"an unknown status", strings.Replace(base, "status: active", "status: approved", 1) + extensions, false},
 		{"a defined field of the wrong type", strings.Replace(base, "source_external: true", "source_external: yes-please", 1), false},
 		{"no id", strings.Replace(base, "id: M-0001\n", "", 1) + extensions, false},
+		{"a promotion gate", base + "promoted_via: auto\n", true},
+		{"an unknown promotion gate", base + "promoted_via: bot\n", false},
 	}
 
 	for _, testCase := range cases {

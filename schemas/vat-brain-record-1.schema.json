@@ -47,7 +47,8 @@
     "reviewed_by": {
       "description": "Git author who promoted the record, as Name <email>. Required by manual and agent gates; auto may omit it when unset.",
       "type": "string"
-    }
+    },
+    "promoted_via": { "$ref": "#/$defs/promotionGate" }
   },
   "$defs": {
     "status": {
@@ -59,6 +60,11 @@
       "description": "What kind of claim this is. Only current-state decays with time: an intent does not stop being the intent because a year passed.",
       "type": "string",
       "enum": ["current-state", "historical", "intent"]
+    },
+    "promotionGate": {
+      "description": "The gate the last promotion passed. It is the path taken, not evidence that a person reviewed the record: auto may carry a reviewed_by too, when an identity was configured. Absent on records promoted before the field existed; nothing infers it for them.",
+      "type": "string",
+      "enum": ["auto", "manual", "agent"]
     }
   }
 }
