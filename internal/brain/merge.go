@@ -25,14 +25,20 @@ type headerPair struct{ key, value *yaml.Node }
 // rather than followed forever.
 //
 // A key written in the mapping is kept as many times as it is written, so the
-// typed decoder still refuses a duplicate.
-func mappingPairs(mapping *yaml.Node, active map[*yaml.Node]bool) ([]headerPair, []string) {
+// typed decoder still refuses a duplicate. A second merge key is refused here,
+// before merge keys are taken out of the mapping: the typed decoder never sees
+// one, and accepting both let either supply the record's status where a
+// generic decode rejects the header outright.
+func mappingPairs(mapping *yaml.Node, active map[*yaml.Node]bool) ([]headerPair, []string, error) {
 	var pairs []headerPair
 	var merges []*yaml.Node
 	present := map[string]bool{}
 	for i := 0; i+1 < len(mapping.Content); i += 2 {
 		key, value := mapping.Content[i], mapping.Content[i+1]
 		if key.Kind == yaml.ScalarNode && key.ShortTag() == mergeTag {
+			if len(merges) > 0 {
+				return nil, nil, mergeFault("gives a key more than once, or a value that does not fit its field", key)
+			}
 			merges = append(merges, value)
 			continue
 		}
@@ -54,8 +60,11 @@ func mappingPairs(mapping *yaml.Node, active map[*yaml.Node]bool) ([]headerPair,
 				continue
 			}
 			active[source] = true
-			merged, nested := mappingPairs(source, active)
+			merged, nested, err := mappingPairs(source, active)
 			delete(active, source)
+			if err != nil {
+				return nil, nil, err
+			}
 			problems = append(problems, nested...)
 			for _, pair := range merged {
 				if !plainStringKey(pair.key) {
@@ -70,7 +79,14 @@ func mappingPairs(mapping *yaml.Node, active map[*yaml.Node]bool) ([]headerPair,
 			}
 		}
 	}
-	return pairs, problems
+	return pairs, problems, nil
+}
+
+// mergeFault refuses a header whose merge keys cannot be resolved the way a
+// generic decode resolves them. Like every header problem it names a line and
+// never the text, which is author input and may be the credential itself.
+func mergeFault(what string, node *yaml.Node) error {
+	return fmt.Errorf("parse front matter: the header %s (line %d)", what, headerLine(node))
 }
 
 // mergeSources returns the mappings a merge value names: one mapping, an alias

@@ -95,7 +95,10 @@ func readHeader(doc frontmatter.Document) (Metadata, map[string]any, []string, e
 		}
 		return metadata, nil, nil, nil
 	}
-	pairs, mergeProblems := mappingPairs(root, map[*yaml.Node]bool{root: true})
+	pairs, mergeProblems, err := mappingPairs(root, map[*yaml.Node]bool{root: true})
+	if err != nil {
+		return metadata, nil, nil, err
+	}
 	typed := &yaml.Node{Kind: yaml.MappingNode, Tag: "!!map", Line: root.Line, Column: root.Column}
 	for _, pair := range pairs {
 		if plainStringKey(pair.key) {
@@ -200,7 +203,10 @@ func jsonValue(node *yaml.Node, active map[*yaml.Node]bool) (any, error) {
 			active[node] = true
 			defer delete(active, node)
 		}
-		pairs, problems := mappingPairs(node, active)
+		pairs, problems, err := mappingPairs(node, active)
+		if err != nil {
+			return nil, errNestedMerge
+		}
 		if len(problems) > 0 {
 			return nil, fmt.Errorf("a nested merge key names no mapping, or includes itself")
 		}
@@ -256,3 +262,7 @@ func jsonScalar(node *yaml.Node) (any, error) {
 }
 
 var errUnconvertible = errors.New("the value cannot be read as the type its tag names")
+
+// errNestedMerge is a merge inside an extension value that a generic decode
+// would refuse; the record's own fields are unaffected, so only the key is lost.
+var errNestedMerge = errors.New("a nested mapping gives its merge key more than once")
