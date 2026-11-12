@@ -10,6 +10,10 @@ import (
 	"github.com/takealook97/vat/internal/frontmatter"
 )
 
+// yamlStringTag is the tag of a plain YAML string, which is the only key an
+// extension mapping may use and the tag --set values are written with.
+const yamlStringTag = "!!str"
+
 // Extension keys, carried into graph.json.
 //
 // SPEC 5.6.1 lets a record hold keys this package does not define, and until
@@ -84,7 +88,7 @@ func readExtensions(header string) (map[string]any, []string) {
 	var problems []string
 	for i := 0; i+1 < len(mapping.Content); i += 2 {
 		key, value := mapping.Content[i], mapping.Content[i+1]
-		if key.Kind != yaml.ScalarNode || key.ShortTag() != "!!str" {
+		if key.Kind != yaml.ScalarNode || key.ShortTag() != yamlStringTag {
 			problems = append(problems, fmt.Sprintf("header key %q is not a string, so graph.json cannot carry it", key.Value))
 			continue
 		}
@@ -125,7 +129,7 @@ func jsonValue(node *yaml.Node) (any, error) {
 		mapping := make(map[string]any, len(node.Content)/2)
 		for i := 0; i+1 < len(node.Content); i += 2 {
 			key := node.Content[i]
-			if key.Kind != yaml.ScalarNode || key.ShortTag() != "!!str" {
+			if key.Kind != yaml.ScalarNode || key.ShortTag() != yamlStringTag {
 				return nil, fmt.Errorf("mapping key %q is not a string", key.Value)
 			}
 			converted, err := jsonValue(node.Content[i+1])
@@ -143,7 +147,7 @@ func jsonValue(node *yaml.Node) (any, error) {
 
 func jsonScalar(node *yaml.Node) (any, error) {
 	switch node.ShortTag() {
-	case "!!str", "!!timestamp", "!!binary":
+	case yamlStringTag, "!!timestamp", "!!binary":
 		return node.Value, nil
 	case "!!null":
 		return nil, nil

@@ -429,11 +429,11 @@ func headerWithExtensions(metadata Metadata, extensions map[string]any) (any, er
 		if err := value.Encode(extensions[key]); err != nil {
 			return nil, fmt.Errorf("encode %s: %w", key, err)
 		}
-		if value.Kind == yaml.ScalarNode && value.Tag == "!!str" {
+		if value.Kind == yaml.ScalarNode && value.Tag == yamlStringTag {
 			value.Style = yaml.DoubleQuotedStyle
 		}
 		node.Content = append(node.Content,
-			&yaml.Node{Kind: yaml.ScalarNode, Tag: "!!str", Value: key}, &value)
+			&yaml.Node{Kind: yaml.ScalarNode, Tag: yamlStringTag, Value: key}, &value)
 	}
 	if len(problems) > 0 {
 		return nil, fmt.Errorf("refused extension keys: %s", strings.Join(problems, "; "))
