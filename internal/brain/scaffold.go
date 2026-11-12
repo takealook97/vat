@@ -50,16 +50,11 @@ func Init(root string, now time.Time) ([]string, error) {
 func InitWithPolicy(root string, now time.Time, policy *MarkerPolicy) ([]string, error) {
 	var created []string
 
+	dirs := make([]string, 0, len(Kinds())+2)
 	for _, kind := range Kinds() {
-		if err := fsx.EnsureDir(filepath.Join(root, kind.Dir())); err != nil {
-			return nil, err
-		}
+		dirs = append(dirs, filepath.Join(root, kind.Dir()))
 	}
-	for _, dir := range []string{"history", "archive"} {
-		if err := fsx.EnsureDir(filepath.Join(root, dir)); err != nil {
-			return nil, err
-		}
-	}
+	dirs = append(dirs, filepath.Join(root, "history"), filepath.Join(root, "archive"))
 
 	files := map[string]string{
 		MarkerFile:        markerContent(policy),
@@ -75,6 +70,18 @@ func InitWithPolicy(root string, now time.Time, policy *MarkerPolicy) ([]string,
 		"AGENT_OPERATING_MODEL.md": operatingModelContent(),
 		"history/.gitkeep":         "",
 		"archive/.gitkeep":         "",
+	}
+	destinations := append([]string{}, dirs...)
+	for name := range files {
+		destinations = append(destinations, filepath.Join(root, name))
+	}
+	if err := confined(root, destinations...); err != nil {
+		return nil, err
+	}
+	for _, dir := range dirs {
+		if err := fsx.EnsureDir(dir); err != nil {
+			return nil, err
+		}
 	}
 	for name, content := range files {
 		path := filepath.Join(root, name)
@@ -385,6 +392,9 @@ func Create(root string, input NewRecordInput) (string, error) {
 	if len(filepath.Base(path)) > maxFileNameBytes {
 		return "", fmt.Errorf("the title is too long for a filename (%d bytes, limit %d); shorten it",
 			len(filepath.Base(path)), maxFileNameBytes)
+	}
+	if err := confined(root, path); err != nil {
+		return "", err
 	}
 	if err := fsx.WriteFileAtomic(path, rendered, fsx.DefaultFileMode); err != nil {
 		return "", err

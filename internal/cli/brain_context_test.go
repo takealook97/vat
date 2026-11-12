@@ -350,3 +350,44 @@ func TestBrainDirUndeclaredInsideWorkspaceStaysStandalone(t *testing.T) {
 		t.Error("a brain the manifest does not declare was governed by it")
 	}
 }
+
+func TestStandaloneInitCannotWriteThroughASymlinkedDirectory(t *testing.T) {
+	s := newStandalone(t)
+	outside := t.TempDir()
+	if err := os.MkdirAll(s.brain, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(outside, filepath.Join(s.brain, "history")); err != nil {
+		t.Skip(err)
+	}
+	code, output := s.run(s.base, s.brain, "brain", "init")
+	if code != 1 || !strings.Contains(output, "outside the brain") {
+		t.Errorf("exit %d, want 1 refusing the symbolic link:\n%s", code, output)
+	}
+	if entries, _ := os.ReadDir(outside); len(entries) > 0 {
+		t.Fatalf("init wrote %s outside --brain-dir", entries[0].Name())
+	}
+	if _, err := os.Stat(filepath.Join(s.brain, brain.MarkerFile)); err == nil {
+		t.Error("a refused init still wrote the marker")
+	}
+}
+
+func TestStandaloneNewCannotWriteThroughASymlinkedDirectory(t *testing.T) {
+	s := newStandalone(t)
+	outside := t.TempDir()
+	s.mustRun("brain", "init")
+	// The scaffold directory is empty, so renaming it discards nothing.
+	if err := os.Rename(filepath.Join(s.brain, "decisions"), filepath.Join(s.brain, "original-decisions")); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(outside, filepath.Join(s.brain, "decisions")); err != nil {
+		t.Skip(err)
+	}
+	code, output := s.run(s.base, s.brain, "brain", "new", "decision", "--title", "Escaped")
+	if code != 1 || !strings.Contains(output, "outside the brain") {
+		t.Errorf("exit %d, want 1 refusing the symbolic link:\n%s", code, output)
+	}
+	if entries, _ := os.ReadDir(outside); len(entries) > 0 {
+		t.Fatalf("new created %s outside --brain-dir", entries[0].Name())
+	}
+}

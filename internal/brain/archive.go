@@ -57,6 +57,9 @@ func moveRecord(root string, record Record, destination string) error {
 	if fsx.Exists(target) {
 		return fmt.Errorf("%s already exists; resolve it before archiving %s", destination, record.ID)
 	}
+	if err := confined(root, target); err != nil {
+		return err
+	}
 	if err := fsx.EnsureDir(filepath.Dir(target)); err != nil {
 		return err
 	}

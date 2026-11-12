@@ -218,3 +218,25 @@ func TestCreateRefusesCredentialTitleWithLegacyBody(t *testing.T) {
 		})
 	}
 }
+
+func TestArchiveCannotMoveThroughASymlinkedDirectory(t *testing.T) {
+	root, _ := newStore(t)
+	writeRecord(t, root, "decisions/D-0001-old.md", "id: D-0001\nstatus: superseded\nsuperseded_by: D-0002", "# Old")
+	writeRecord(t, root, "decisions/D-0002-new.md", "id: D-0002\nstatus: active\nsupersedes: [D-0001]", "# New")
+	outside := t.TempDir()
+	if err := os.RemoveAll(filepath.Join(root, "archive")); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(outside, filepath.Join(root, "archive")); err != nil {
+		t.Skip(err)
+	}
+	if _, err := brain.Archive(reload(t, root), true); err == nil {
+		t.Error("archive moved a record through a symbolic link out of the brain")
+	}
+	if entries, _ := os.ReadDir(outside); len(entries) > 0 {
+		t.Fatalf("archive wrote %s outside the brain", entries[0].Name())
+	}
+	if _, err := os.Stat(filepath.Join(root, "decisions", "D-0001-old.md")); err != nil {
+		t.Errorf("the record left its place: %v", err)
+	}
+}

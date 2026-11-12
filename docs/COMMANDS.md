@@ -694,7 +694,11 @@ every bad key named.
 `vat --brain-dir <dir> brain init [directory]` scaffolds at `<dir>`, which is
 the write boundary in this mode: `directory` is taken relative to it and may not
 leave it, through `..` or a symbolic link. Without a workspace the marker it
-writes carries the policy block with every default spelled out. Outside a
+writes carries the policy block with every default spelled out. In either
+mode, every file `init`, `new`, and `archive --apply` write under a brain must
+resolve inside that brain once the symbolic links already on disk are
+followed; a linked `history/` or `decisions/` pointing elsewhere makes the
+command exit `1` before it writes anything. Outside a
 workspace, `vat brain init` without `--brain-dir` exits `2` and says to pass it.
 
 What needs a repository list is refused on a standalone brain, exiting `2`:
