@@ -295,3 +295,58 @@ func TestSameDirComparesFilesystemIdentity(t *testing.T) {
 		t.Error("paths that do not exist yet should compare through their resolved parent")
 	}
 }
+
+func TestBrainDirOutsideCwdKeepsWorkspacePolicy(t *testing.T) {
+	h := brainFixture(t)
+	writeFile(t, h.path("brain/.brain"), "schema: 1\npolicy:\n  promotion_gate: auto\n")
+	bc, err := resolveBrain(&Env{Cwd: t.TempDir(), BrainDir: h.path("brain"), Now: testNow})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if bc.Workspace == nil || bc.Policy.PromotionGate != "manual" {
+		t.Fatalf("governed brain opened standalone=%v gate=%s; want the manifest's manual gate",
+			bc.Standalone(), bc.Policy.PromotionGate)
+	}
+}
+
+func TestBrainDirOutsideCwdRejectsBrokenManifest(t *testing.T) {
+	h := brainFixture(t)
+	writeFile(t, h.path("vat.yaml"), "version: 1\nworkspace: [broken\n")
+	if _, err := resolveBrain(&Env{Cwd: t.TempDir(), BrainDir: h.path("brain"), Now: testNow}); err == nil {
+		t.Fatal("a broken vat.yaml above the selected brain was silently ignored")
+	}
+}
+
+func TestBrainDirOutsideCwdCannotBypassManualPromotion(t *testing.T) {
+	isolateGitIdentity(t)
+	h := brainFixture(t)
+	h.mustRun("brain", "new", "decision", "--title", "Manual gate")
+	writeFile(t, h.path("brain/.brain"), "schema: 1\npolicy:\n  promotion_gate: auto\n")
+	git(t, h.path("brain"), "config", "user.name", "")
+	git(t, h.path("brain"), "config", "user.email", "")
+	var out, errOut bytes.Buffer
+	env := &Env{Printer: ui.NewWith(&out, &errOut, false), Now: testNow, Cwd: t.TempDir(), BrainDir: h.path("brain"), Yes: true}
+	code := dispatch(context.Background(), env, Root(), []string{"brain", "promote", "D-0001"}, nil)
+	store, err := brain.Load(h.path("brain"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if store.ByID()["D-0001"].Status == brain.StatusActive {
+		t.Fatalf("manual workspace gate bypassed from an unrelated cwd: exit=%d", code)
+	}
+}
+
+func TestBrainDirUndeclaredInsideWorkspaceStaysStandalone(t *testing.T) {
+	h := brainFixture(t)
+	other := h.path("notes")
+	if _, err := brain.Init(other, testNow); err != nil {
+		t.Fatal(err)
+	}
+	bc, err := resolveBrain(&Env{Cwd: t.TempDir(), BrainDir: other, Now: testNow})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bc.Standalone() {
+		t.Error("a brain the manifest does not declare was governed by it")
+	}
+}

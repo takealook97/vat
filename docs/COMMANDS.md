@@ -676,9 +676,12 @@ directory named by `--brain-dir`; otherwise the brain the workspace declares;
 otherwise, only when there is no `vat.yaml` above the current directory, the
 nearest directory upward holding a `.brain` marker. A `vat.yaml` that exists
 and fails to load is reported, never passed over for a marker, because that
-would run a governed brain under the wrong policy. `--brain-dir` naming the
-workspace's own brain keeps the workspace; naming any other directory makes it
-standalone.
+would run a governed brain under the wrong policy. For `--brain-dir` the
+workspace is looked for upward from the named directory, not from the current
+one, so where vat is run from cannot change who governs a brain; a `vat.yaml`
+found there that fails to load is reported the same way. `--brain-dir` naming
+that workspace's own brain — the same directory, however it is spelled — keeps
+the workspace; naming any other directory makes it standalone.
 
 A standalone brain runs under the `policy` block of its marker (see
 [SPEC.md](SPEC.md) §5.1); a key the marker does not declare takes the default

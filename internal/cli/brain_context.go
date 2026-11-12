@@ -84,8 +84,22 @@ func explicitBrainRoot(env *Env) string {
 // is none. A brain named explicitly is governed by the workspace only when it
 // is the brain that workspace declares; anything else would apply a policy the
 // workspace never stated for that directory.
+//
+// The search starts at root, not at the directory vat was run in. Starting
+// from the caller's directory let anyone open a governed brain from elsewhere
+// with --brain-dir, find no manifest, and run it standalone — under a marker
+// policy of `promotion_gate: auto` that the manifest's manual gate exists to
+// forbid, and past a broken manifest that would otherwise stop the run. Where
+// the brain is decides who governs it; where the caller stands does not.
+// --root still names the workspace outright.
 func workspaceAround(env *Env, root string) (*workspace.Workspace, error) {
-	ws, err := env.Workspace()
+	var ws *workspace.Workspace
+	var err error
+	if env.Root != "" {
+		ws, err = env.Workspace()
+	} else {
+		ws, err = workspace.Open(root)
+	}
 	if err != nil {
 		if noWorkspace(err) && env.Root == "" {
 			return nil, nil
