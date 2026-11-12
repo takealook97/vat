@@ -1,11 +1,13 @@
 package brain_test
 
 import (
+	"encoding/json"
 	"runtime/debug"
 	"strings"
 	"testing"
 
 	"github.com/takealook97/vat/internal/brain"
+	"github.com/takealook97/vat/internal/frontmatter"
 )
 
 // malformedReported reports whether Check raised brain/record-malformed.
@@ -112,4 +114,82 @@ func TestLoadKeepsRecordWithNonStringHeaderKey(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestLoadResolvesMergeKeysAsFieldsDoes(t *testing.T) {
+	cases := map[string]string{
+		"single alias":         "shared: &shared {project: demo-project}\n<<: *shared\n",
+		"explicit key wins":    "shared: &shared {project: other, extra: x}\n<<: *shared\nproject: demo-project\n",
+		"earlier source wins":  "a: &a {project: demo-project}\nb: &b {project: other, extra: y}\n<<: [*a, *b]\n",
+		"nested merge":         "a: &a {project: demo-project}\nb: &b {<<: *a, extra: z}\n<<: *b\n",
+		"merged defined field": "shared: &shared {status: superseded, project: demo-project}\n<<: *shared\n",
+		"alias of a mapping":   "shared: &shared {project: demo-project}\ncopy: *shared\n<<: *shared\n",
+	}
+	for name, header := range cases {
+		t.Run(name, func(t *testing.T) {
+			raw := "id: D-0001\n" + header
+			fields, err := frontmatter.Document{Present: true, Raw: raw}.Fields()
+			if err != nil || fields["project"] != "demo-project" {
+				t.Fatalf("fixture not merged by Fields: %v %v", fields, err)
+			}
+			root, _ := newStore(t)
+			writeRecord(t, root, "decisions/D-0001-review.md", raw, "# Review")
+			store, err := brain.Load(root)
+			if err != nil {
+				t.Fatal(err)
+			}
+			record, ok := store.ByID()["D-0001"]
+			if !ok {
+				t.Fatalf("record dropped: %+v", store.Malformed)
+			}
+			if len(record.ExtensionProblems) > 0 {
+				t.Errorf("merge reported as malformed: %v", record.ExtensionProblems)
+			}
+			for key, want := range fields {
+				if brain.IsDefinedField(key) {
+					continue
+				}
+				if got, err := json.Marshal(record.Extensions[key]); err != nil || string(got) != mustJSON(t, want) {
+					t.Errorf("extension %s = %s, Fields shows %s", key, got, mustJSON(t, want))
+				}
+			}
+			if _, leaked := record.Extensions["<<"]; leaked {
+				t.Error("the merge key itself was carried as an extension")
+			}
+			if status, _ := fields["status"].(string); status != "" && string(record.Status) != status {
+				t.Errorf("status = %s, Fields shows %s", record.Status, status)
+			}
+		})
+	}
+}
+
+func TestLoadReportsMergeKeyThatNamesNoMapping(t *testing.T) {
+	defer debug.SetMaxStack(debug.SetMaxStack(128 << 10))
+	for name, header := range map[string]string{
+		"scalar":       "<<: 5\nnote: kept\n",
+		"self include": "loop: &loop {<<: *loop}\nnote: kept\n",
+		"self alias":   "loop: &loop {inner: *loop}\nnote: kept\n",
+	} {
+		t.Run(name, func(t *testing.T) {
+			root, _ := newStore(t)
+			writeRecord(t, root, "decisions/D-0001-review.md", "id: D-0001\nstatus: active\n"+header, "# Review")
+			store := reload(t, root)
+			record, ok := store.ByID()["D-0001"]
+			if !ok || record.Extensions["note"] != "kept" {
+				t.Fatalf("record dropped: %+v", store.Malformed)
+			}
+			if !malformedReported(store) {
+				t.Error("the merge was not reported")
+			}
+		})
+	}
+}
+
+func mustJSON(t *testing.T, value any) string {
+	t.Helper()
+	data, err := json.Marshal(value)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return string(data)
 }

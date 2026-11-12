@@ -95,18 +95,18 @@ func readHeader(doc frontmatter.Document) (Metadata, map[string]any, []string, e
 		}
 		return metadata, nil, nil, nil
 	}
+	pairs, mergeProblems := mappingPairs(root, map[*yaml.Node]bool{root: true})
 	typed := &yaml.Node{Kind: yaml.MappingNode, Tag: "!!map", Line: root.Line, Column: root.Column}
-	for i := 0; i+1 < len(root.Content); i += 2 {
-		key := root.Content[i]
-		if plainStringKey(key) || key.ShortTag() == mergeTag {
-			typed.Content = append(typed.Content, key, root.Content[i+1])
+	for _, pair := range pairs {
+		if plainStringKey(pair.key) {
+			typed.Content = append(typed.Content, pair.key, pair.value)
 		}
 	}
 	if err := typed.Decode(&metadata); err != nil {
 		return metadata, nil, nil, headerProblem(err)
 	}
-	extensions, problems := readExtensions(root)
-	return metadata, extensions, problems, nil
+	extensions, problems := readExtensions(pairs)
+	return metadata, extensions, append(mergeProblems, problems...), nil
 }
 
 // mergeTag is the tag YAML gives the merge key `<<`.
@@ -125,12 +125,12 @@ func plainStringKey(key *yaml.Node) bool {
 // timestamp is published as the text the author wrote instead of as whatever
 // a time library prints for it, and the same header always yields the same
 // bytes.
-func readExtensions(mapping *yaml.Node) (map[string]any, []string) {
+func readExtensions(pairs []headerPair) (map[string]any, []string) {
 	defined := frontmatter.Keys(Metadata{})
 	extensions := map[string]any{}
 	var problems []string
-	for i := 0; i+1 < len(mapping.Content); i += 2 {
-		key, value := mapping.Content[i], mapping.Content[i+1]
+	for _, pair := range pairs {
+		key, value := pair.key, pair.value
 		if !plainStringKey(key) {
 			problems = append(problems, fmt.Sprintf(
 				"line %d: a header key that is not a plain string cannot be carried into graph.json", headerLine(key)))
@@ -194,17 +194,26 @@ func jsonValue(node *yaml.Node, active map[*yaml.Node]bool) (any, error) {
 		}
 		return list, nil
 	case yaml.MappingNode:
-		mapping := make(map[string]any, len(node.Content)/2)
-		for i := 0; i+1 < len(node.Content); i += 2 {
-			key := node.Content[i]
-			if !plainStringKey(key) {
+		// Marked so a merge of this mapping into itself is caught; an alias
+		// that led here has marked it already.
+		if !active[node] {
+			active[node] = true
+			defer delete(active, node)
+		}
+		pairs, problems := mappingPairs(node, active)
+		if len(problems) > 0 {
+			return nil, fmt.Errorf("a nested merge key names no mapping, or includes itself")
+		}
+		mapping := make(map[string]any, len(pairs))
+		for _, pair := range pairs {
+			if !plainStringKey(pair.key) {
 				return nil, fmt.Errorf("a nested key is not a plain string")
 			}
-			converted, err := jsonValue(node.Content[i+1], active)
+			converted, err := jsonValue(pair.value, active)
 			if err != nil {
 				return nil, err
 			}
-			mapping[key.Value] = converted
+			mapping[pair.key.Value] = converted
 		}
 		return mapping, nil
 	case yaml.ScalarNode:

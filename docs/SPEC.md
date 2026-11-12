@@ -590,7 +590,10 @@ with their values: mappings with string keys, lists, strings, numbers, booleans,
 and null. A timestamp is carried as the text written in the record. A value
 outside that set, including an alias that refers to itself, and a key that is
 not a plain string, are reported as a malformed record and left out; the rest
-of the record, its defined fields included, is unaffected. The
+of the record, its defined fields included, is unaffected. A YAML merge key
+(`<<`) is resolved before keys are read, as a generic YAML decode resolves it: a
+key written in the mapping wins over a merged one, and among merged mappings
+the earlier wins. The
 report names the line and **MUST NOT** quote the value, and names the key only
 when it carries nothing shaped like a credential. Fields this specification defines are carried under
 their own names and never inside `extensions`. `extensions` is display data:
