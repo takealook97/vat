@@ -458,3 +458,23 @@ func TestAFailedAtomicWriteNamesTheFileItWasAskedToWrite(t *testing.T) {
 		t.Errorf("error %q does not say what went wrong", message)
 	}
 }
+
+func TestResolveExistingFollowsAnExistingAncestorLink(t *testing.T) {
+	dir := t.TempDir()
+	real := filepath.Join(dir, "real")
+	if err := os.Mkdir(real, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	link := filepath.Join(dir, "link")
+	if err := os.Symlink(real, link); err != nil {
+		t.Skip(err)
+	}
+	resolvedReal, err := filepath.EvalSymlinks(real)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := fsx.ResolveExisting(filepath.Join(link, "not", "yet"))
+	if want := filepath.Join(resolvedReal, "not", "yet"); got != want {
+		t.Errorf("ResolveExisting = %s, want %s", got, want)
+	}
+}

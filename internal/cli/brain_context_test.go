@@ -254,3 +254,44 @@ func TestBrainDirNamingTheWorkspaceBrainKeepsTheWorkspace(t *testing.T) {
 		t.Errorf("the workspace brain's marker declares %v (%v)", declared, err)
 	}
 }
+
+func TestBrainDirCaseAliasKeepsWorkspacePolicy(t *testing.T) {
+	h := brainFixture(t)
+	canonical, err := os.Stat(h.path("brain"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	alias, err := os.Stat(h.path("BRAIN"))
+	if err != nil || !os.SameFile(canonical, alias) {
+		t.Skip("case-sensitive filesystem")
+	}
+	writeFile(t, h.path("brain/.brain"), "schema: 1\npolicy:\n  promotion_gate: auto\n")
+	bc, err := resolveBrain(&Env{Cwd: h.root, Root: h.root, BrainDir: "BRAIN", Now: testNow})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if bc.Workspace == nil || bc.Policy.PromotionGate != "manual" {
+		t.Fatalf("same directory with different casing became standalone=%v gate=%s", bc.Standalone(), bc.Policy.PromotionGate)
+	}
+}
+
+func TestSameDirComparesFilesystemIdentity(t *testing.T) {
+	dir := t.TempDir()
+	real := filepath.Join(dir, "real")
+	if err := os.Mkdir(real, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	link := filepath.Join(dir, "link")
+	if err := os.Symlink(real, link); err != nil {
+		t.Skip(err)
+	}
+	if !sameDir(real, link) {
+		t.Error("a symbolic link to the directory is the same directory")
+	}
+	if sameDir(real, filepath.Join(dir, "other")) {
+		t.Error("an existing directory matched a path that does not exist")
+	}
+	if !sameDir(filepath.Join(link, "new"), filepath.Join(real, "new")) {
+		t.Error("paths that do not exist yet should compare through their resolved parent")
+	}
+}

@@ -3,6 +3,7 @@ package cli
 import (
 	"context"
 	"fmt"
+	"os"
 	"path/filepath"
 	"strings"
 
@@ -151,20 +152,27 @@ func brainNextStep(ws *workspace.Workspace, root string) string {
 		rel, manifest.FileName, rel, rel)
 }
 
-// sameDir compares two paths that are already absolute and inside the
-// workspace. Symlinks are resolved before the comparison because the workspace
-// root itself may be reached through one, and a false mismatch here would send
-// the reader to adopt a repository that is already the brain.
+// sameDir reports whether two absolute paths name the same directory.
+//
+// Existing directories are compared by filesystem identity. Comparing resolved
+// path strings missed a case alias on a case-insensitive filesystem — `BRAIN`
+// and `brain` are one directory there, and EvalSymlinks keeps the casing it
+// was given — so `--brain-dir BRAIN` opened the workspace's own brain as a
+// standalone one, under the marker's policy instead of the manifest's. Only a
+// path that does not exist yet falls back to comparing resolved strings.
 func sameDir(a, b string) bool {
 	if filepath.Clean(a) == filepath.Clean(b) {
 		return true
 	}
-	resolvedA, errA := filepath.EvalSymlinks(a)
-	resolvedB, errB := filepath.EvalSymlinks(b)
-	if errA != nil || errB != nil {
+	infoA, errA := os.Stat(a)
+	infoB, errB := os.Stat(b)
+	if errA == nil && errB == nil {
+		return os.SameFile(infoA, infoB)
+	}
+	if errA == nil || errB == nil {
 		return false
 	}
-	return resolvedA == resolvedB
+	return fsx.ResolveExisting(a) == fsx.ResolveExisting(b)
 }
 
 func brainBuildCommand() *Command {

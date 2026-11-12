@@ -3,6 +3,8 @@ package workspace
 import (
 	"path/filepath"
 	"strings"
+
+	"github.com/takealook97/vat/internal/fsx"
 )
 
 // Contains reports whether target sits inside root and is not root itself.
@@ -24,7 +26,7 @@ func Contains(root, target string) bool {
 	if err != nil {
 		return false
 	}
-	resolvedTarget := resolveExisting(target)
+	resolvedTarget := fsx.ResolveExisting(target)
 	relative, err := filepath.Rel(resolvedRoot, resolvedTarget)
 	if err != nil {
 		return false
@@ -37,26 +39,3 @@ func Contains(root, target string) bool {
 
 // Contains reports whether target sits strictly below this workspace's root.
 func (w *Workspace) Contains(target string) bool { return Contains(w.Root, target) }
-
-// resolveExisting resolves the longest existing prefix of a path and rejoins
-// whatever remains, so a not-yet-created directory still resolves through any
-// symlinked ancestor.
-func resolveExisting(target string) string {
-	absolute, err := filepath.Abs(target)
-	if err != nil {
-		return filepath.Clean(target)
-	}
-	remainder := ""
-	current := absolute
-	for {
-		if resolved, err := filepath.EvalSymlinks(current); err == nil {
-			return filepath.Join(resolved, remainder)
-		}
-		parent := filepath.Dir(current)
-		if parent == current {
-			return absolute
-		}
-		remainder = filepath.Join(filepath.Base(current), remainder)
-		current = parent
-	}
-}

@@ -165,3 +165,29 @@ func PortableName(name string) error {
 func NormaliseNewlines(text string) string {
 	return strings.ReplaceAll(text, "\r\n", "\n")
 }
+
+// ResolveExisting resolves the longest existing prefix of a path through its
+// symbolic links and rejoins whatever remains, so a path that does not exist
+// yet still resolves through any symlinked ancestor.
+//
+// It lives here so every package that asks "where would this write land" asks
+// it the same way; the knowledge layer cannot import the workspace package.
+func ResolveExisting(target string) string {
+	absolute, err := filepath.Abs(target)
+	if err != nil {
+		return filepath.Clean(target)
+	}
+	remainder := ""
+	current := absolute
+	for {
+		if resolved, err := filepath.EvalSymlinks(current); err == nil {
+			return filepath.Join(resolved, remainder)
+		}
+		parent := filepath.Dir(current)
+		if parent == current {
+			return absolute
+		}
+		remainder = filepath.Join(filepath.Base(current), remainder)
+		current = parent
+	}
+}
