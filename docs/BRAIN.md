@@ -589,6 +589,13 @@ INFO  G-0014  Retries can double-submit an order    active
       │ Two identical requests within the retry window create two orders.
 ```
 
+`vat brain list` is the other way in: every record, archived ones included,
+filtered by `--status`, `--kind`, and `--where key=value` on extension keys,
+read from the files as they are now rather than from `graph.json`. Citability
+is judged at read time, the same way `query` judges it. A file that cannot be
+read is listed under `skipped` and the rest still print; the command then exits
+`1`.
+
 The default surface is deliberately narrow: the root projections and the
 non-terminal records. Superseded reasoning is excluded, because an answer
 assembled from it is worse than no answer.

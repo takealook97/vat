@@ -478,6 +478,7 @@ vat brain new       <goal|gap|decision|memory> --title "..." [--claim <kind>]
 vat brain build
 vat brain check     [--only <rule>] [--list]
 vat brain query     <terms...> [--all] [--limit n]
+vat brain list      [--status <s>] [--kind <k>] [--where key=value]... [--json]
 vat brain review    [--overdue] [--drifted] [--limit n]
 vat brain sweep     [--apply]
 vat brain promote   <id...> | --owner <repo> [--reverified]
@@ -689,6 +690,31 @@ one class while you work through it. `--only` matches a substring, so
 refused rather than reported as a clean run, because a mistyped selector in CI
 buys a green build that checked nothing. The rules are tabulated in
 [BRAIN.md](BRAIN.md).
+
+`list` prints every record, archived ones included, ordered by `id` then
+`path`. Every filter must hold: `--status` and `--kind` match exactly, and the
+repeatable `--where key=value` matches an extension key to an exact string
+value — a key no record carries lists nothing, and a key vat defines is
+refused. An unknown status or kind, a malformed `--where`, or a positional
+argument exits `2`. Citability is judged at read time, as in `query`.
+
+`--json` prints one object, `{"records": [...], "skipped": [...]}`, both always
+arrays. Every record carries every field:
+
+| Field | Value |
+| --- | --- |
+| `path` | relative to the brain root |
+| `id`, `kind`, `status`, `claim_kind`, `title`, `date`, `observed_at` | as in the record; empty string when absent |
+| `citable` | whether the record may be cited now |
+| `citable_until` | the last citable day of a dated current-state claim, else empty |
+| `supersedes`, `superseded_by` | the replacement chain; an array and a string |
+| `extensions` | every header key vat does not define, as written; `{}` when none |
+| `source_external` | whether the evidence is declared outside the workspace |
+
+A file that cannot be read as a record is listed under `skipped` with its
+`path` and a fixed `reason` that never quotes the file. The records that could
+be read are still printed, the skipped paths are named on stderr, and the
+command exits `1`; an empty listing exits `0`.
 
 `check` reports `brain/record-malformed` for a file it cannot read as a record
 and keeps loading the rest, and `brain/record-secret-suspected` for a record

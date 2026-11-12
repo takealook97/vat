@@ -17,6 +17,9 @@ Notable changes to `vat`. The format follows
   record a script produces is written complete in one atomic write, with the
   heading added by vat, and refused before any write when its title, body, or
   header values carry a credential shape.
+- `vat brain list [--status] [--kind] [--where key=value] [--json]`: every
+  record filtered by what it is, citability judged at read time, and unreadable
+  files listed under `skipped` while the rest still print.
 
 ### Changed
 
