@@ -505,7 +505,9 @@ when git is unavailable.
 carrying its own H1, or an empty one, exits `2`. `--set key=value` adds a header
 key vat does not define, always as a string, and may be repeated; an empty key,
 a key given twice, and a key vat defines (`status`, `reviewed_by`, …) exit `2`,
-all named in one run. `--source-external` writes `source_external: true` and no
+all named in one run. A defined field that has its own flag is refused with that
+flag named: `--set source_url=...` points at `--source-url`, and
+`--set source_quote=...` at `--source-quote`. `--source-external` writes `source_external: true` and no
 `source_ref`, and cannot be combined with `--owner`. Before anything is written,
 the whole record — title, body, every header value — is checked for the
 credential shapes `brain/record-secret-suspected` knows; a match exits `1`,

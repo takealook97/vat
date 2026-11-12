@@ -149,7 +149,9 @@ refs: [O-0003, D-0031]
 
 Any other key is an extension: vat keeps it, shows it, and gives it no meaning
 in the lifecycle. `vat brain new --set key=value` writes one as a string, and
-refuses a key from the table above. `--body-stdin` takes the body from a pipe
+refuses a key from the table above, naming the flag that writes it where there
+is one (`source_url` was an extension key before it was a field; `--set
+source_url=...` now points at `--source-url`). `--body-stdin` takes the body from a pipe
 and writes the heading itself, so a record a script produces is complete in one
 write.
 

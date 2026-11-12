@@ -35,7 +35,7 @@ func (f *extensionFlag) Set(raw string) error {
 		f.errs = append(f.errs, fmt.Sprintf("--set %q has no key", raw))
 	case brain.IsDefinedField(key):
 		// Setting status or reviewed_by here would walk round promotion.
-		f.errs = append(f.errs, fmt.Sprintf("--set %s: %s is a field vat defines; use its own flag or command", key, key))
+		f.errs = append(f.errs, definedFieldRefusal(key))
 	default:
 		if f.values == nil {
 			f.values = map[string]string{}
@@ -48,6 +48,28 @@ func (f *extensionFlag) Set(raw string) error {
 		f.values[key] = value
 	}
 	return nil
+}
+
+// definedFieldFlags names the brain new flag that writes a defined field.
+// source_url and source_quote were extension keys before they were fields, so
+// scripts written then still pass them through --set; the refusal has to say
+// where they went.
+var definedFieldFlags = map[string]string{
+	"source_url":      "--source-url",
+	"source_quote":    "--source-quote",
+	"source_external": "--source-external",
+	"claim_kind":      "--claim",
+	"owned_by":        "--owner",
+	"axis":            "--axis",
+	"refs":            "--refs",
+	"id":              "--id",
+}
+
+func definedFieldRefusal(key string) string {
+	if flag, ok := definedFieldFlags[key]; ok {
+		return fmt.Sprintf("--set %s: %s is a field vat defines; pass it with %s", key, key, flag)
+	}
+	return fmt.Sprintf("--set %s: %s is a field vat defines; use its own flag or command", key, key)
 }
 
 func (f *extensionFlag) validate() error {

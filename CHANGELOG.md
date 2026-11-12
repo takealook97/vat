@@ -39,7 +39,9 @@ Notable changes to `vat`. The format follows
 - `vat brain new --body-stdin`, `--set key=value`, and `--source-external`: a
   record a script produces is written complete in one atomic write, with the
   heading added by vat, and refused before any write when its title, body, or
-  header values carry a credential shape.
+  header values carry a credential shape. `--set source_url=...` and
+  `--set source_quote=...` are refused as defined fields, naming
+  `--source-url` and `--source-quote`.
 - `vat brain list [--status] [--kind] [--where key=value] [--json]`: every
   record filtered by what it is, citability judged at read time, and unreadable
   files listed under `skipped` while the rest still print.

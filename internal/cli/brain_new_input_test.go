@@ -206,3 +206,35 @@ func TestBrainNewLeavesNothingWhenTheWriteFails(t *testing.T) {
 		}
 	}
 }
+
+// source_url and source_quote were extension keys before they were fields, so
+// a script written then still passes them through --set. The refusal has to
+// name the flag that now writes them, or the script's author is left guessing.
+func TestBrainNewPointsDefinedSourceFieldsAtTheirFlags(t *testing.T) {
+	h := brainFixture(t)
+	code, output := h.run("brain", "new", "memory", "--title", "x",
+		"--set", "source_url=https://example.com/a", "--set", "source_quote=said so")
+	if code != ExitUsage {
+		t.Fatalf("a defined field passed through --set (exit %d):\n%s", code, output)
+	}
+	// The usage line names every flag, so each refusal line must name its own.
+	for field, flag := range map[string]string{"source_url": "--source-url", "source_quote": "--source-quote"} {
+		named := false
+		for _, line := range strings.Split(output, "\n") {
+			if strings.Contains(line, "--set "+field) && strings.Contains(line, flag) {
+				named = true
+			}
+		}
+		if !named {
+			t.Errorf("the refusal of %s does not point at %s:\n%s", field, flag, output)
+		}
+	}
+	if files := recordFiles(t, h.path("brain", "memory")); len(files) != 0 {
+		t.Errorf("a refused record was written: %v", files)
+	}
+	for field := range definedFieldFlags {
+		if !brain.IsDefinedField(field) {
+			t.Errorf("%s is mapped to a flag but is not a defined field", field)
+		}
+	}
+}
