@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"regexp"
 	"strings"
+	"unicode"
 )
 
 // Credential detection for records.
@@ -115,6 +116,25 @@ func SuspectedCredentialNames(text string) []string {
 		names = append(names, fmt.Sprintf("%s (line %d)", hit.name, hit.line))
 	}
 	return names
+}
+
+// maxDisplayedKeyBytes bounds a key a diagnostic will quote; a longer one is
+// more likely pasted content than a name somebody chose.
+const maxDisplayedKeyBytes = 64
+
+// DisplayableKey reports whether a header key may appear in a diagnostic: one
+// short line of printable text in which the credential scan finds nothing.
+// Anything else is named by its position instead.
+func DisplayableKey(key string) bool {
+	if key == "" || len(key) > maxDisplayedKeyBytes {
+		return false
+	}
+	for _, r := range key {
+		if !unicode.IsPrint(r) {
+			return false
+		}
+	}
+	return len(suspectedCredentials(key)) == 0
 }
 
 type credentialHit struct {

@@ -748,7 +748,8 @@ flag must also run `vat brain archive --apply`, or
 and keeps loading the rest, and `brain/record-secret-suspected` for a record
 that appears to carry a credential in its body or in a header key vat does not
 define. The second names the line or the key and the kind of credential, never
-the value.
+the value. Neither quotes the header: a finding names the line and the class of
+problem, and names a key only when the credential scan finds nothing in it.
 
 `adopt` points the workspace at an existing knowledge repository and reports
 which records do not yet meet the schema. Nothing is rewritten.

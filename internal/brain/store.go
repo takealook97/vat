@@ -136,7 +136,7 @@ func loadRecord(root string, kind Kind, path string) (Record, error) {
 	doc := frontmatter.Split(string(data))
 	var metadata Metadata
 	if err := doc.Decode(&metadata); err != nil {
-		return Record{}, err
+		return Record{}, headerProblem(err)
 	}
 	relative := relTo(root, path)
 	if metadata.ID == "" {

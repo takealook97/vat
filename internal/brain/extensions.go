@@ -1,6 +1,7 @@
 package brain
 
 import (
+	"errors"
 	"fmt"
 	"math"
 	"sort"
@@ -89,7 +90,8 @@ func readExtensions(header string) (map[string]any, []string) {
 	for i := 0; i+1 < len(mapping.Content); i += 2 {
 		key, value := mapping.Content[i], mapping.Content[i+1]
 		if key.Kind != yaml.ScalarNode || key.ShortTag() != yamlStringTag {
-			problems = append(problems, fmt.Sprintf("header key %q is not a string, so graph.json cannot carry it", key.Value))
+			problems = append(problems, fmt.Sprintf(
+				"line %d: a header key that is not a plain string cannot be carried into graph.json", headerLine(key)))
 			continue
 		}
 		if defined[key.Value] {
@@ -97,7 +99,8 @@ func readExtensions(header string) (map[string]any, []string) {
 		}
 		converted, err := jsonValue(value, map[*yaml.Node]bool{})
 		if err != nil {
-			problems = append(problems, fmt.Sprintf("extension key %s cannot be carried into graph.json: %v", key.Value, err))
+			problems = append(problems, fmt.Sprintf("line %d: %s cannot be carried into graph.json: %v",
+				headerLine(key), keyLabel(key.Value), err))
 			continue
 		}
 		extensions[key.Value] = converted
@@ -107,6 +110,20 @@ func readExtensions(header string) (map[string]any, []string) {
 		return nil, problems
 	}
 	return extensions, problems
+}
+
+// headerLine is the line of the record file a header node sits on: the
+// header starts on the line after the opening delimiter.
+func headerLine(node *yaml.Node) int { return node.Line + 1 }
+
+// keyLabel names an extension key in a diagnostic. A key is author text like
+// any value, and a finding that quotes a credential has published it a second
+// time, so a key is named only once the credential scan finds nothing in it.
+func keyLabel(key string) string {
+	if DisplayableKey(key) {
+		return "extension key " + key
+	}
+	return "a header key"
 }
 
 // jsonValue converts a YAML node into a string-keyed mapping, a list, or a
@@ -140,7 +157,7 @@ func jsonValue(node *yaml.Node, active map[*yaml.Node]bool) (any, error) {
 		for i := 0; i+1 < len(node.Content); i += 2 {
 			key := node.Content[i]
 			if key.Kind != yaml.ScalarNode || key.ShortTag() != yamlStringTag {
-				return nil, fmt.Errorf("mapping key %q is not a string", key.Value)
+				return nil, fmt.Errorf("a nested key is not a plain string")
 			}
 			converted, err := jsonValue(node.Content[i+1], active)
 			if err != nil {
@@ -155,6 +172,8 @@ func jsonValue(node *yaml.Node, active map[*yaml.Node]bool) (any, error) {
 	return nil, fmt.Errorf("unsupported YAML node")
 }
 
+// jsonScalar converts one scalar. Its errors are fixed sentences: the value,
+// and a custom tag, are author text and may be the credential itself.
 func jsonScalar(node *yaml.Node) (any, error) {
 	switch node.ShortTag() {
 	case yamlStringTag, "!!timestamp", "!!binary":
@@ -163,23 +182,27 @@ func jsonScalar(node *yaml.Node) (any, error) {
 		return nil, nil
 	case "!!bool":
 		var value bool
-		err := node.Decode(&value)
-		return value, err
+		if err := node.Decode(&value); err != nil {
+			return nil, errUnconvertible
+		}
+		return value, nil
 	case "!!int":
 		var value int64
 		if err := node.Decode(&value); err != nil {
-			return nil, fmt.Errorf("integer %s does not fit in 64 bits", node.Value)
+			return nil, fmt.Errorf("the value is not an integer that fits in 64 bits")
 		}
 		return value, nil
 	case "!!float":
 		var value float64
 		if err := node.Decode(&value); err != nil {
-			return nil, err
+			return nil, errUnconvertible
 		}
 		if math.IsNaN(value) || math.IsInf(value, 0) {
-			return nil, fmt.Errorf("%s is not a number JSON can hold", node.Value)
+			return nil, fmt.Errorf("the value is not a number JSON can hold")
 		}
 		return value, nil
 	}
-	return nil, fmt.Errorf("value tagged %s has no JSON form", node.Tag)
+	return nil, fmt.Errorf("a value with a custom tag has no JSON form")
 }
+
+var errUnconvertible = errors.New("the value cannot be read as the type its tag names")
