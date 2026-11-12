@@ -595,7 +595,9 @@ of the record, its defined fields included, is unaffected. A YAML merge key
 key written in the mapping wins over a merged one, and among merged mappings
 the earlier wins. A mapping that gives the merge key twice is refused as a
 generic decode refuses it: in the header it makes the record malformed, and in
-an extension value it loses that key. The
+an extension value it loses that key. A header whose merge keys and aliases
+expand past a fixed budget — far beyond what a written header uses — is
+refused the same way rather than expanded. The
 report names the line and **MUST NOT** quote the value, and names the key only
 when it carries nothing shaped like a credential. Fields this specification defines are carried under
 their own names and never inside `extensions`. `extensions` is display data:

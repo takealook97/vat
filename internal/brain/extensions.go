@@ -95,7 +95,8 @@ func readHeader(doc frontmatter.Document) (Metadata, map[string]any, []string, e
 		}
 		return metadata, nil, nil, nil
 	}
-	pairs, mergeProblems, err := mappingPairs(root, map[*yaml.Node]bool{root: true})
+	resolver := newMergeResolver()
+	pairs, mergeProblems, err := resolver.mappingPairs(root, map[*yaml.Node]bool{root: true})
 	if err != nil {
 		return metadata, nil, nil, err
 	}
@@ -108,7 +109,7 @@ func readHeader(doc frontmatter.Document) (Metadata, map[string]any, []string, e
 	if err := typed.Decode(&metadata); err != nil {
 		return metadata, nil, nil, headerProblem(err)
 	}
-	extensions, problems := readExtensions(pairs)
+	extensions, problems := readExtensions(pairs, resolver)
 	return metadata, extensions, append(mergeProblems, problems...), nil
 }
 
@@ -128,7 +129,7 @@ func plainStringKey(key *yaml.Node) bool {
 // timestamp is published as the text the author wrote instead of as whatever
 // a time library prints for it, and the same header always yields the same
 // bytes.
-func readExtensions(pairs []headerPair) (map[string]any, []string) {
+func readExtensions(pairs []headerPair, resolver *mergeResolver) (map[string]any, []string) {
 	defined := frontmatter.Keys(Metadata{})
 	extensions := map[string]any{}
 	var problems []string
@@ -142,7 +143,7 @@ func readExtensions(pairs []headerPair) (map[string]any, []string) {
 		if defined[key.Value] {
 			continue
 		}
-		converted, err := jsonValue(value, map[*yaml.Node]bool{})
+		converted, err := jsonValue(value, map[*yaml.Node]bool{}, resolver)
 		if err != nil {
 			problems = append(problems, fmt.Sprintf("line %d: %s cannot be carried into graph.json: %v",
 				headerLine(key), keyLabel(key.Value), err))
@@ -177,19 +178,26 @@ func keyLabel(key string) string {
 // names one of them refers to itself, and following it would recurse until the
 // stack ran out: one record with `extra: &loop [*loop]` took down every
 // command that loads the brain.
-func jsonValue(node *yaml.Node, active map[*yaml.Node]bool) (any, error) {
+//
+// Every alias followed is charged to the header's merge budget: an alias is
+// expanded once per reference, so a list of two aliases of the line above,
+// repeated, doubles at every line just as merges did.
+func jsonValue(node *yaml.Node, active map[*yaml.Node]bool, resolver *mergeResolver) (any, error) {
 	switch node.Kind {
 	case yaml.AliasNode:
 		if active[node.Alias] {
 			return nil, fmt.Errorf("it refers to itself through an alias")
 		}
+		if err := resolver.spend(1, node); err != nil {
+			return nil, errExpansion
+		}
 		active[node.Alias] = true
 		defer delete(active, node.Alias)
-		return jsonValue(node.Alias, active)
+		return jsonValue(node.Alias, active, resolver)
 	case yaml.SequenceNode:
 		list := make([]any, 0, len(node.Content))
 		for _, item := range node.Content {
-			converted, err := jsonValue(item, active)
+			converted, err := jsonValue(item, active, resolver)
 			if err != nil {
 				return nil, err
 			}
@@ -203,7 +211,7 @@ func jsonValue(node *yaml.Node, active map[*yaml.Node]bool) (any, error) {
 			active[node] = true
 			defer delete(active, node)
 		}
-		pairs, problems, err := mappingPairs(node, active)
+		pairs, problems, err := resolver.mappingPairs(node, active)
 		if err != nil {
 			return nil, errNestedMerge
 		}
@@ -215,7 +223,7 @@ func jsonValue(node *yaml.Node, active map[*yaml.Node]bool) (any, error) {
 			if !plainStringKey(pair.key) {
 				return nil, fmt.Errorf("a nested key is not a plain string")
 			}
-			converted, err := jsonValue(pair.value, active)
+			converted, err := jsonValue(pair.value, active, resolver)
 			if err != nil {
 				return nil, err
 			}
@@ -264,5 +272,9 @@ func jsonScalar(node *yaml.Node) (any, error) {
 var errUnconvertible = errors.New("the value cannot be read as the type its tag names")
 
 // errNestedMerge is a merge inside an extension value that a generic decode
-// would refuse; the record's own fields are unaffected, so only the key is lost.
-var errNestedMerge = errors.New("a nested mapping gives its merge key more than once")
+// would refuse, or that runs past the header's budget; the record's own fields
+// are unaffected, so only the key is lost.
+var errNestedMerge = errors.New("a nested mapping gives its merge key more than once, or expands too far")
+
+// errExpansion is an extension value whose aliases run past the header's budget.
+var errExpansion = errors.New("it expands through aliases further than a record header can")
