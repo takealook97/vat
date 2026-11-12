@@ -7,7 +7,7 @@ Every command that prints a table also accepts `--json`.
 | Code | Meaning |
 | --- | --- |
 | `0` | ran and found nothing wrong |
-| `1` | ran correctly and found problems (errors; warnings alone exit 0) |
+| `1` | ran correctly and found problems (errors; warnings alone exit 0 unless a command's opt-in flag, such as `vat brain check --fail-on-warning`, says otherwise) |
 | `2` | the invocation itself was wrong |
 
 The distinction matters in CI: `1` means act on the findings, `2` means fix the
@@ -476,7 +476,7 @@ vat brain new       <goal|gap|decision|memory> --title "..." [--claim <kind>]
                     [--axis <a>] [--refs <ids>] [--id <id>]
                     [--body-stdin] [--set key=value]...
 vat brain build
-vat brain check     [--only <rule>] [--list]
+vat brain check     [--only <rule>] [--list] [--fail-on-warning]
 vat brain query     <terms...> [--all] [--limit n]
 vat brain list      [--status <s>] [--kind <k>] [--where key=value]... [--json]
 vat brain review    [--overdue] [--drifted] [--limit n]
@@ -715,6 +715,14 @@ A file that cannot be read as a record is listed under `skipped` with its
 `path` and a fixed `reason` that never quotes the file. The records that could
 be read are still printed, the skipped paths are named on stderr, and the
 command exits `1`; an empty listing exits `0`.
+
+`check --fail-on-warning` exits `1` when any selected finding is a warning,
+as it already does for an error; every finding is still printed first, and the
+human report and the JSON array are unchanged. Only the rules `--only` selected
+count. `--list` ignores it and exits `0`. Without the flag a warning alone
+exits `0`. A job that revokes or supersedes records and runs check with this
+flag must also run `vat brain archive --apply`, or
+`brain/terminal-unarchived` stops it.
 
 `check` reports `brain/record-malformed` for a file it cannot read as a record
 and keeps loading the rest, and `brain/record-secret-suspected` for a record

@@ -559,7 +559,12 @@ knows to look for, so this table and `brain.RuleNames()` are compared by a test.
 ```console
 $ vat brain check --only claim     # the provenance rules alone
 $ vat brain check --list           # every rule name
+$ vat brain check --fail-on-warning   # exit 1 on a warning too, for a job that must stop
 ```
+
+Warnings exit `0` by default, because they are judgements a person may defer.
+`--fail-on-warning` is for an automated writer that should stop instead; it
+changes the exit code and nothing it prints.
 
 ---
 

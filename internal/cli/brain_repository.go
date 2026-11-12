@@ -205,12 +205,16 @@ func brainCheckCommand() *Command {
 	return &Command{
 		Name:    "check",
 		Summary: "Validate identifiers, provenance, supersession, and links",
-		Usage:   "vat brain check [--only <rule>] [--list]",
+		Usage:   "vat brain check [--only <rule>] [--list] [--fail-on-warning]",
 		Long: `Fail closed on everything that would make the knowledge layer untrustworthy.
 
 Every finding is reported at once rather than one per run, because these rules
 are run in a loop while cleaning up a repository. --only narrows that to one
-class of problem while you work through it; --list names every rule.`,
+class of problem while you work through it; --list names every rule.
+
+Warnings alone exit 0. --fail-on-warning makes a selected warning exit 1 as an
+error does, for a job that must stop on one; the report and the JSON are the
+same either way.`,
 		Examples: []string{
 			"vat brain check",
 			"vat brain check --only claim    # provenance rules alone",
@@ -219,6 +223,7 @@ class of problem while you work through it; --list names every rule.`,
 			set := newFlagSet("brain check")
 			only := set.String("only", "", "only rules whose name contains this")
 			list := set.Bool("list", false, "list every rule and exit")
+			failOnWarning := set.Bool("fail-on-warning", false, "exit 1 on a warning as well as an error")
 			if err := parseFlags(set, args); err != nil {
 				return err
 			}
@@ -278,7 +283,10 @@ class of problem while you work through it; --list names every rule.`,
 						pluralise(len(findings)-brain.Errors(findings), "warning", "warnings")))
 				reportBrainFixes(env, findings)
 			}
-			if brain.Errors(findings) > 0 {
+			// Only the exit code changes. A job that must stop on a warning
+			// used to parse the report for one, and a flag that also changed
+			// the report would break the job reading it.
+			if brain.Errors(findings) > 0 || (*failOnWarning && len(findings) > 0) {
 				return findingsErrorf("")
 			}
 			return nil
