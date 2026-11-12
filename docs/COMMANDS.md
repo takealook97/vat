@@ -525,7 +525,8 @@ something that is not a repository: the address, and the source's own words.
 `new` refuses an address that is not an absolute `http` or `https` URL with a
 host, or that carries user information, and writes nothing. Neither flag sets
 `source_external`; `brain check` reports both fields' absence only when
-`policy.brain.require_external_evidence` is set.
+`policy.brain.require_external_evidence` is set (in a standalone brain, the
+marker's `require_external_evidence`).
 
 `query` searches a deliberately narrow surface. `--all` widens it to history,
 archives, and terminal records — for auditing why something was decided, rather
@@ -676,9 +677,9 @@ standalone.
 A standalone brain runs under the `policy` block of its marker (see
 [SPEC.md](SPEC.md) §5.1); a key the marker does not declare takes the default
 `promotion_gate: manual`, `stale_after_days: 90`, `review_sla_days: 30`,
-`require_promotion_gate: true`. Where a workspace governs the brain, its
-`vat.yaml` policy wins entirely, defaults included, and `vat doctor` warns about
-each marker value that disagrees. An invalid marker policy is refused with
+`require_promotion_gate: true`, `require_external_evidence: false`. Where a
+workspace governs the brain, its `vat.yaml` policy wins entirely, defaults
+included, and `vat doctor` warns about each marker value that disagrees. An invalid marker policy is refused with
 every bad key named.
 
 `vat --brain-dir <dir> brain init [directory]` scaffolds at `<dir>`, which is

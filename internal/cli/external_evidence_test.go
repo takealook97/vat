@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -23,30 +24,54 @@ func requireExternalEvidence(t *testing.T, h *workspaceFixture) {
 	writeFile(t, h.path("vat.yaml"), updated)
 }
 
-// The policy lives in vat.yaml and the rule in the brain package; the only
-// thing joining them is the command. A policy that parses and never reaches
-// the rule is a rule silently switched off.
-func TestExternalEvidencePolicyReachesWorkspaceChecks(t *testing.T) {
-	// Arrange
-	isolateGitIdentity(t)
-	h := brainFixture(t)
-	h.mustRun("brain", "new", "memory", "--title", "An external event", "--claim", "historical")
-	path := findRecord(t, h, "M-0001")
-	writeFile(t, path, strings.Replace(readFile(t, path), "status: provisional", "status: provisional\nsource_external: true", 1))
+// The policy lives in vat.yaml or in the brain's marker, and the rule in the
+// brain package; the only thing joining them is the command. A policy that
+// parses and never reaches the rule is a rule silently switched off.
+func TestExternalEvidencePolicyReachesStandaloneAndWorkspaceChecks(t *testing.T) {
+	t.Run("workspace", func(t *testing.T) {
+		// Arrange
+		isolateGitIdentity(t)
+		h := brainFixture(t)
+		h.mustRun("brain", "new", "memory", "--title", "An external event", "--claim", "historical")
+		path := findRecord(t, h, "M-0001")
+		writeFile(t, path, strings.Replace(readFile(t, path), "status: provisional", "status: provisional\nsource_external: true", 1))
 
-	// Act
-	before := h.mustRun("brain", "check", "--only", "external")
-	requireExternalEvidence(t, h)
-	code, after := h.run("brain", "check", "--only", "external")
+		// Act
+		before := h.mustRun("brain", "check", "--only", "external")
+		requireExternalEvidence(t, h)
+		code, after := h.run("brain", "check", "--only", "external")
 
-	// Assert
-	if strings.Contains(before, "brain/external-evidence-missing") {
-		t.Fatalf("the rule fired with the policy off: %s", before)
-	}
-	if code != ExitFindings || !strings.Contains(after, "brain/external-evidence-missing") ||
-		!strings.Contains(after, "source_url or source_quote") {
-		t.Fatalf("the policy did not reach the check: %d %s", code, after)
-	}
+		// Assert
+		if strings.Contains(before, "brain/external-evidence-missing") {
+			t.Fatalf("the rule fired with the policy off: %s", before)
+		}
+		if code != ExitFindings || !strings.Contains(after, "brain/external-evidence-missing") ||
+			!strings.Contains(after, "source_url or source_quote") {
+			t.Fatalf("the policy did not reach the check: %d %s", code, after)
+		}
+	})
+	t.Run("standalone", func(t *testing.T) {
+		// Arrange
+		isolateGitIdentity(t)
+		s := newStandalone(t)
+		s.mustRun("brain", "init")
+		s.mustRun("brain", "new", "memory", "--title", "An external event", "--claim", "historical", "--source-external")
+		before := s.mustRun("brain", "check", "--only", "external")
+		marker := filepath.Join(s.brain, brain.MarkerFile)
+		writeFile(t, marker, strings.Replace(readFile(t, marker),
+			"require_external_evidence: false", "require_external_evidence: true", 1))
+
+		// Act
+		code, after := s.run(s.base, s.brain, "brain", "check", "--only", "external")
+
+		// Assert
+		if strings.Contains(before, "brain/external-evidence-missing") {
+			t.Fatalf("the rule fired with the marker policy at its default: %s", before)
+		}
+		if code != ExitFindings || !strings.Contains(after, "brain/external-evidence-missing") {
+			t.Fatalf("the marker policy did not reach the check: %d %s", code, after)
+		}
+	})
 }
 
 func TestBrainNewWritesExternalEvidenceAndRefusesABadAddress(t *testing.T) {

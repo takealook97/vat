@@ -27,14 +27,18 @@ type MarkerPolicy struct {
 	StaleAfterDays       int    `json:"stale_after_days"`
 	ReviewSLADays        int    `json:"review_sla_days"`
 	RequirePromotionGate bool   `json:"require_promotion_gate"`
+	// RequireExternalEvidence is off by default for the reason the manifest's
+	// is: records written before source_url existed must not start failing.
+	RequireExternalEvidence bool `json:"require_external_evidence"`
 }
 
 // Policy keys as they appear in the marker.
 const (
-	PolicyPromotionGate        = "promotion_gate"
-	PolicyStaleAfterDays       = "stale_after_days"
-	PolicyReviewSLADays        = "review_sla_days"
-	PolicyRequirePromotionGate = "require_promotion_gate"
+	PolicyPromotionGate           = "promotion_gate"
+	PolicyStaleAfterDays          = "stale_after_days"
+	PolicyReviewSLADays           = "review_sla_days"
+	PolicyRequirePromotionGate    = "require_promotion_gate"
+	PolicyRequireExternalEvidence = "require_external_evidence"
 )
 
 // DefaultMarkerPolicy is what a brain with no workspace and no declared value
@@ -56,6 +60,8 @@ func (p MarkerPolicy) CheckPolicy() CheckPolicy {
 		PromotionGate:  p.PromotionGate,
 		StaleAfterDays: p.StaleAfterDays,
 		ReviewSLADays:  p.ReviewSLADays,
+
+		RequireExternalEvidence: p.RequireExternalEvidence,
 	}
 }
 
@@ -88,6 +94,9 @@ func (d DeclaredPolicy) Resolve() MarkerPolicy {
 	}
 	if required, ok := d[PolicyRequirePromotionGate].(bool); ok {
 		out.RequirePromotionGate = required
+	}
+	if required, ok := d[PolicyRequireExternalEvidence].(bool); ok {
+		out.RequireExternalEvidence = required
 	}
 	return out
 }
@@ -162,7 +171,7 @@ func policyValue(key string, node yaml.Node) (any, string) {
 			return nil, fmt.Sprintf("policy.%s must be a whole number of days, 1 or more", key)
 		}
 		return days, ""
-	case PolicyRequirePromotionGate:
+	case PolicyRequirePromotionGate, PolicyRequireExternalEvidence:
 		var required bool
 		if node.Kind != yaml.ScalarNode || node.Tag != "!!bool" || node.Decode(&required) != nil {
 			return nil, fmt.Sprintf("policy.%s must be true or false", key)
@@ -177,7 +186,10 @@ func policyValue(key string, node yaml.Node) (any, string) {
 
 // PolicyKeys names every key a marker policy block may hold.
 func PolicyKeys() []string {
-	return []string{PolicyPromotionGate, PolicyStaleAfterDays, PolicyReviewSLADays, PolicyRequirePromotionGate}
+	return []string{
+		PolicyPromotionGate, PolicyStaleAfterDays, PolicyReviewSLADays,
+		PolicyRequirePromotionGate, PolicyRequireExternalEvidence,
+	}
 }
 
 // markerPolicyBlock renders a policy block for a marker.
@@ -186,5 +198,6 @@ func markerPolicyBlock(p MarkerPolicy) string {
 		fmt.Sprintf("  %s: %s\n", PolicyPromotionGate, p.PromotionGate) +
 		fmt.Sprintf("  %s: %d\n", PolicyStaleAfterDays, p.StaleAfterDays) +
 		fmt.Sprintf("  %s: %d\n", PolicyReviewSLADays, p.ReviewSLADays) +
-		fmt.Sprintf("  %s: %t\n", PolicyRequirePromotionGate, p.RequirePromotionGate)
+		fmt.Sprintf("  %s: %t\n", PolicyRequirePromotionGate, p.RequirePromotionGate) +
+		fmt.Sprintf("  %s: %t\n", PolicyRequireExternalEvidence, p.RequireExternalEvidence)
 }

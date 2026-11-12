@@ -802,6 +802,8 @@ func checkBrainPolicy(ws *workspace.Workspace, root string) []Finding {
 		brain.PolicyStaleAfterDays:       ws.Manifest.Policy.Brain.StaleAfterDays,
 		brain.PolicyReviewSLADays:        ws.Manifest.Policy.Brain.ReviewSLADays,
 		brain.PolicyRequirePromotionGate: ws.Manifest.Policy.Brain.RequirePromotionGate,
+
+		brain.PolicyRequireExternalEvidence: ws.Manifest.Policy.Brain.RequireExternalEvidence,
 	}
 	var findings []Finding
 	for _, key := range declared.Keys() {

@@ -478,6 +478,7 @@ policy:
   stale_after_days: 90
   review_sla_days: 30
   require_promotion_gate: true
+  require_external_evidence: false
 ```
 
 Inside a workspace, `vat.yaml` wins over every one of these, and `vat doctor`
@@ -806,7 +807,8 @@ source_quote: The cutover moves to Monday.
 `vat brain new --source-url <url> --source-quote "..."` writes both.
 `brain/external-source-url` reports an address that is not an absolute `http`
 or `https` URL, or that carries user information — wherever it is written, and
-without opening it. Set `policy.brain.require_external_evidence: true` and
+without opening it. Set `policy.brain.require_external_evidence: true` (in a standalone brain,
+`require_external_evidence: true` in the marker's `policy` block) and
 `brain/external-evidence-missing` fails every `source_external` record lacking
 either field, including archived ones. It is off by default so records written
 before these fields existed keep passing; fill those in, or move them, before

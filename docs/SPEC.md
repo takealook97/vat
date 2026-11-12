@@ -288,6 +288,7 @@ is the lifecycle a brain runs under when no workspace manifest governs it:
 | `stale_after_days` | integer ≥ 1 | `90` |
 | `review_sla_days` | integer ≥ 1 | `30` |
 | `require_promotion_gate` | boolean | `true` |
+| `require_external_evidence` | boolean | `false` |
 
 A key absent from the mapping takes its default. A reader **MUST** refuse a
 policy key it does not know and a value of the wrong type, rather than fall
@@ -500,7 +501,8 @@ a record **MAY** carry `source_url`, the address it was read from, and
 present on any record, an implementation **MUST** report it unless it is an
 absolute `http` or `https` URL naming a host and carrying no user information,
 and **MUST NOT** quote the value in that report. When
-`policy.brain.require_external_evidence` is `true`, an implementation **MUST**
+`policy.brain.require_external_evidence` — or, for a brain no manifest governs,
+the marker's `require_external_evidence` (§5.1) — is `true`, an implementation **MUST**
 report every `source_external` record — archived records included — that lacks
 either field. Both reports **MUST** be judged from the record alone: an
 implementation **MUST NOT** open the address, and does not judge whether the

@@ -344,6 +344,19 @@ func TestDoctorReportsBrainPolicyConflict(t *testing.T) {
 	}
 }
 
+func TestDoctorComparesTheExternalEvidencePolicy(t *testing.T) {
+	ws, root := brainFixture(t)
+	marker := fmt.Sprintf("schema: 1\npolicy:\n  require_external_evidence: %t\n",
+		!ws.Manifest.Policy.Brain.RequireExternalEvidence)
+	if err := os.WriteFile(filepath.Join(root, brain.MarkerFile), []byte(marker), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	finding, found := findingFor(judge(t, ws), "brain", "policy-conflict")
+	if !found || !strings.Contains(finding.Detail, "require_external_evidence") || !strings.Contains(finding.Detail, "vat.yaml wins") {
+		t.Errorf("a disagreeing require_external_evidence went unreported: %+v", finding)
+	}
+}
+
 func TestDoctorIsQuietAboutAMarkerWithoutPolicy(t *testing.T) {
 	ws, _ := brainFixture(t)
 	if _, found := findingFor(judge(t, ws), "brain", "policy-conflict"); found {
