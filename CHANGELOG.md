@@ -6,6 +6,31 @@ Notable changes to `vat`. The format follows
 
 ## [Unreleased]
 
+## [0.8.1] - 2026-11-13
+
+### Added
+
+- A changeset participant can record `rollback_lost`, a reason its
+  `rollback_point` no longer resolves, such as a rewritten history.
+  `changeset/rollback-point-missing` told the reader to record why the way back
+  was lost, and the record had no field for it, so the finding stayed red for
+  good. A non-blank reason silences that finding; a reason recorded for a point
+  that still resolves is reported by the new warning
+  `changeset/rollback-lost-but-present`. `rollback_point` stays in the record as
+  the evidence of what was lost. The field is optional, so the completion record
+  stays at version 1; an older vat rejects a record that sets it.
+
+### Fixed
+
+- `vat changeset undo-plan` no longer prints `git reset --hard` for a
+  participant whose `rollback_lost` is set. It prints a `#` line naming the
+  repository and the reason, folded onto one line so a multiline reason cannot
+  start a line a shell would run, and keeps the plan for the others.
+- `vat lint` checks the workspace-root participant `.` for a missing or falsely
+  lost return point. The check looked participants up in `repos:`, which never
+  lists the root, so it skipped `.` silently. A root participant whose point
+  is gone now fails `changeset/rollback-point-missing` where it passed before.
+
 ## [0.8.0] - 2026-11-12
 
 ### Added
