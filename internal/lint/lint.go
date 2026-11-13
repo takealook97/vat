@@ -738,11 +738,10 @@ func checkRollbackPoints(ctx context.Context, ws *workspace.Workspace, set chang
 			// policy. Reporting it twice says nothing new.
 			continue
 		}
-		repo, governed := ws.Manifest.Find(participant.Name)
+		dir, governed := ws.ParticipantDir(participant.Name)
 		if !governed {
 			continue
 		}
-		dir := ws.RepoPath(repo)
 		if !gitx.IsRepository(dir) {
 			// A repository that is not on this machine says nothing about
 			// whether its history still holds the revision. Reporting it would

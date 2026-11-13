@@ -243,3 +243,61 @@ func TestARecordedLossWithoutAReturnPointIsNotAnInvalidChangeset(t *testing.T) {
 		}
 	}
 }
+
+// The workspace root is a participant too, under the name ".". It is not in
+// `repos:`, so a lookup through the manifest alone skipped it and its return
+// point was never checked, in either direction.
+
+func rootChangeset(rollbackPoint, reason string) changeset.Changeset {
+	set := lostChangeset(rollbackPoint, reason)
+	set.Repositories[0].Name = changeset.WorkspaceParticipant
+	return set
+}
+
+func TestALossClaimedForTheWorkspaceRootThatResolvesIsReported(t *testing.T) {
+	// Arrange
+	ws := fixture(t)
+	commitOnce(t, ws.Root)
+	saveChangeset(t, ws.Root, rootChangeset(headRevision(t, ws.Root), "history rewritten"))
+
+	// Act
+	report := run(t, ws)
+
+	// Assert
+	if _, ok := rules(report)["changeset/rollback-lost-but-present"]; !ok {
+		t.Fatalf("a root return point that resolves was called lost without a warning: %+v", report.Findings)
+	}
+}
+
+func TestAMissingWorkspaceRootReturnPointIsReported(t *testing.T) {
+	// Arrange
+	ws := fixture(t)
+	commitOnce(t, ws.Root)
+	saveChangeset(t, ws.Root, rootChangeset("0000000000000000000000000000000000000000", ""))
+
+	// Act
+	report := run(t, ws)
+
+	// Assert
+	if _, ok := rules(report)["changeset/rollback-point-missing"]; !ok {
+		t.Fatalf("a root return point that does not exist went unreported: %+v", report.Findings)
+	}
+}
+
+func TestARecordedLossSilencesTheMissingWorkspaceRootReturnPoint(t *testing.T) {
+	// Arrange
+	ws := fixture(t)
+	commitOnce(t, ws.Root)
+	saveChangeset(t, ws.Root, rootChangeset("0000000000000000000000000000000000000000", "history rewritten"))
+
+	// Act
+	report := run(t, ws)
+
+	// Assert
+	found := rules(report)
+	for _, rule := range []string{"changeset/rollback-point-missing", "changeset/rollback-lost-but-present"} {
+		if _, ok := found[rule]; ok {
+			t.Errorf("%s reported for an acknowledged root loss: %+v", rule, report.Findings)
+		}
+	}
+}

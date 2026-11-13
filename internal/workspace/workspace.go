@@ -13,6 +13,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/takealook97/vat/internal/changeset"
 	"github.com/takealook97/vat/internal/fsx"
 	"github.com/takealook97/vat/internal/manifest"
 )
@@ -102,6 +103,25 @@ func (w *Workspace) ManifestPath() string {
 // validation still cannot reach outside.
 func (w *Workspace) RepoPath(repo manifest.Repo) string {
 	return w.Path(repo.Dir())
+}
+
+// ParticipantDir maps a changeset participant name onto its working tree.
+//
+// Two kinds of name resolve: a repository in `repos:`, and
+// changeset.WorkspaceParticipant, the root itself. Any other name is unknown,
+// or a mistyped repository would be taken for something real. It is the one
+// lookup both the commands and lint go through, because a rule that resolved
+// names differently from the command that wrote the record would check a
+// different tree than the one the record describes.
+func (w *Workspace) ParticipantDir(name string) (string, bool) {
+	if name == changeset.WorkspaceParticipant {
+		return w.Root, true
+	}
+	repo, ok := w.Manifest.Find(name)
+	if !ok {
+		return "", false
+	}
+	return w.RepoPath(repo), true
 }
 
 // Path joins workspace-relative parts onto the root, containing the result.

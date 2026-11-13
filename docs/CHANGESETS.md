@@ -221,7 +221,8 @@ mirror or a bundle, or record why the way back was lost:
 `rollback_point` stays: it is the evidence of what was lost. `vat changeset show`
 prints the reason under the repository table, and the finding stops. A reason
 recorded for a return point that still resolves is reported as
-`changeset/rollback-lost-but-present`.
+`changeset/rollback-lost-but-present`. Both checks cover the workspace root
+(`.`) like any repository.
 
 `vat changeset undo-plan` prints a line naming the repository and the reason in
 place of the `git reset` it would otherwise plan, and keeps the plan for the rest.

@@ -27,19 +27,20 @@ type participantTarget struct {
 // each: three copies of this lookup is how three commands come to disagree
 // about which tree a record describes.
 func resolveParticipant(ws *workspace.Workspace, name string) (participantTarget, bool) {
+	dir, ok := ws.ParticipantDir(name)
+	if !ok {
+		return participantTarget{}, false
+	}
 	if name == changeset.WorkspaceParticipant {
 		return participantTarget{
-			Dir:    ws.Root,
+			Dir:    dir,
 			Branch: ws.Manifest.Workspace.DefaultBranch,
 			Checks: ws.Manifest.Workspace.Checks,
 		}, true
 	}
-	repo, ok := ws.Manifest.Find(name)
-	if !ok {
-		return participantTarget{}, false
-	}
+	repo, _ := ws.Manifest.Find(name)
 	return participantTarget{
-		Dir:    ws.RepoPath(repo),
+		Dir:    dir,
 		Branch: repo.Branch(ws.Manifest.Workspace.DefaultBranch),
 		Checks: repo.Checks,
 	}, true

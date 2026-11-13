@@ -185,3 +185,28 @@ func TestSelectRefusesAFilterThatMatchesNothing(t *testing.T) {
 		t.Error("selecting a group that matches nothing reported success")
 	}
 }
+
+func TestParticipantDirResolvesTheRootAndGovernedRepositoriesOnly(t *testing.T) {
+	// Arrange
+	root := t.TempDir()
+	ws := &workspace.Workspace{
+		Root:     root,
+		Manifest: manifest.WithRepo(manifest.Default("acme"), productRepo("payments")),
+	}
+
+	// Act
+	rootDir, rootOK := ws.ParticipantDir(".")
+	repoDir, repoOK := ws.ParticipantDir("payments")
+	_, unknownOK := ws.ParticipantDir("typo")
+
+	// Assert
+	if !rootOK || rootDir != root {
+		t.Errorf("root = %q, %v; want %q, true", rootDir, rootOK, root)
+	}
+	if !repoOK || repoDir != filepath.Join(root, "payments") {
+		t.Errorf("repo = %q, %v", repoDir, repoOK)
+	}
+	if unknownOK {
+		t.Error("an unknown name resolved")
+	}
+}
