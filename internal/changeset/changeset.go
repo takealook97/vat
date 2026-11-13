@@ -428,7 +428,9 @@ func (c Changeset) AgeDays(now time.Time) int {
 }
 
 // RollbackPlan returns the ordered instructions to undo the change, or an error
-// naming the repositories whose rollback point was never recorded.
+// naming the repositories whose rollback point was never recorded. A repository
+// whose record explains that its way back is lost gets a line saying so in
+// place of a reset, and the plan for the others stands.
 //
 // The plan is generated rather than written down because it is only correct if
 // it matches what was actually verified, and a hand-written one drifts the
@@ -441,6 +443,14 @@ func (c Changeset) RollbackPlan() ([]string, error) {
 	// is already gone.
 	for i := len(c.Repositories) - 1; i >= 0; i-- {
 		participant := c.Repositories[i]
+		// A reset to a point the record says no longer resolves would fail, or
+		// land somewhere other than where the change started. The line stays a
+		// comment so pasting the whole plan into a shell cannot act on it.
+		if participant.LossRecorded() {
+			steps = append(steps, fmt.Sprintf("# %s: the way back is lost, no reset is planned: %s",
+				participant.Name, strings.TrimSpace(participant.RollbackLost)))
+			continue
+		}
 		if participant.RollbackPoint == "" {
 			missing = append(missing, participant.Name)
 			continue

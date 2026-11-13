@@ -223,6 +223,9 @@ prints the reason under the repository table, and the finding stops. A reason
 recorded for a return point that still resolves is reported as
 `changeset/rollback-lost-but-present`.
 
+`vat changeset undo-plan` prints a line naming the repository and the reason in
+place of the `git reset` it would otherwise plan, and keeps the plan for the rest.
+
 A repository that is not cloned on this machine is not reported. Its absence
 says nothing about whether the history still holds the revision.
 
@@ -248,7 +251,15 @@ what others have already pulled. The plan is the part that is hard to
 reconstruct; acting on it is your decision.
 
 A repository with no recorded return point makes the plan refuse rather than
-emit a half-plan.
+emit a half-plan, unless the record says why the way back is gone
+(`rollback_lost`). Then the plan prints a comment line in its place, so the
+reset that would fail is never offered:
+
+```console
+# payments: the way back is lost, no reset is planned: history rewritten
+```
+
+The other repositories keep their reset lines.
 
 ---
 

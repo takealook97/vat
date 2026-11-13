@@ -407,3 +407,65 @@ func TestARecordedLossSurvivesASaveAndLoad(t *testing.T) {
 		t.Errorf("rollback_point = %q; recording the loss must not erase what was lost", got)
 	}
 }
+
+func TestRollbackPlanPlansNoResetForAReturnPointRecordedAsLost(t *testing.T) {
+	// Arrange: the lost repository has a recorded point, as a lost one does.
+	current := changeset.New("CS-0001", "x", reference)
+	current = changeset.WithParticipant(current, changeset.Participant{
+		Name: "payments", RollbackPoint: "aaaaaaaaaaaa", RollbackLost: "history rewritten",
+	})
+	current = changeset.WithParticipant(current,
+		changeset.Participant{Name: "console", RollbackPoint: "bbbbbbbbbbbb"})
+
+	// Act
+	steps, err := current.RollbackPlan()
+
+	// Assert
+	if err != nil {
+		t.Fatalf("RollbackPlan returned an error: %v", err)
+	}
+	joined := strings.Join(steps, "\n")
+	if !strings.Contains(joined, "git -C console reset --hard bbbbbbbbbbbb") {
+		t.Errorf("the healthy repository lost its reset line:\n%s", joined)
+	}
+	if strings.Contains(joined, "reset --hard aaaaaaaaaaaa") {
+		t.Errorf("a reset to a lost point was planned:\n%s", joined)
+	}
+	if !strings.Contains(joined, "payments") || !strings.Contains(joined, "history rewritten") {
+		t.Errorf("the lost repository and its reason are not named:\n%s", joined)
+	}
+}
+
+func TestRollbackPlanTreatsAWhitespaceReasonAsNotLost(t *testing.T) {
+	// Arrange
+	current := changeset.WithParticipant(changeset.New("CS-0001", "x", reference),
+		changeset.Participant{Name: "payments", RollbackPoint: "aaaaaaaaaaaa", RollbackLost: "  \t"})
+
+	// Act
+	steps, err := current.RollbackPlan()
+
+	// Assert
+	if err != nil {
+		t.Fatalf("RollbackPlan returned an error: %v", err)
+	}
+	if len(steps) != 1 || !strings.Contains(steps[0], "reset --hard aaaaaaaaaaaa") {
+		t.Errorf("a blank reason suppressed the reset line: %v", steps)
+	}
+}
+
+func TestRollbackPlanAcceptsALostReturnPointThatWasNeverRecorded(t *testing.T) {
+	// Arrange: a recorded loss is an explanation, so it is not a gap.
+	current := changeset.WithParticipant(changeset.New("CS-0001", "x", reference),
+		changeset.Participant{Name: "payments", RollbackLost: "object gone"})
+
+	// Act
+	steps, err := current.RollbackPlan()
+
+	// Assert
+	if err != nil {
+		t.Fatalf("a recorded loss was refused as missing: %v", err)
+	}
+	if len(steps) != 1 || strings.Contains(steps[0], "git ") {
+		t.Errorf("steps = %v, want one line saying the way back is lost", steps)
+	}
+}

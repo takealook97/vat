@@ -879,7 +879,10 @@ this record says.
 for it in `--json` gets the same answer the table shows.
 
 `undo-plan` prints the commands that would return every repository to its start
-point, in reverse enrolment order. `vat` prints and never runs it.
+point, in reverse enrolment order. `vat` prints and never runs it. A repository
+whose participant records `rollback_lost` gets a `#` line naming it and the
+reason instead of a `git reset`, and the plan for the others is unchanged. The
+command has no `--json` form.
 
 See [CHANGESETS.md](CHANGESETS.md).
 

@@ -262,3 +262,32 @@ func TestShowSaysWhyARepositoryHasNoWayBack(t *testing.T) {
 		t.Errorf("JSON rollback_lost = %v", first["rollback_lost"])
 	}
 }
+
+func TestAChangesetUndoPlanSaysWhichWayBackIsLostInsteadOfPlanningAReset(t *testing.T) {
+	// Arrange
+	h := adoptedFixture(t, "payments", "console")
+	h.mustRun("changeset", "new", "Move cancellation to v2", "--repos", "payments,console")
+	current, err := changeset.Load(h.root, "CS-0001")
+	if err != nil {
+		t.Fatal(err)
+	}
+	lost := current.Repositories[0]
+	lost.RollbackLost = "history rewritten; the object is gone"
+	if err := changeset.Save(h.root, changeset.WithParticipant(current, lost)); err != nil {
+		t.Fatal(err)
+	}
+
+	// Act
+	plan := h.mustRun("changeset", "undo-plan", "CS-0001")
+
+	// Assert
+	if strings.Contains(plan, "git -C payments") {
+		t.Errorf("a reset was planned for the lost repository:\n%s", plan)
+	}
+	if !strings.Contains(plan, "git -C console reset --hard") {
+		t.Errorf("the healthy repository dropped out of the plan:\n%s", plan)
+	}
+	if !strings.Contains(plan, "payments") || !strings.Contains(plan, "history rewritten; the object is gone") {
+		t.Errorf("the lost repository and its reason are not in the plan:\n%s", plan)
+	}
+}
