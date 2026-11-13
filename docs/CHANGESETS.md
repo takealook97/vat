@@ -208,9 +208,20 @@ before the change began cannot, which is why it is captured at enrolment.
 A rewritten history takes it away — a force-push, a squashed branch, a pruned
 object — and the record goes on asserting a return point in exactly the voice of
 one that is there. `vat lint` reports that as
-`changeset/rollback-point-missing`. There is no fix line worth printing: no
+`changeset/rollback-point-missing`. No command repairs it, because no
 command recovers a revision the repository does not hold. Recover it from a
-mirror or a bundle, or record why the way back was lost.
+mirror or a bundle, or record why the way back was lost:
+
+```yaml
+  - name: payments
+    rollback_point: 3f9a1c2e8b7412
+    rollback_lost: history rewritten; the object is gone from the remote and every clone
+```
+
+`rollback_point` stays: it is the evidence of what was lost. `vat changeset show`
+prints the reason under the repository table, and the finding stops. A reason
+recorded for a return point that still resolves is reported as
+`changeset/rollback-lost-but-present`.
 
 A repository that is not cloned on this machine is not reported. Its absence
 says nothing about whether the history still holds the revision.

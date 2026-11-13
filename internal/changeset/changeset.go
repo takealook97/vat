@@ -84,6 +84,14 @@ type Participant struct {
 	// RollbackPoint is the revision before the change began. Recorded at
 	// enrolment, because after the change lands it can no longer be observed.
 	RollbackPoint string `yaml:"rollback_point,omitempty" json:"rollback_point,omitempty"`
+	// RollbackLost says why RollbackPoint no longer resolves, when it does not.
+	//
+	// A rewritten history is sometimes deliberate, and then the loss is a fact
+	// the workspace can only acknowledge. Without a place to say so the lint
+	// finding stayed red for good, and a finding that is always red teaches
+	// everybody to read past the next one. RollbackPoint is kept beside it: it
+	// is the evidence of what was lost.
+	RollbackLost string `yaml:"rollback_lost,omitempty" json:"rollback_lost,omitempty"`
 	// Revision is the revision the checks were verified against.
 	Revision string     `yaml:"revision,omitempty" json:"revision,omitempty"`
 	Branch   string     `yaml:"branch,omitempty" json:"branch,omitempty"`
@@ -109,6 +117,13 @@ type Participant struct {
 	// workspace may take deliberately; the completion record has to show that it
 	// did, rather than leaving a gap that reads as work in progress.
 	Unverifiable string `yaml:"unverifiable,omitempty" json:"unverifiable,omitempty"`
+}
+
+// LossRecorded reports whether the record explains why its way back is gone.
+// Whitespace is not an explanation, and counting it would let the field silence
+// a finding without saying anything.
+func (p Participant) LossRecorded() bool {
+	return strings.TrimSpace(p.RollbackLost) != ""
 }
 
 // OutputLimit is how many bytes of a failing check's output a record keeps.

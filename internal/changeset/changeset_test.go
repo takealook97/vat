@@ -377,3 +377,33 @@ func TestKnowledgeUpdatesDoNotMutateExistingLinksAndRoundTripTheReason(t *testin
 		t.Fatalf("knowledge lost: %+v", loaded)
 	}
 }
+
+func TestARecordedLossSurvivesASaveAndLoad(t *testing.T) {
+	// Arrange
+	root := t.TempDir()
+	reason := "history rewritten; the object is gone from the remote"
+	set := changeset.Changeset{
+		ID: "CS-0001", Objective: "Move cancellation to v2",
+		Status: changeset.StatusOpen, OpenedAt: "2026-08-25",
+		Repositories: []changeset.Participant{{
+			Name: "payments", RollbackPoint: "aaaaaaaaaaaa", RollbackLost: reason,
+		}},
+	}
+
+	// Act
+	if err := changeset.Save(root, set); err != nil {
+		t.Fatalf("Save: %v", err)
+	}
+	loaded, err := changeset.Load(root, "CS-0001")
+
+	// Assert
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	if got := loaded.Repositories[0].RollbackLost; got != reason {
+		t.Errorf("rollback_lost = %q, want %q", got, reason)
+	}
+	if got := loaded.Repositories[0].RollbackPoint; got != "aaaaaaaaaaaa" {
+		t.Errorf("rollback_point = %q; recording the loss must not erase what was lost", got)
+	}
+}

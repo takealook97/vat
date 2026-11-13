@@ -224,6 +224,7 @@ func RuleNames() []string {
 		"changeset/closed-unlanded",
 		"changeset/closed-unrecorded",
 		"changeset/rollback-point-missing",
+		"changeset/rollback-lost-but-present",
 	}
 }
 
@@ -749,16 +750,30 @@ func checkRollbackPoints(ctx context.Context, ws *workspace.Workspace, set chang
 			// made yet.
 			continue
 		}
-		if gitx.RevisionExists(ctx, dir, participant.RollbackPoint) {
-			continue
+		subject := set.ID + " · " + participant.Name
+		present := gitx.RevisionExists(ctx, dir, participant.RollbackPoint)
+		switch {
+		case present && participant.LossRecorded():
+			// A record that calls a working way back lost is drift in the other
+			// direction: somebody reading it will not try a return that would
+			// have worked. A warning, because the way back itself is intact.
+			findings = append(findings, Finding{
+				Rule: "changeset/rollback-lost-but-present", Severity: SeverityWarn,
+				Subject: subject,
+				Message: fmt.Sprintf("rollback_lost says the way back is gone, but return point %s still resolves",
+					short(participant.RollbackPoint)),
+				Fix: "remove rollback_lost from " + participant.Name + " in " + changeset.Path(set.ID),
+			})
+		case !present && !participant.LossRecorded():
+			findings = append(findings, Finding{
+				Rule: "changeset/rollback-point-missing", Severity: SeverityError,
+				Subject: subject,
+				Message: fmt.Sprintf("return point %s is not in this repository any more, so the recorded way back does not exist",
+					short(participant.RollbackPoint)),
+				Fix: "recover the revision, or set rollback_lost on " + participant.Name + " in " +
+					changeset.Path(set.ID) + " to say why the way back was lost",
+			})
 		}
-		findings = append(findings, Finding{
-			Rule: "changeset/rollback-point-missing", Severity: SeverityError,
-			Subject: set.ID + " · " + participant.Name,
-			Message: fmt.Sprintf("return point %s is not in this repository any more, so the recorded way back does not exist",
-				short(participant.RollbackPoint)),
-			Fix: "recover the revision, or record why the way back was lost",
-		})
 	}
 	return findings
 }

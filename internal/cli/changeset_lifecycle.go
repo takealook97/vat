@@ -69,6 +69,7 @@ func changesetShowCommand() *Command {
 				})
 			}
 			env.Printer.Table([]string{"REPOSITORY", "RETURN TO", "VERIFIED AT", "CHECKS"}, rows)
+			printLostReturnPoints(env, current)
 			problems := changeset.Validate(current, ws.Manifest.Policy.Changeset.RequireRollbackPoint)
 			if len(problems) > 0 {
 				env.Printer.Heading("Problems")
@@ -318,5 +319,24 @@ a consumer still expects an interface that is already gone.`,
 			}
 			return nil
 		},
+	}
+}
+
+// printLostReturnPoints says why a repository's way back is gone. The table
+// still prints the recorded revision, which reads as a return point that works;
+// the reason is the half of the record that says it does not.
+func printLostReturnPoints(env *Env, current changeset.Changeset) {
+	var lost []changeset.Participant
+	for _, participant := range current.Repositories {
+		if participant.LossRecorded() {
+			lost = append(lost, participant)
+		}
+	}
+	if len(lost) == 0 {
+		return
+	}
+	env.Printer.Heading("Lost return points")
+	for _, participant := range lost {
+		env.Printer.Printf("%s: %s\n", participant.Name, strings.TrimSpace(participant.RollbackLost))
 	}
 }

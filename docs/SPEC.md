@@ -729,6 +729,14 @@ the worst thing this record can say.
 `rollback_point` **MUST** be captured when a repository is enrolled, not when
 the change completes: after the change lands it can no longer be observed.
 
+`rollback_lost` is an optional string saying why a participant's
+`rollback_point` no longer resolves — a rewritten history, a pruned object. An
+implementation **MUST NOT** report a missing return point for a participant whose
+`rollback_lost` is non-blank, and **SHOULD** report one that still resolves while
+`rollback_lost` claims it is gone. A value of only whitespace records nothing.
+Recording the loss **MUST NOT** remove `rollback_point`: it is the evidence of
+what was lost. This is an additive extension of the version 1 completion record.
+
 A generated return plan **MUST** be ordered in reverse enrolment order, so no
 window exists in which a consumer expects an interface that is already gone.
 

@@ -229,3 +229,36 @@ func TestCloseRefusesTerminalChangesetsWithoutSaving(t *testing.T) {
 		}
 	}
 }
+
+func TestShowSaysWhyARepositoryHasNoWayBack(t *testing.T) {
+	// Arrange: a loss recorded by hand, which is the only way it is recorded.
+	h := adoptedFixture(t, "payments")
+	h.mustRun("changeset", "new", "Move cancellation", "--repos", "payments")
+	current, err := changeset.Load(h.root, "CS-0001")
+	if err != nil {
+		t.Fatal(err)
+	}
+	participant := current.Repositories[0]
+	participant.RollbackLost = "history rewritten; the object is gone from the remote"
+	if err := changeset.Save(h.root, changeset.WithParticipant(current, participant)); err != nil {
+		t.Fatal(err)
+	}
+
+	// Act
+	output := h.mustRun("changeset", "show", "CS-0001")
+	var shown map[string]any
+	h.runJSON(&shown, "changeset", "show", "CS-0001")
+
+	// Assert
+	if !strings.Contains(output, "payments: history rewritten; the object is gone from the remote") {
+		t.Errorf("the recorded loss is not shown: %s", output)
+	}
+	repositories, _ := shown["repositories"].([]any)
+	if len(repositories) != 1 {
+		t.Fatalf("repositories = %v", shown["repositories"])
+	}
+	first, _ := repositories[0].(map[string]any)
+	if first["rollback_lost"] != participant.RollbackLost {
+		t.Errorf("JSON rollback_lost = %v", first["rollback_lost"])
+	}
+}

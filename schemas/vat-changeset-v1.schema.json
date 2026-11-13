@@ -70,6 +70,10 @@
           "description": "The revision to return to. Recorded before the change, because afterwards nobody can tell which commit was the last good one.",
           "type": "string"
         },
+        "rollback_lost": {
+          "description": "Why rollback_point no longer resolves, when it does not. Free text; a blank value records nothing. rollback_point is kept beside it as the evidence of what was lost.",
+          "type": "string"
+        },
         "revision": { "type": "string" },
         "branch": { "type": "string" },
         "checks": { "type": "array", "items": { "$ref": "#/$defs/check" } },
