@@ -226,3 +226,20 @@ func TestALossClaimedForARevisionThatResolvesIsReported(t *testing.T) {
 		t.Errorf("a resolving revision was reported missing: %+v", report.Findings)
 	}
 }
+
+func TestARecordedLossWithoutAReturnPointIsNotAnInvalidChangeset(t *testing.T) {
+	// Arrange: require_rollback_point defaults to true; the loss is the explanation.
+	ws := fixture(t, repoFixture(t, "payments"))
+	ws.Manifest.Policy.Changeset.RequireRollbackPoint = true
+	saveChangeset(t, ws.Root, lostChangeset("", "object gone"))
+
+	// Act
+	report := run(t, ws)
+
+	// Assert
+	for _, finding := range report.Findings {
+		if finding.Rule == "changeset/invalid" && strings.Contains(finding.Message, "no rollback_point") {
+			t.Errorf("a recorded loss was reported as invalid: %s: %s", finding.Severity, finding.Message)
+		}
+	}
+}

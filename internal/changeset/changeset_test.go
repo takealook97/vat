@@ -469,3 +469,63 @@ func TestRollbackPlanAcceptsALostReturnPointThatWasNeverRecorded(t *testing.T) {
 		t.Errorf("steps = %v, want one line saying the way back is lost", steps)
 	}
 }
+
+func TestValidateAcceptsAParticipantWhoseLossIsRecordedEvenWithoutAReturnPoint(t *testing.T) {
+	// Arrange: the plan accepts this record, so validation must agree with it.
+	current := changeset.WithParticipant(changeset.New("CS-0001", "x", reference),
+		changeset.Participant{Name: "payments", RollbackLost: "object gone"})
+
+	// Act
+	problems := changeset.Validate(current, true)
+
+	// Assert
+	for _, problem := range problems {
+		if strings.Contains(problem, "rollback_point") {
+			t.Errorf("a recorded loss was reported as a missing point: %q", problem)
+		}
+	}
+}
+
+func TestValidateStillRequiresAReturnPointWhenTheLossReasonIsBlank(t *testing.T) {
+	// Arrange
+	current := changeset.WithParticipant(changeset.New("CS-0001", "x", reference),
+		changeset.Participant{Name: "payments", RollbackLost: " \t"})
+
+	// Act
+	problems := changeset.Validate(current, true)
+
+	// Assert
+	if !strings.Contains(strings.Join(problems, "\n"), "payments has no rollback_point") {
+		t.Errorf("a blank reason silenced the missing point: %v", problems)
+	}
+}
+
+func TestRollbackPlanKeepsAMultilineLossReasonOnOneCommentLine(t *testing.T) {
+	// Arrange: pasting the plan into a shell must never run the reason.
+	current := changeset.WithParticipant(changeset.New("CS-0001", "x", reference),
+		changeset.Participant{
+			Name: "payments", RollbackPoint: "aaaaaaaaaaaa",
+			RollbackLost: "rewritten\nprintf a > m\r\nprintf b > m\t\x0b rm -rf x\u2028printf c > m",
+		})
+
+	// Act
+	steps, err := current.RollbackPlan()
+
+	// Assert
+	if err != nil {
+		t.Fatalf("RollbackPlan returned an error: %v", err)
+	}
+	for _, line := range strings.FieldsFunc(strings.Join(steps, "\n"), func(r rune) bool {
+		return r == '\n' || r == '\r' || r == '\u2028' || r == '\u2029' || r == '\x0b' || r == '\x0c'
+	}) {
+		if !strings.HasPrefix(line, "#") {
+			t.Errorf("a line of the plan is not a comment: %q", line)
+		}
+	}
+	if len(steps) != 1 || strings.ContainsAny(steps[0], "\n\r\t") {
+		t.Errorf("steps = %q, want one single-line step", steps)
+	}
+	if !strings.Contains(steps[0], "rewritten printf a > m printf b > m") {
+		t.Errorf("the reason was not collapsed to single spaces: %q", steps[0])
+	}
+}

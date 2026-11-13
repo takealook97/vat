@@ -19,6 +19,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"unicode"
 
 	"gopkg.in/yaml.v3"
 
@@ -448,7 +449,7 @@ func (c Changeset) RollbackPlan() ([]string, error) {
 		// comment so pasting the whole plan into a shell cannot act on it.
 		if participant.LossRecorded() {
 			steps = append(steps, fmt.Sprintf("# %s: the way back is lost, no reset is planned: %s",
-				participant.Name, strings.TrimSpace(participant.RollbackLost)))
+				participant.Name, oneLine(participant.RollbackLost)))
 			continue
 		}
 		if participant.RollbackPoint == "" {
@@ -514,7 +515,10 @@ func Validate(set Changeset, requireRollbackPoint bool) []string {
 			problems = append(problems, fmt.Sprintf("%s is enrolled twice", participant.Name))
 		}
 		seen[participant.Name] = true
-		if requireRollbackPoint && participant.RollbackPoint == "" {
+		// A recorded loss is the explanation for a missing point, and the plan
+		// already accepts it; validation that disagreed would leave lint and
+		// show red over a record the tool itself treats as complete.
+		if requireRollbackPoint && participant.RollbackPoint == "" && !participant.LossRecorded() {
 			problems = append(problems,
 				fmt.Sprintf("%s has no rollback_point; it cannot be undone", participant.Name))
 		}
@@ -552,4 +556,18 @@ func WithKnowledge(set Changeset, knowledge []string, reason string) Changeset {
 		out.NoRecordReason = reason
 	}
 	return out
+}
+
+// oneLine folds a free-text reason onto a single line. The reason is printed
+// after a comment marker, and a comment ends at the first line break, so any
+// newline, carriage return, or other control character left in it would start
+// a line a shell would run when the plan is pasted.
+func oneLine(text string) string {
+	spaced := strings.Map(func(r rune) rune {
+		if unicode.IsControl(r) {
+			return ' '
+		}
+		return r
+	}, text)
+	return strings.Join(strings.Fields(spaced), " ")
 }

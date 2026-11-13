@@ -291,3 +291,58 @@ func TestAChangesetUndoPlanSaysWhichWayBackIsLostInsteadOfPlanningAReset(t *test
 		t.Errorf("the lost repository and its reason are not in the plan:\n%s", plan)
 	}
 }
+
+func TestAChangesetUndoPlanKeepsAMultilineReasonOnOneCommentLine(t *testing.T) {
+	// Arrange
+	h := adoptedFixture(t, "payments", "console")
+	h.mustRun("changeset", "new", "Move cancellation", "--repos", "payments,console")
+	current, err := changeset.Load(h.root, "CS-0001")
+	if err != nil {
+		t.Fatal(err)
+	}
+	lost := current.Repositories[0]
+	lost.RollbackLost = "history rewritten\nprintf injected > marker\r\nprintf b > marker\tend"
+	if err := changeset.Save(h.root, changeset.WithParticipant(current, lost)); err != nil {
+		t.Fatal(err)
+	}
+
+	// Act
+	plan := h.mustRun("changeset", "undo-plan", "CS-0001")
+
+	// Assert
+	for _, line := range strings.Split(plan, "\n") {
+		if strings.Contains(line, "payments") && !strings.HasPrefix(line, "#") {
+			t.Errorf("a line about the lost repository is not a comment: %q", line)
+		}
+		if strings.Contains(line, "printf") && !strings.HasPrefix(line, "#") {
+			t.Errorf("the reason escaped the comment: %q", line)
+		}
+	}
+	if !strings.Contains(plan, "history rewritten printf injected > marker printf b > marker end") {
+		t.Errorf("the reason was not collapsed onto one line:\n%s", plan)
+	}
+}
+
+func TestShowDoesNotCallARecordedLossWithoutAReturnPointAProblem(t *testing.T) {
+	// Arrange
+	h := adoptedFixture(t, "payments")
+	h.mustRun("changeset", "new", "Move cancellation", "--repos", "payments")
+	current, err := changeset.Load(h.root, "CS-0001")
+	if err != nil {
+		t.Fatal(err)
+	}
+	participant := current.Repositories[0]
+	participant.RollbackPoint = ""
+	participant.RollbackLost = "object gone"
+	if err := changeset.Save(h.root, changeset.WithParticipant(current, participant)); err != nil {
+		t.Fatal(err)
+	}
+
+	// Act
+	output := h.mustRun("changeset", "show", "CS-0001")
+
+	// Assert
+	if strings.Contains(output, "no rollback_point") {
+		t.Errorf("show reported a recorded loss as a missing point:\n%s", output)
+	}
+}
