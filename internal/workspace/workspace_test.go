@@ -1,12 +1,9 @@
 package workspace_test
 
 import (
-	"errors"
 	"fmt"
-	"io/fs"
 	"os"
 	"path/filepath"
-	"runtime"
 	"strings"
 	"sync"
 	"testing"
@@ -197,9 +194,11 @@ func TestALockLeftBySomethingThatDiedIsNotPermanent(t *testing.T) {
 	if err != nil {
 		t.Fatalf("a lock left behind an hour ago blocked a save: %v", err)
 	}
-	if _, err := os.Stat(lock); err == nil {
-		t.Error("the lock was not released")
+	release, err := workspace.LockManifest(root)
+	if err != nil {
+		t.Fatalf("the lock was not released: %v", err)
 	}
+	release()
 }
 
 // A lock somebody is actually holding is still waited on and then reported.
@@ -213,13 +212,11 @@ func TestALockSomebodyIsHoldingIsWaitedOnAndThenReported(t *testing.T) {
 	if err != nil {
 		t.Fatalf("OpenAt: %v", err)
 	}
-	lock := filepath.Join(root, ".vat", "manifest.lock")
-	if err := os.MkdirAll(filepath.Dir(lock), 0o755); err != nil {
-		t.Fatalf("mkdir: %v", err)
+	release, err := workspace.LockManifest(root)
+	if err != nil {
+		t.Fatalf("hold the lock: %v", err)
 	}
-	if err := os.WriteFile(lock, nil, 0o644); err != nil {
-		t.Fatalf("write lock: %v", err)
-	}
+	defer release()
 
 	// Act
 	err = ws.SaveManifest(ws.Manifest)
@@ -230,85 +227,5 @@ func TestALockSomebodyIsHoldingIsWaitedOnAndThenReported(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), "another vat command") {
 		t.Errorf("the refusal does not say what is in the way: %v", err)
-	}
-}
-
-// Windows reports a name in "delete pending" state — the instant between one
-// holder releasing the lock and the next acquiring it — as a permission error
-// rather than as "already exists". Treating only fs.ErrExist as contention
-// turned an ordinary race between two vat commands into "Access is denied",
-// which names nothing a person can act on and stopped the write entirely.
-//
-// Deciding on the lock file's presence was the first attempt and was not
-// enough: a name in delete-pending state answers "access denied" to stat as
-// readily as to open, and it stops existing the moment the holder's Remove
-// lands — so pure contention can present as "the lock is not there". The rule
-// is now whether the directory takes a write at all, which is the same question
-// on every platform rather than a branch nobody can test from the other one.
-func TestContentionIsDecidedByTheLockBeingThereNotByTheErrno(t *testing.T) {
-	// Arrange
-	dir := t.TempDir()
-	present := filepath.Join(dir, "held.lock")
-	if err := os.WriteFile(present, nil, 0o644); err != nil {
-		t.Fatal(err)
-	}
-	absent := filepath.Join(dir, "gone.lock")
-
-	cases := []struct {
-		name string
-		err  error
-		path string
-		want bool
-	}{
-		{"exists, which is what POSIX reports", fs.ErrExist, present, true},
-		{"permission denied while the lock is there", fs.ErrPermission, present, true},
-		// The holder released the lock between the failed open and this
-		// question. Nothing is wrong; the next attempt takes it.
-		{"permission denied, no lock, and the directory takes writes", fs.ErrPermission, absent, true},
-		{"any other failure", errors.New("disk on fire"), present, false},
-	}
-
-	for _, tc := range cases {
-		t.Run(tc.name, func(t *testing.T) {
-			// Act
-			got := workspace.IsLockContention(tc.err, tc.path)
-
-			// Assert
-			if got != tc.want {
-				t.Errorf("IsLockContention(%v) = %v, want %v", tc.err, got, tc.want)
-			}
-		})
-	}
-}
-
-func TestAPermissionProblemStaysAPermissionProblem(t *testing.T) {
-	// Arrange: a directory that cannot be written at all is not a lock somebody
-	// else holds, and reporting it as one would send the reader looking for a
-	// command that is not running.
-	if runtime.GOOS == "windows" {
-		// A directory mode does not deny a write there, so the arrangement this
-		// test needs cannot be built. The case it guards is POSIX-shaped
-		// anyway: Windows reaches this path through delete-pending, which the
-		// test above covers on every platform.
-		t.Skip("directory modes do not deny writes on Windows")
-	}
-	if os.Getuid() == 0 {
-		t.Skip("root writes to a directory regardless of its mode")
-	}
-	dir := t.TempDir()
-	sealed := filepath.Join(dir, "sealed")
-	if err := os.Mkdir(sealed, 0o500); err != nil {
-		t.Fatalf("mkdir: %v", err)
-	}
-	t.Cleanup(func() { _ = os.Chmod(sealed, 0o700) })
-	path := filepath.Join(sealed, "manifest.lock")
-
-	// Act
-	contention := workspace.IsLockContention(
-		&fs.PathError{Op: "open", Path: path, Err: fs.ErrPermission}, path)
-
-	// Assert
-	if contention {
-		t.Error("an unwritable directory was reported as a lock somebody else holds")
 	}
 }
