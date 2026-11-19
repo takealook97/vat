@@ -6,6 +6,18 @@ Notable changes to `vat`. The format follows
 
 ## [Unreleased]
 
+## [0.8.2] - 2026-11-19
+
+### Fixed
+
+- The manifest lock is an operating-system file lock (`flock` on Unix,
+  `LockFileEx` on Windows) instead of a file whose age decided whether its holder
+  was dead. Two commands could both take a lock they judged abandoned when its
+  holder was only suspended, because file systems offer no compare-and-delete to
+  make removing it safe. The kernel releases the lock when the holder exits, so
+  a killed command never blocks the workspace and nothing guesses. The lock file
+  is now left in place after a command finishes.
+
 ## [0.8.1] - 2026-11-13
 
 ### Added
